@@ -1,0 +1,54 @@
+# ============================================
+# Python & Virtual Environments
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+.env
+
+# ============================================
+# Jupyter Notebook Cache & Checkpoints
+# ============================================
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# ============================================
+# Model Weights & Heavy Datasets
+# ============================================
+*.pt
+*.onnx
+*.engine
+*.bin
+*.pkl
+backend/models/*.pt
+backend/dataset/*.zip
+backend/dataset/raw_images/
+
+# ============================================
+# Node.js & Frontend
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+frontend/dist/
+frontend/.cache/
+
+# ============================================
+# IDE & System Files
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
