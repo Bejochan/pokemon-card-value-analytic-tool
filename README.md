@@ -147,11 +147,4 @@ pokemon-card-value-analytic-tool/
 * **Metadatas & Histori Harga:** [pokemontcg.io API](https://pokemontcg.io/) (15.000+ data kartu & snapshot harga harian TCGPlayer & Cardmarket).
 * **Model Deteksi Kondisi Fisik:** [Roboflow Universe — Card Grader Dataset](https://universe.roboflow.com/group-6-major-project/card-grader).
 
----
 
-## 📝 Lisensi & Penulis
-
-Proyek ini dikembangkan untuk penilaian Mata Kuliah **Proyek Sistem Cerdas** dan **Proyek Analitika Data**.
-
-* **Author:** [Bejochan](https://github.com/Bejochan)
-* **License:** MIT License
