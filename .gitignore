@@ -28,6 +28,8 @@ venv.bak/
 *.engine
 *.bin
 *.pkl
+*.tmp
+pokemon-cards/
 backend/models/*.pt
 backend/dataset/*.zip
 backend/dataset/raw_images/
