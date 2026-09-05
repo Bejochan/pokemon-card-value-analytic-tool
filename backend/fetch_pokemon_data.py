@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 =============================================================================
-Pokemon Card Value Analytic Tool — Efficient Data Ingestion Engine
+Pokemon Card Value Analytic Tool — Ultra-Efficient Page-Based Ingestion Engine
 =============================================================================
-Skrip otomatisasi penarikan seluruh data kartu Pokemon (18.000+ kartu, 160+ set)
-dari pokemontcg.io API dengan efisiensi maksimal:
-  - Page size 250 (meminimalkan HTTP round-trip ke ~70 request)
-  - Automatic Retry & Exponential Backoff (bebas crash dari 502 Bad Gateway)
+Skrip otomatisasi penarikan SELURUH data kartu Pokemon (20.479+ kartu)
+dari pokemontcg.io API secara langsung via paginated endpoint:
+  - Page size 250 (hanya butuh ~82 request HTTP untuk seluruh 20.479 kartu di dunia)
+  - Automatic Retry & Exponential Backoff (kebal crash 502 Bad Gateway / Cloudflare)
   - Resumable Checkpoint (bisa dilanjutkan jika terputus di tengah jalan)
   - Multi-threaded Image Downloader (opsional)
 =============================================================================
@@ -47,21 +47,6 @@ def fetch_with_retry(url, headers=None, params=None, max_retries=5, backoff_fact
             tqdm.write(f"⚠️ [Network Error] {e}. Retry {attempt}/{max_retries} dalam {wait_time:.1f}s...")
             time.sleep(wait_time)
     return None
-
-
-def fetch_all_sets(headers=None):
-    """
-    Mengambil daftar seluruh set kartu Pokemon yang tersedia di API.
-    """
-    tqdm.write("🔍 Mengambil daftar seluruh set kartu dari API...")
-    data = fetch_with_retry(f"{BASE_URL}/sets", headers=headers, params={"pageSize": 250})
-    if not data or "data" not in data:
-        tqdm.write("❌ Gagal mendapatkan daftar set.")
-        return []
-    
-    sets = data["data"]
-    tqdm.write(f"✅ Ditemukan total {len(sets)} set kartu.")
-    return sets
 
 
 def extract_relevant_fields(card):
@@ -122,7 +107,7 @@ def extract_relevant_fields(card):
 
 def load_existing_dataset(output_file):
     """
-    Membaca dataset lokal jika ada untuk fitur Resumable Download (Skip set/kartu yang sudah ditarik).
+    Membaca dataset lokal jika ada untuk fitur Resumable Download.
     """
     if os.path.exists(output_file):
         try:
@@ -149,70 +134,58 @@ def save_dataset(data, output_file):
 def run_pipeline(api_key=None, output_file=DEFAULT_OUTPUT, download_images=False, max_workers=8):
     headers = {"X-Api-Key": api_key} if api_key else {}
 
-    # 1. Load data yang sudah ada untuk resume
+    # 1. Load data lokal untuk resume
     existing_cards = load_existing_dataset(output_file)
-    existing_ids = {c["card_id"] for c in existing_cards if "card_id" in c}
-    tqdm.write(f"ℹ️ Dataset lokal memuat {len(existing_cards)} kartu terdaftar.")
+    cards_map = {c["card_id"]: c for c in existing_cards if "card_id" in c}
+    tqdm.write(f"ℹ️ Dataset lokal memuat {len(cards_map)} kartu terdaftar.")
 
-    # 2. Ambil seluruh set
-    all_sets = fetch_all_sets(headers=headers)
-    if not all_sets:
-        tqdm.write("❌ Proses dibatalkan karena gagal mengambil set.")
+    # 2. Cek totalCount kartu langsung dari API
+    tqdm.write("🔍 Mengambil total jumlah kartu dari API pokemontcg.io...")
+    init_res = fetch_with_retry(f"{BASE_URL}/cards", headers=headers, params={"pageSize": 1})
+    if not init_res or "totalCount" not in init_res:
+        tqdm.write("❌ Gagal terhubung ke API pokemontcg.io.")
         return
 
-    # 3. Penarikan kartu per set dengan efisiensi maksimal
-    extracted_cards = list(existing_cards)
-    cards_map = {c["card_id"]: c for c in extracted_cards}
+    total_cards_count = init_res["totalCount"]
+    page_size = 250
+    total_pages = (total_cards_count + page_size - 1) // page_size
 
-    total_new_added = 0
-    tqdm.write(f"\n🚀 Memulai penarikan kartu dari {len(all_sets)} set...")
+    tqdm.write(f"✅ Total kartu di database API: {total_cards_count} kartu.")
+    tqdm.write(f"🚀 Memproses {total_pages} halaman (setiap halaman {page_size} kartu)...")
 
-    for set_obj in tqdm(all_sets, desc="Memproses Set"):
-        set_id = set_obj["id"]
-        set_name = set_obj["name"]
-        printed_total = set_obj.get("printedTotal", 0)
+    # 3. Penarikan Paginated Page 1 s/d N
+    for page in tqdm(range(1, total_pages + 1), desc="Memproses Halaman"):
+        params = {
+            "page": page,
+            "pageSize": page_size
+        }
+        res = fetch_with_retry(f"{BASE_URL}/cards", headers=headers, params=params)
+        if not res or "data" not in res:
+            tqdm.write(f"⚠️ Gagal menarik halaman {page}, melewati...")
+            continue
 
-        # Cek apakah kartu dari set ini sudah lengkap ter-cache di lokal
-        page = 1
-        set_new_count = 0
+        cards = res.get("data", [])
+        new_in_page = 0
+        for card in cards:
+            card_id = card.get("id")
+            if card_id and card_id not in cards_map:
+                extracted = extract_relevant_fields(card)
+                cards_map[card_id] = extracted
+                new_in_page += 1
 
-        while True:
-            params = {
-                "q": f"set.id:{set_id}",
-                "page": page,
-                "pageSize": 250  # Ukuran maksimal per request
-            }
-            res = fetch_with_retry(f"{BASE_URL}/cards", headers=headers, params=params)
-            if not res or "data" not in res:
-                break
-
-            cards = res.get("data", [])
-            if not cards:
-                break
-
-            for card in cards:
-                card_id = card.get("id")
-                if card_id not in cards_map:
-                    extracted = extract_relevant_fields(card)
-                    cards_map[card_id] = extracted
-                    existing_ids.add(card_id)
-                    set_new_count += 1
-
-            page += 1
-            time.sleep(0.15)  # Jeda ramah API
-
-        if set_new_count > 0:
-            total_new_added += set_new_count
-            # Auto-save / checkpoint per set
+        # Auto-save per halaman jika ada kartu baru
+        if new_in_page > 0:
             save_dataset(list(cards_map.values()), output_file)
+
+        time.sleep(0.15)  # Jeda ramah API
 
     final_dataset = list(cards_map.values())
     save_dataset(final_dataset, output_file)
-    tqdm.write(f"\n✨ Penarikan Selesai! Total {len(final_dataset)} kartu tersimpan di: {output_file}")
+    tqdm.write(f"\n✨ Penarikan Selesai! Total {len(final_dataset)} / {total_cards_count} kartu tersimpan di: {output_file}")
 
     # 4. Opsional: Download Gambar Kartu secara Multi-Threaded
     if download_images:
-        download_images_parallel(final_dataset, max_workers=max_workers)
+        download_images_parallel(final_dataset, save_dir="pokemon-cards", max_workers=max_workers)
 
 
 def download_single_image(card, save_dir):
@@ -247,7 +220,7 @@ def download_images_parallel(cards, save_dir="pokemon-cards", max_workers=8):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Pokemon Card Data Ingestion Engine")
+    parser = argparse.ArgumentParser(description="Pokemon Card Page-Based Data Ingestion Engine")
     parser.add_argument("--api-key", type=str, default="", help="API Key dari pokemontcg.io")
     parser.add_argument("--output", type=str, default=DEFAULT_OUTPUT, help="Path berkas output JSON")
     parser.add_argument("--download-images", action="store_true", help="Download seluruh gambar kartu secara paralel")
