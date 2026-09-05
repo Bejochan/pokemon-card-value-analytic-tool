@@ -1,4 +1,4 @@
-# PokeScan — Dokumentasi Proyek
+# PokeScan — Dokumentasi Proyek Anjay
 
 **Dashboard analitik dan tools cek grade PSA untuk kolektor Pokemon card**
 
