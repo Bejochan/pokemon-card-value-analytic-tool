@@ -34,9 +34,7 @@ venv.bak/
 pokemon-cards/
 backend/models/*.pt
 backend/dataset/*.zip
-backend/dataset/train/
-backend/dataset/valid/
-backend/dataset/test/
+backend/dataset/card-condition-dataset/
 
 # ============================================
 # Node.js & Frontend
