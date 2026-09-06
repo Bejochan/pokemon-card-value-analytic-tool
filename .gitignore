@@ -35,6 +35,7 @@ pokemon-cards/
 backend/models/*.pt
 backend/dataset/*.zip
 backend/dataset/raw_images/
+backend/dataset/pokemon-cards-dataset/
 
 # ============================================
 # Node.js & Frontend
