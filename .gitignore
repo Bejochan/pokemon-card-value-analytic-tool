@@ -36,6 +36,7 @@ backend/models/*.pt
 backend/dataset/*.zip
 backend/dataset/raw_images/
 backend/dataset/pokemon-cards-dataset/
+backend/dataset/card-condition-dataset/
 
 # ============================================
 # Node.js & Frontend
