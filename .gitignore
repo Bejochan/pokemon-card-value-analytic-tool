@@ -34,6 +34,7 @@ venv.bak/
 pokemon-cards/
 backend/models/*.pt
 backend/dataset/*.zip
+backend/dataset/raw_images/
 backend/dataset/card-condition-dataset/
 
 # ============================================
