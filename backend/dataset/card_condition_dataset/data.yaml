@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 4
+names: ['Card', 'Corner Wear', 'Edge Wear', 'Scratch']
+
+roboflow:
+  workspace: group-6-major-project
+  project: card-grader
+  version: 4
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/group-6-major-project/card-grader/dataset/4
