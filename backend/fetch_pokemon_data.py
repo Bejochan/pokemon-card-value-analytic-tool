@@ -21,8 +21,17 @@ import requests
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
+# Load API Key dari file .env secara otomatis
+try:
+    from dotenv import load_dotenv
+    _env_path = os.path.join(os.path.dirname(__file__), ".env")
+    load_dotenv(_env_path)
+except ImportError:
+    pass  # python-dotenv tidak terinstall, tidak apa-apa
+
 BASE_URL = "https://api.pokemontcg.io/v2"
 DEFAULT_OUTPUT = os.path.join(os.path.dirname(__file__), "dataset", "pokemon_cards_dataset.json")
+DEFAULT_API_KEY = os.getenv("POKEMONTCG_API_KEY", "")
 
 
 def fetch_with_retry(url, headers=None, params=None, max_retries=5, backoff_factor=1.5):
@@ -221,7 +230,7 @@ def download_images_parallel(cards, save_dir="pokemon-cards", max_workers=8):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pokemon Card Page-Based Data Ingestion Engine")
-    parser.add_argument("--api-key", type=str, default="", help="API Key dari pokemontcg.io")
+    parser.add_argument("--api-key", type=str, default=DEFAULT_API_KEY, help="API Key dari pokemontcg.io (default: dibaca dari backend/.env)")
     parser.add_argument("--output", type=str, default=DEFAULT_OUTPUT, help="Path berkas output JSON")
     parser.add_argument("--download-images", action="store_true", help="Download seluruh gambar kartu secara paralel")
     parser.add_argument("--workers", type=int, default=8, help="Jumlah thread paralel download gambar")
