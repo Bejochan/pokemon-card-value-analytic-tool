@@ -1,4 +1,5 @@
 import os
+import base64
 import requests
 from dotenv import load_dotenv
 
@@ -18,9 +19,9 @@ def detect_card_defects(image_path):
     Tidak memerlukan inference-sdk sehingga aman dari bentrok dependensi.
     """
     try:
-        # Membaca file gambar menjadi bentuk binary
+        # Roboflow expects the image payload as a base64-encoded string.
         with open(image_path, "rb") as image_file:
-            image_data = image_file.read()
+            image_data = base64.b64encode(image_file.read()).decode("utf-8")
 
         # URL Endpoint API Roboflow
         # Ganti "card-grader/4" jika kamu menggunakan versi model yang lain
@@ -30,8 +31,10 @@ def detect_card_defects(image_path):
         response = requests.post(
             api_url,
             data=image_data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=60,
         )
+        response.raise_for_status()
 
         # Mengembalikan hasil berupa JSON (dictionary)
         return response.json()
