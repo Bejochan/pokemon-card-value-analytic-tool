@@ -150,6 +150,7 @@ pokemon-card-value-analytic-tool/
 │   └── package.json                      # Dependensi Node.js frontend
 │
 ├── docs/                                 # Dokumentasi proyek & konsep pendukung
+│   └── dataset_dictionary.md             # Kamus data & skema 22 variabel dataset
 ├── .gitignore                            # Filter venv, node_modules, cache, & secret .env
 └── README.md                             # Dokumentasi Utama Repositori GitHub
 ```
