@@ -85,8 +85,15 @@ print("3. Menyinkronkan dataset bersih (link aktif & gambar fisik ada)...")
 
 valid_card_ids = set()
 if os.path.exists(compressed_img_dir):
-    # Mengambil ID dari gambar yang berhasil dikompres ke JPG
-    valid_card_ids = {os.path.splitext(f)[0] for f in os.listdir(compressed_img_dir) if f.endswith('.jpg')}
+    for f in os.listdir(compressed_img_dir):
+        if f.endswith('.jpg'):
+            fname = os.path.splitext(f)[0]
+            if fname == 'question_hires':
+                # Karakter '?' dilarang di Windows filesystem, sehingga kartu 'ex10-?' (Unown ?)
+                # disimpan sebagai 'question_hires.jpg'. Kita petakan kembali secara eksplisit.
+                valid_card_ids.add('ex10-?')
+            else:
+                valid_card_ids.add(fname)
     print(f"   Ditemukan {len(valid_card_ids)} gambar valid di folder compressed_images.")
 
 if valid_card_ids:
