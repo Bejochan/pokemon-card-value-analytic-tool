@@ -123,9 +123,9 @@ def build_index(batch_size=128, num_workers=2):
         
     elapsed = time.time() - start_time
     print(f"\n============================================================")
-    print(f"✨ PROSES INDEXING SELESAI DALAM {elapsed:.2f} DETIK!")
-    print(f"• FAISS Index Saved  : {INDEX_OUTPUT_PATH} ({os.path.getsize(INDEX_OUTPUT_PATH)/(1024*1024):.2f} MB)")
-    print(f"• ID Map Saved       : {MAP_OUTPUT_PATH}")
+    print(f"SUCCESS: PROSES INDEXING SELESAI DALAM {elapsed:.2f} DETIK!")
+    print(f"* FAISS Index Saved  : {INDEX_OUTPUT_PATH} ({os.path.getsize(INDEX_OUTPUT_PATH)/(1024*1024):.2f} MB)")
+    print(f"* ID Map Saved       : {MAP_OUTPUT_PATH}")
     print(f"============================================================")
 
 
