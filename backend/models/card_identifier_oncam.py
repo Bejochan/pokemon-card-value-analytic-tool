@@ -84,9 +84,10 @@ def main():
 
             if result['status'] == 'success' and result['candidates']:
                 top_match = result['candidates'][0]
+                print(f"🎴 ID Card        : {top_match.get('card_id', 'Unknown')}")
                 print(f"🎯 Hasil Scan     : {top_match.get('name', 'Unknown')} ({top_match.get('set_name', 'Unknown')})")
                 print(f"📊 Confidence     : {top_match['confidence_percentage']}%")
-                print(f"⏱️  Waktu Inferensi: {result['execution_time_ms']} ms")
+                print(f"⏱️ Waktu Inferensi: {result['execution_time_ms']} ms")
             else:
                 print("❌ Kartu tidak dikenali.")
 
