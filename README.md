@@ -1,4 +1,4 @@
-# Pokemon Card Value Analytic Tool (PokeScan) 🎴📊
+# Pokemon Card Value Analytic Tool (REGOKEMON) 🎴📊
 
 > **Dashboard Analitika Data, Dual-Model Computer Vision & Estimasi Harga Wajar Kartu Pokémon untuk Marketplace**
 
@@ -14,7 +14,7 @@
 
 ## 📌 Ringkasan Proyek
 
-**Pokemon Card Value Analytic Tool (PokeScan)** adalah sistem analitika data dan intelijen buatan berbasis **Dual-Model Computer Vision** yang dirancang untuk membantu penjual maupun pembeli kartu Pokémon pada **marketplace umum** (seperti Tokopedia, Shopee, eBay, atau forum jual-beli lokal). 
+**Pokemon Card Value Analytic Tool (REGOKEMON)** adalah sistem analitika data dan intelijen buatan berbasis **Dual-Model Computer Vision** yang dirancang untuk membantu penjual maupun pembeli kartu Pokémon pada **marketplace umum** (seperti Tokopedia, Shopee, eBay, atau forum jual-beli lokal). 
 
 Sistem ini menyelesaikan 3 permasalahan utama dalam transaksi kartu koleksi TCG:
 1. **Identifikasi Kartu Otomatis:** Mengenali jenis kartu secara instan (< 5 ms) dari foto kamera HP dari total **19.926 jenis kartu**.
