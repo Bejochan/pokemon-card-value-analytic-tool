@@ -78,7 +78,7 @@ class CardIdentifier:
         ])
 
     # ------------------------------------------------------------------
-    # ALIGNMENT — deteksi & luruskan kartu
+    # ALIGNMENT — deteksi & luruskan kartu (v2: berlapis & ada fallback)
     # ------------------------------------------------------------------
     @staticmethod
     def _order_points(pts):
@@ -273,7 +273,7 @@ class CardIdentifier:
     # ------------------------------------------------------------------
     # MAIN ENTRY POINT
     # ------------------------------------------------------------------
-    def identify_card(self, image_input, top_k=3):
+    def identify_card(self, image_input, top_k=3, debug=False):
         t0 = time.time()
 
         if isinstance(image_input, str):
@@ -299,7 +299,6 @@ class CardIdentifier:
         sims_pool = distances[0]
         probs, margin = self._compute_calibrated_confidence(sims_pool)
 
-        # Susun kandidat mentah (sebanyak rerank_pool) sebelum diurutkan ulang
         raw_candidates = []
         n_avail = min(rerank_pool, len(indices[0]))
         for rank in range(n_avail):
@@ -366,12 +365,18 @@ class CardIdentifier:
         elapsed_ms = round((time.time() - t0) * 1000, 2)
         top_match = candidates[0] if candidates else None
 
-        return {
+        result = {
             "status": "success",
             "execution_time_ms": elapsed_ms,
             "top_match": top_match,
             "candidates": candidates
         }
+
+        if debug:
+            result["debug_similarity_pool"] = [round(float(s), 4) for s in sims_pool]
+            result["debug_temperature"] = self.confidence_temperature
+
+        return result
 
 
 # Quick test interface

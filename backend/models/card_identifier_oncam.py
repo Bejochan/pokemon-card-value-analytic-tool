@@ -8,6 +8,10 @@ from card_identifier import CardIdentifier
 SHARPNESS_THRESHOLD = 80.0
 BURST_FRAMES = 5
 
+USE_TTA = False
+DEBUG_MODE = True
+DEBUG_TOP_K = 5
+
 LABEL_COLOR = {
     "Tinggi": (0, 200, 0),      # hijau (BGR)
     "Sedang": (0, 200, 255),    # kuning
@@ -19,8 +23,8 @@ def sharpness_score(gray_frame):
     """Variance of Laplacian -- makin tinggi, makin tajam (tidak blur)."""
     return cv2.Laplacian(gray_frame, cv2.CV_64F).var()
 
-
 def capture_best_of_burst(cap, x1, y1, x2, y2, n_frames=BURST_FRAMES):
+    """Ambil beberapa frame berturut-turut, kembalikan crop yang paling tajam."""
     best_crop = None
     best_score = -1.0
     for _ in range(n_frames):
@@ -39,9 +43,8 @@ def capture_best_of_burst(cap, x1, y1, x2, y2, n_frames=BURST_FRAMES):
 def main():
     print("Memuat AI Engine dan Index (Mohon tunggu sebentar)...")
     try:
-        # use_tta=True aman dipakai di sini karena scan hanya dipicu saat user
-        # menekan tombol (bukan tiap frame), jadi tambahan latency tidak terasa.
-        identifier = CardIdentifier(use_tta=True)
+        identifier = CardIdentifier(use_tta=USE_TTA)
+        print(f"[debug] use_tta={USE_TTA}  confidence_temperature={identifier.confidence_temperature}")
     except Exception as e:
         print(f"Gagal memuat engine: {e}")
         return
@@ -119,7 +122,7 @@ def main():
                 continue
 
             print(f"Memindai kartu (ketajaman terbaik: {best_score:.0f})... 🔍")
-            result = identifier.identify_card(best_crop, top_k=1)
+            result = identifier.identify_card(best_crop, top_k=DEBUG_TOP_K, debug=DEBUG_MODE)
 
             if result['status'] == 'success' and result['candidates']:
                 top_match = result['candidates'][0]
@@ -127,6 +130,16 @@ def main():
                 print(f"Hasil Scan      : {top_match.get('name', 'Unknown')} ({top_match.get('set_name', 'Unknown')})")
                 print(f"Confidence      : {top_match['confidence_percentage']}% ({label})")
                 print(f"Waktu Inferensi : {result['execution_time_ms']} ms")
+
+                if DEBUG_MODE:
+                    print(f"[debug] raw_similarity_score (top-1)  : {top_match.get('raw_similarity_score')}")
+                    print(f"[debug] margin_to_runner_up            : {top_match.get('margin_to_runner_up')}")
+                    print(f"[debug] temperature dipakai            : {result.get('debug_temperature')}")
+                    print(f"[debug] {DEBUG_TOP_K} kandidat teratas (nama - raw_sim - confidence):")
+                    for c in result['candidates']:
+                        print(f"         #{c['rank']} {c.get('name','?'):20s} raw={c['raw_similarity_score']:.4f}  conf={c['confidence_percentage']}%")
+                    pool = result.get('debug_similarity_pool', [])
+                    print(f"[debug] seluruh pool similarity (top-{len(pool)}): {pool}")
 
                 last_result_text = f"{top_match.get('name', 'Unknown')} - {top_match['confidence_percentage']}% ({label})"
                 last_result_color = LABEL_COLOR.get(label, (255, 255, 255))
