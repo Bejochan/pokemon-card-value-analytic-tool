@@ -24,10 +24,9 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Rasio standar kartu Pokemon (lebar:tinggi = 63mm:88mm)
 CARD_ASPECT_RATIO = 63.0 / 88.0
 
-
 class CardIdentifier:
     def __init__(self, index_path=INDEX_PATH, map_path=MAP_PATH, csv_path=CSV_PATH,
-                 image_dir=IMAGE_DIR, confidence_temperature=0.06,
+                 image_dir=IMAGE_DIR, confidence_temperature=0.03,
                  calibration_pool_size=20, use_tta=False, use_orb_rerank=False):
         self.index_path = index_path
         self.map_path = map_path
@@ -104,86 +103,85 @@ class CardIdentifier:
                (abs(ratio - (1.0 / CARD_ASPECT_RATIO)) / (1.0 / CARD_ASPECT_RATIO) < tol)
 
     def _align_card_image_debug(self, image_np, out_size=(448, 625)):
-        status = "NO_CONTOUR"
-        try:
-            h_img, w_img = image_np.shape[:2]
-            frame_area = h_img * w_img
-            min_area = 0.05 * frame_area
-            max_area = 0.92 * frame_area
-            border_margin = 2
+        h_img, w_img = image_np.shape[:2]
+        frame_area = h_img * w_img
+        min_area = 0.05 * frame_area
+        max_area = 0.92 * frame_area
+        border_margin = 2
+        max_sides_touch = 1     # tolak hanya kalau nempel di >=2 sisi frame
+        solidity_thresh = 0.80  # diturunkan dari 0.85 -- tepi kartu low-contrast sering agak pecah
 
+        try:
             gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
             smooth = cv2.bilateralFilter(gray, d=9, sigmaColor=60, sigmaSpace=60)
-
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             gray_eq = clahe.apply(smooth)
+            edges_base = cv2.Canny(gray_eq, 40, 120)
 
-            edges = cv2.Canny(gray_eq, 40, 120)
-            kernel = np.ones((5, 5), np.uint8)
-            edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
-
-            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if not contours:
-                return image_np, status
-
-            candidates = []
-            for c in contours:
-                area = cv2.contourArea(c)
-                if area < min_area or area > max_area:
+            for ksize, iters in [(5, 2), (7, 2), (9, 3), (11, 3), (13, 4)]:
+                kernel = np.ones((ksize, ksize), np.uint8)
+                edges = cv2.morphologyEx(edges_base, cv2.MORPH_CLOSE, kernel, iterations=iters)
+                contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if not contours:
                     continue
 
-                x, y, w, h = cv2.boundingRect(c)
-                touches_border = (
-                    x <= border_margin or y <= border_margin or
-                    x + w >= w_img - border_margin or y + h >= h_img - border_margin
-                )
-                if touches_border:
+                candidates = []
+                for c in contours:
+                    area = cv2.contourArea(c)
+                    if area < min_area or area > max_area:
+                        continue
+
+                    x, y, w, h = cv2.boundingRect(c)
+                    sides_touched = sum([
+                        x <= border_margin, y <= border_margin,
+                        x + w >= w_img - border_margin, y + h >= h_img - border_margin
+                    ])
+                    if sides_touched > max_sides_touch:
+                        continue
+
+                    hull = cv2.convexHull(c)
+                    hull_area = cv2.contourArea(hull)
+                    solidity = area / hull_area if hull_area > 0 else 0
+                    if solidity < solidity_thresh:
+                        continue
+
+                    candidates.append((area, c))
+
+                if not candidates:
                     continue
+                candidates.sort(key=lambda t: t[0], reverse=True)
 
-                hull = cv2.convexHull(c)
-                hull_area = cv2.contourArea(hull)
-                solidity = area / hull_area if hull_area > 0 else 0
-                if solidity < 0.85:
-                    continue
+                for area, c in candidates[:5]:
+                    peri = cv2.arcLength(c, True)
+                    approx = cv2.approxPolyDP(c, 0.02 * peri, True)
 
-                candidates.append((area, c))
+                    if len(approx) == 4 and cv2.isContourConvex(approx):
+                        rect = self._order_points(approx)
+                        local_status = f"ALIGNED_4PT_k{ksize}"
+                    else:
+                        min_rect = cv2.minAreaRect(c)
+                        (rw, rh) = min_rect[1]
+                        rect_area = rw * rh
+                        extent = (area / rect_area) if rect_area > 0 else 0
+                        if extent < 0.85:
+                            continue
+                        box = cv2.boxPoints(min_rect)
+                        rect = self._order_points(box)
+                        local_status = f"ALIGNED_MINAREARECT_k{ksize}"
 
-            if not candidates:
-                return image_np, "NO_CARD_LIKE_CONTOUR"
+                    if not self._aspect_ok(rect):
+                        continue
 
-            candidates.sort(key=lambda t: t[0], reverse=True)
+                    width, height = out_size
+                    dst = np.array([
+                        [0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]
+                    ], dtype="float32")
 
-            for area, c in candidates[:5]:
-                peri = cv2.arcLength(c, True)
-                approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+                    M = cv2.getPerspectiveTransform(rect, dst)
+                    warped = cv2.warpPerspective(image_np, M, (width, height))
+                    return warped, local_status
 
-                if len(approx) == 4 and cv2.isContourConvex(approx):
-                    rect = self._order_points(approx)
-                    local_status = "ALIGNED_4PT"
-                else:
-                    min_rect = cv2.minAreaRect(c)
-                    (rw, rh) = min_rect[1]
-                    rect_area = rw * rh
-                    extent = (area / rect_area) if rect_area > 0 else 0
-                    if extent < 0.85:
-                        continue  # kemungkinan gabungan >1 objek, bukan 1 kartu solid
-                    box = cv2.boxPoints(min_rect)
-                    rect = self._order_points(box)
-                    local_status = "ALIGNED_MINAREARECT"
-
-                if not self._aspect_ok(rect):
-                    continue
-
-                width, height = out_size
-                dst = np.array([
-                    [0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]
-                ], dtype="float32")
-
-                M = cv2.getPerspectiveTransform(rect, dst)
-                warped = cv2.warpPerspective(image_np, M, (width, height))
-                return warped, local_status
-
-            return image_np, "NO_VALID_ASPECT_CANDIDATE"
+            return image_np, "NO_VALID_CANDIDATE"
         except Exception as e:
             return image_np, f"EXCEPTION:{e}"
 
@@ -216,18 +214,22 @@ class CardIdentifier:
     # ------------------------------------------------------------------
     def _compute_calibrated_confidence(self, sims_pool):
         sims = np.asarray(sims_pool, dtype=np.float64)
-        scaled = sims / self.confidence_temperature
-        scaled -= scaled.max()
-        exp = np.exp(scaled)
-        probs = exp / exp.sum()
-        margin = float(sims[0] - sims[1]) if len(sims) > 1 else float(sims[0])
-        return probs, margin
+        n = len(sims)
+        margins = np.zeros(n)
+        for i in range(n - 1):
+            margins[i] = sims[i] - sims[i + 1]
+        # kandidat terakhir dalam pool tidak punya "kandidat di bawahnya" -> margin 0
+
+        z = margins / self.confidence_temperature
+        probs = 1.0 / (1.0 + np.exp(-z))  # sigmoid per-rank, BUKAN softmax (tidak perlu jumlah ke 1)
+
+        return probs, margins
 
     @staticmethod
-    def _confidence_label(calibrated_pct, margin):
-        if calibrated_pct >= 70 and margin >= 0.05:
+    def _confidence_label(margin):
+        if margin >= 0.05:
             return "Tinggi"
-        if calibrated_pct >= 35:
+        if margin >= 0.015:
             return "Sedang"
         return "Rendah"
 
@@ -273,7 +275,7 @@ class CardIdentifier:
     # ------------------------------------------------------------------
     # MAIN ENTRY POINT
     # ------------------------------------------------------------------
-    def identify_card(self, image_input, top_k=3, debug=False):
+    def identify_card(self, image_input, top_k=3, debug=False, debug_save_path=None):
         t0 = time.time()
 
         if isinstance(image_input, str):
@@ -289,16 +291,23 @@ class CardIdentifier:
         else:
             raise ValueError("Format image_input tidak valid! Gunakan path str, PIL Image, atau np.ndarray.")
 
+        if debug_save_path:
+            cv2.imwrite(debug_save_path, aligned_bgr)
+
         feat = self._extract_embedding_tta(pil_img) if self.use_tta else self._extract_embedding(pil_img)
         faiss.normalize_L2(feat)
 
+        # Pool pencarian: cukup besar untuk kalibrasi confidence & (opsional) re-ranking,
+        # tapi tetap dibatasi ke ukuran index. Karena index-nya IndexFlatIP (brute-force),
+        # mencari top-20 vs top-3 nyaris tidak menambah latency.
         rerank_pool = max(top_k, 5) if self.use_orb_rerank else top_k
         pool_k = min(max(rerank_pool, self.calibration_pool_size), self.index.ntotal)
 
         distances, indices = self.index.search(feat, pool_k)
         sims_pool = distances[0]
-        probs, margin = self._compute_calibrated_confidence(sims_pool)
+        probs, margins = self._compute_calibrated_confidence(sims_pool)
 
+        # Susun kandidat mentah (sebanyak rerank_pool) sebelum diurutkan ulang
         raw_candidates = []
         n_avail = min(rerank_pool, len(indices[0]))
         for rank in range(n_avail):
@@ -306,18 +315,25 @@ class CardIdentifier:
             dist = float(distances[0][rank])
             card_id = self.card_id_map.get(str(idx), "Unknown")
             calibrated_pct = float(probs[rank] * 100)
+            margin_r = float(margins[rank])
 
             entry = {
                 "card_id": card_id,
                 "raw_similarity_score": dist,
                 "calibrated_confidence_pct": calibrated_pct,
+                "margin": margin_r,
             }
             if self.use_orb_rerank:
+                # Blend untuk RE-RANKING pakai raw similarity + ORB, BUKAN confidence_pct --
+                # confidence_pct sekarang berbasis margin LOKAL per-rank (buat ditampilkan),
+                # jadi tidak monoton mengikuti similarity dan TIDAK BOLEH dipakai sebagai
+                # kunci urutan (ini bug yang sempat kejadian: urutan tampilan jadi acak).
                 orb_score = self._orb_match_score(aligned_bgr, card_id)
                 entry["orb_verification_score"] = orb_score
-                entry["blended_score"] = 0.6 * (calibrated_pct / 100.0) + 0.4 * (orb_score or 0.0)
+                entry["blended_score"] = 0.6 * dist + 0.4 * (orb_score or 0.0)
             else:
-                entry["blended_score"] = calibrated_pct / 100.0
+                # Tanpa ORB re-rank: pertahankan urutan similarity asli dari FAISS apa adanya.
+                entry["blended_score"] = dist
             raw_candidates.append(entry)
 
         raw_candidates.sort(key=lambda e: e["blended_score"], reverse=True)
@@ -331,12 +347,10 @@ class CardIdentifier:
                 "card_id": card_id,
                 "confidence_percentage": round(entry["calibrated_confidence_pct"], 2),
                 "raw_similarity_score": round(entry["raw_similarity_score"], 4),
-                "confidence_label": self._confidence_label(
-                    entry["calibrated_confidence_pct"], margin if rank == 0 else 0.0
-                ),
+                "confidence_label": self._confidence_label(entry["margin"]),
             }
             if rank == 0:
-                card_info["margin_to_runner_up"] = round(margin, 4)
+                card_info["margin_to_runner_up"] = round(entry["margin"], 4)
             if self.use_orb_rerank:
                 orb_score = entry.get("orb_verification_score")
                 card_info["orb_verification_score"] = round(orb_score, 3) if orb_score is not None else None
@@ -373,6 +387,8 @@ class CardIdentifier:
         }
 
         if debug:
+            # Mentah, sebelum dikalibrasi -- buat lihat sebenarnya seberapa
+            # jauh sebaran similarity di pool kandidat (top-1 s/d top-N).
             result["debug_similarity_pool"] = [round(float(s), 4) for s in sims_pool]
             result["debug_temperature"] = self.confidence_temperature
 
