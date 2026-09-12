@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""
-=============================================================================
-Pokemon Card Value Analytic Tool — Ultra-Efficient Page-Based Ingestion Engine
-=============================================================================
-Skrip otomatisasi penarikan SELURUH data kartu Pokemon (20.479+ kartu)
-dari pokemontcg.io API secara langsung via paginated endpoint:
-  - Page size 250 (hanya butuh ~82 request HTTP untuk seluruh 20.479 kartu di dunia)
-  - Automatic Retry & Exponential Backoff (kebal crash 502 Bad Gateway / Cloudflare)
-  - Resumable Checkpoint (bisa dilanjutkan jika terputus di tengah jalan)
-  - Multi-threaded Image Downloader (opsional)
-=============================================================================
-"""
 
 import os
 import sys
@@ -30,7 +18,7 @@ except ImportError:
     pass  # python-dotenv tidak terinstall, tidak apa-apa
 
 BASE_URL = "https://api.pokemontcg.io/v2"
-DEFAULT_OUTPUT = os.path.join(os.path.dirname(__file__), "dataset", "pokemon_cards_dataset.json")
+DEFAULT_OUTPUT = os.path.join(os.path.dirname(__file__), "dataset", "pokemon_cards_dataset_exp.json")
 DEFAULT_API_KEY = os.getenv("POKEMONTCG_API_KEY", "")
 
 
