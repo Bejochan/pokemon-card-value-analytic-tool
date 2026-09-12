@@ -283,6 +283,22 @@ def draw_status_bar(frame: np.ndarray, result: dict | None, analyzing: bool,
     return canvas
 
 
+def apply_clahe(image: np.ndarray) -> np.ndarray:
+    """Meningkatkan kontras gambar (CLAHE) untuk menonjolkan defect halus."""
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l_channel, a_channel, b_channel = cv2.split(lab)
+    
+    # Aplikasikan algoritma CLAHE ke Lightness channel
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    cl = clahe.apply(l_channel)
+    
+    # Gabungkan kembali dan konversi ke BGR
+    merged = cv2.merge((cl, a_channel, b_channel))
+    enhanced_image = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
+    
+    return enhanced_image
+
+
 # ── Main Loop ────────────────────────────────────────────────────────────────
 def main():
     print("=" * 60)
@@ -347,9 +363,14 @@ def main():
                     # Crop area guide
                     cropped_frame = crop_guide_area(frozen_frame)
                     crop_h, crop_w = cropped_frame.shape[:2]
+                    
+                    # --- PREPROCESSING ---
+                    processed_frame = apply_clahe(cropped_frame)
+                    # ---------------------
+
                     print(f"\n[*] Frame di-freeze")
                     print(f"    Crop area: {crop_w}x{crop_h} piksel")
-                    print(f"    Mengirim ke Roboflow...")
+                    print(f"    Menerapkan CLAHE & Mengirim ke Roboflow...")
 
                     # Tampilkan freeze + status analyzing
                     freeze_display = draw_guide_frame(frozen_frame, frozen=True)
@@ -357,9 +378,9 @@ def main():
                     cv2.imshow(window_name, freeze_display)
                     cv2.waitKey(1)
 
-                    # Kirim cropped image ke API
+                    # Kirim processed image ke API
                     start_time = time.time()
-                    result = send_frame_to_roboflow(cropped_frame)
+                    result = send_frame_to_roboflow(processed_frame)
                     elapsed = time.time() - start_time
 
                     if result is not None:
@@ -369,13 +390,12 @@ def main():
 
                         # Confidence per kelas
                         conf = get_confidence_per_class(result)
-                        print(f"    ┌─────────────────────────────────┐")
+                        print(f"    -----------------------------------")
                         for label in ALL_CLASSES:
                             c = conf[label]
-                            bar = "█" * int(c * 20)
                             status = f"{c:.1%}" if c > 0 else "tidak terdeteksi"
-                            print(f"    │ {label:<12s} : {status:<18s} {bar}")
-                        print(f"    └─────────────────────────────────┘")
+                            print(f"    {label:<12s} : {status}")
+                        print(f"    -----------------------------------")
 
                         defects = [p for p in predictions if p.get("class") != "Card"]
                         if defects:
@@ -383,14 +403,14 @@ def main():
                         else:
                             print("[✓] Tidak ada defect — kartu dalam kondisi baik!")
 
-                        # Tampilkan hasil: cropped image + bounding box
-                        result_display = draw_detections(cropped_frame, last_result)
+                        # Tampilkan hasil: processed image (sudah dicontrast) + bounding box
+                        result_display = draw_detections(processed_frame, last_result)
                         result_display = draw_status_bar(result_display, last_result,
                                                          analyzing=False, is_cropped=True)
                         cv2.imshow(window_name, result_display)
                     else:
                         print("[!] Gagal mendapatkan hasil dari API")
-                        fail_display = draw_status_bar(cropped_frame, None, analyzing=False)
+                        fail_display = draw_status_bar(processed_frame, None, analyzing=False)
                         cv2.imshow(window_name, fail_display)
 
                 else:
@@ -398,6 +418,7 @@ def main():
                     frozen = False
                     frozen_frame = None
                     cropped_frame = None
+                    processed_frame = None
                     last_result = None
                     print("[*] Kembali ke live camera\n")
 
