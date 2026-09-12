@@ -69,7 +69,7 @@ def find_full_rank_from_aligned(identifier, aligned_image_path, expected_card_id
         print("-> Tebakan top-1 SUDAH BENAR.")
     elif found_rank <= 20:
         print("-> Kartu yang benar dekat top (<=20) tapi kalah tipis: ini soal RANKING/")
-        print("   diskriminasi pada kandidat yang mirip -- coba aktifkan --use_orb_rerank,")
+        print("   diskriminasi pada kandidat yang mirip -- coba naikkan orb_rerank_pool_size,")
         print("   atau kalibrasi ulang confidence_temperature.")
     else:
         print("-> Kartu yang benar ranking-nya JAUH dari top. Ini indikasi kuat bahwa")
@@ -94,8 +94,9 @@ def process_one(identifier, image_path, top_k, expected_card_id, use_tta, full_r
     for c in result["candidates"]:
         name = c.get("name", "?")
         set_name = c.get("set_name", "?")
+        orb_str = f"  orb={c['orb_verification_score']:.3f}" if c.get("orb_verification_score") is not None else ""
         print(f"#{c['rank']} {name:20s} ({set_name:20s}) card_id={c['card_id']:10s} "
-              f"raw={c['raw_similarity_score']:.4f}  conf={c['confidence_percentage']}% ({c['confidence_label']})")
+              f"raw={c['raw_similarity_score']:.4f}  conf={c['confidence_percentage']}% ({c['confidence_label']}){orb_str}")
 
     top1 = result["candidates"][0] if result["candidates"] else None
     if top1:
@@ -129,7 +130,8 @@ def main():
                          help="Path ke file foto kartu (opsional -- kalau kosong, jendela pilih file akan terbuka).")
     parser.add_argument("--top_k", type=int, default=5)
     parser.add_argument("--use_tta", action="store_true", help="Aktifkan Test-Time Augmentation.")
-    parser.add_argument("--use_orb_rerank", action="store_true", help="Aktifkan re-ranking ORB.")
+    parser.add_argument("--no_orb_rerank", action="store_true",
+                         help="Matikan ORB re-rank (default: AKTIF). Pakai ini kalau mau tes cepat tanpa verifikasi ORB.")
     parser.add_argument("--expected_card_id", type=str, default=None,
                          help="card_id yang BENAR (kalau tahu), untuk validasi otomatis.")
     parser.add_argument("--full_rank_search", action="store_true",
@@ -137,8 +139,8 @@ def main():
     args = parser.parse_args()
 
     print("Memuat AI Engine dan Index (mohon tunggu)...")
-    identifier = CardIdentifier(use_tta=args.use_tta, use_orb_rerank=args.use_orb_rerank)
-    print(f"[debug] use_tta={args.use_tta}  use_orb_rerank={args.use_orb_rerank}  "
+    identifier = CardIdentifier(use_tta=args.use_tta, use_orb_rerank=not args.no_orb_rerank)
+    print(f"[debug] use_tta={args.use_tta}  use_orb_rerank={not args.no_orb_rerank}  "
           f"confidence_temperature={identifier.confidence_temperature}")
 
     if args.image_path:
@@ -157,7 +159,6 @@ def main():
         process_one(identifier, image_path, args.top_k, args.expected_card_id,
                     args.use_tta, args.full_rank_search)
         print("\n--- Pilih file lain untuk scan berikutnya, atau Cancel untuk keluar ---")
-
 
 if __name__ == "__main__":
     main()

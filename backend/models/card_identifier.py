@@ -27,7 +27,8 @@ CARD_ASPECT_RATIO = 63.0 / 88.0
 class CardIdentifier:
     def __init__(self, index_path=INDEX_PATH, map_path=MAP_PATH, csv_path=CSV_PATH,
                  image_dir=IMAGE_DIR, confidence_temperature=0.03,
-                 calibration_pool_size=20, use_tta=False, use_orb_rerank=False):
+                 calibration_pool_size=20, use_tta=False, use_orb_rerank=False,
+                 orb_rerank_pool_size=15):
         self.index_path = index_path
         self.map_path = map_path
         self.csv_path = csv_path
@@ -37,6 +38,7 @@ class CardIdentifier:
         self.calibration_pool_size = calibration_pool_size
         self.use_tta = use_tta
         self.use_orb_rerank = use_orb_rerank
+        self.orb_rerank_pool_size = orb_rerank_pool_size
 
         self.index = None
         self.card_id_map = {}
@@ -92,15 +94,14 @@ class CardIdentifier:
         return rect
 
     @staticmethod
-    def _aspect_ok(rect, tol=0.18):
+    def _aspect_ok(rect, tol=0.20):
         (tl, tr, br, bl) = rect
         w = (np.linalg.norm(tr - tl) + np.linalg.norm(br - bl)) / 2.0
         h = (np.linalg.norm(bl - tl) + np.linalg.norm(br - tr)) / 2.0
         if h == 0:
             return False
         ratio = w / h
-        return (abs(ratio - CARD_ASPECT_RATIO) / CARD_ASPECT_RATIO < tol) or \
-               (abs(ratio - (1.0 / CARD_ASPECT_RATIO)) / (1.0 / CARD_ASPECT_RATIO) < tol)
+        return abs(ratio - CARD_ASPECT_RATIO) / CARD_ASPECT_RATIO < tol
 
     def _align_card_image_debug(self, image_np, out_size=(448, 625)):
         h_img, w_img = image_np.shape[:2]
@@ -108,7 +109,9 @@ class CardIdentifier:
         min_area = 0.05 * frame_area
         max_area = 0.92 * frame_area
         border_margin = 2
-        max_sides_touch = 1     # tolak hanya kalau nempel di >=2 sisi frame
+        max_sides_touch = 2     # v2.3: dilonggarkan dari 1 -- foto close-up yang pas-pasan
+                                # bisa nempel di 2 sisi frame; tolak baru kalau nempel 3-4 sisi
+                                # (indikasi kuat noise/background yang membungkus seluruh frame)
         solidity_thresh = 0.80  # diturunkan dari 0.85 -- tepi kartu low-contrast sering agak pecah
 
         try:
@@ -300,7 +303,7 @@ class CardIdentifier:
         # Pool pencarian: cukup besar untuk kalibrasi confidence & (opsional) re-ranking,
         # tapi tetap dibatasi ke ukuran index. Karena index-nya IndexFlatIP (brute-force),
         # mencari top-20 vs top-3 nyaris tidak menambah latency.
-        rerank_pool = max(top_k, 5) if self.use_orb_rerank else top_k
+        rerank_pool = max(top_k, self.orb_rerank_pool_size) if self.use_orb_rerank else top_k
         pool_k = min(max(rerank_pool, self.calibration_pool_size), self.index.ntotal)
 
         distances, indices = self.index.search(feat, pool_k)
@@ -336,7 +339,14 @@ class CardIdentifier:
                 entry["blended_score"] = dist
             raw_candidates.append(entry)
 
-        raw_candidates.sort(key=lambda e: e["blended_score"], reverse=True)
+        # PENTING (fix v2.2): pengurutan ulang pakai blended_score HANYA masuk akal
+        # kalau use_orb_rerank aktif (menggabungkan skor embedding + verifikasi ORB).
+        # Sebelumnya baris sort ini SELALU jalan walau ORB mati, dan karena
+        # blended_score berbasis margin (bukan raw similarity), urutan tampilan
+        # kandidat jadi kacau/tidak sinkron dengan raw_similarity_score-nya sendiri.
+        if self.use_orb_rerank:
+            raw_candidates.sort(key=lambda e: e["blended_score"], reverse=True)
+        # kalau tidak, biarkan urutan asli dari FAISS (sudah terurut menurun by similarity)
         raw_candidates = raw_candidates[:top_k]
 
         candidates = []
@@ -393,7 +403,6 @@ class CardIdentifier:
             result["debug_temperature"] = self.confidence_temperature
 
         return result
-
 
 # Quick test interface
 if __name__ == "__main__":
