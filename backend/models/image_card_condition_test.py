@@ -1,14 +1,3 @@
-"""
-Image Card Condition Tester (with Preprocessing)
-================================================
-Menguji API Roboflow card-grader menggunakan file gambar statis.
-Dilengkapi dengan fitur Image Preprocessing (Smart Resize & CLAHE) 
-untuk meningkatkan akurasi deteksi defect sebelum dikirim ke API.
-
-Cara pakai:
-  python image_card_condition_test.py
-"""
-
 import os
 import sys
 import base64
@@ -20,7 +9,6 @@ import requests
 import numpy as np
 from dotenv import load_dotenv
 
-# ── Konfigurasi ──────────────────────────────────────────────────────────────
 _script_dir = Path(__file__).resolve().parent
 _project_root = _script_dir.parent.parent
 load_dotenv(_project_root / ".env")
@@ -30,58 +18,151 @@ if not ROBOFLOW_API_KEY:
     print("ERROR: ROBOFLOW_API_KEY tidak ditemukan di file .env!")
     sys.exit(1)
 
-API_URL = f"https://detect.roboflow.com/card-grader/4?api_key={ROBOFLOW_API_KEY}"
-
-ALL_CLASSES = ["Card", "Corner Wear", "Edge Wear", "Scratch"]
+API_URL = f"https://detect.roboflow.com/card-grader/4?api_key={ROBOFLOW_API_KEY}&confidence=0"
 
 CLASS_COLORS = {
-    "Card":        (0, 255, 0),    # Hijau
-    "Corner Wear": (0, 0, 255),    # Merah
-    "Edge Wear":   (0, 165, 255),  # Oranye
-    "Scratch":     (255, 0, 255),  # Magenta
+    "Card":        (0, 255, 0),
+    "Corner Wear": (0, 0, 255),
+    "Edge Wear":   (0, 165, 255),
+    "Scratch":     (255, 0, 255),
 }
-DEFAULT_COLOR = (255, 255, 0)      # Cyan
+DEFAULT_COLOR = (255, 255, 0)
+
+LOW_THRESH = 0.25
+HIGH_THRESH = 0.55
+
+CARD_ASPECT_RATIO = 63.0 / 88.0
+CARD_OUT_SIZE = (600, 837)
+CROP_MARGIN_RATIO = 0.08
 
 
-# ── FUNGSI IMAGE PREPROCESSING ───────────────────────────────────────────────
-def preprocess_image(image: np.ndarray, max_size=1280) -> np.ndarray:
-    """Melakukan preprocessing pada gambar sebelum dikirim ke API."""
-    # 1. Smart Resize: Batasi dimensi maksimal agar upload cepat namun tetap tajam
-    h, w = image.shape[:2]
-    if max(h, w) > max_size:
-        scale = max_size / max(h, w)
-        image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+def _order_points(pts):
+    pts = pts.reshape(4, 2).astype("float32")
+    rect = np.zeros((4, 2), dtype="float32")
+    s = pts.sum(axis=1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmax(s)]
+    diff = np.diff(pts, axis=1)
+    rect[1] = pts[np.argmin(diff)]
+    rect[3] = pts[np.argmax(diff)]
+    return rect
 
-    # 2. CLAHE (Contrast Limited Adaptive Histogram Equalization)
-    # Konversi ke ruang warna LAB agar manipulasi kontras tidak merusak warna RGB
-    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
-    l_channel, a_channel, b_channel = cv2.split(lab)
-    
-    # Aplikasikan algoritma CLAHE ke Lightness channel
+
+def _aspect_ok(rect, tol=0.20):
+    (tl, tr, br, bl) = rect
+    w = (np.linalg.norm(tr - tl) + np.linalg.norm(br - bl)) / 2.0
+    h = (np.linalg.norm(bl - tl) + np.linalg.norm(br - tr)) / 2.0
+    if h == 0:
+        return False
+    return abs((w / h) - CARD_ASPECT_RATIO) / CARD_ASPECT_RATIO < tol
+
+
+def _expand_rect(rect, ratio=CROP_MARGIN_RATIO):
+    center = rect.mean(axis=0)
+    return (center + (rect - center) * (1 + ratio)).astype("float32")
+
+
+def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray | None:
+    """Coba deteksi kontur kartu otomatis. Return None kalau gagal."""
+    h_img, w_img = image_np.shape[:2]
+    frame_area = h_img * w_img
+    min_area = 0.05 * frame_area
+    max_area = 0.95 * frame_area
+
+    gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
+    smooth = cv2.bilateralFilter(gray, d=9, sigmaColor=60, sigmaSpace=60)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    cl = clahe.apply(l_channel)
-    
-    # Gabungkan kembali dan konversi ke BGR
-    merged = cv2.merge((cl, a_channel, b_channel))
-    enhanced_image = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
-    
-    return enhanced_image
-# ────────────────────────────────────────────────────────────────────────────
+    gray_eq = clahe.apply(smooth)
+    edges_base = cv2.Canny(gray_eq, 40, 120)
+
+    for ksize, iters in [(5, 2), (7, 2), (9, 3), (11, 3), (13, 4)]:
+        kernel = np.ones((ksize, ksize), np.uint8)
+        edges = cv2.morphologyEx(edges_base, cv2.MORPH_CLOSE, kernel, iterations=iters)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            continue
+
+        candidates = [c for c in contours if min_area < cv2.contourArea(c) < max_area]
+        if not candidates:
+            continue
+        candidates.sort(key=cv2.contourArea, reverse=True)
+
+        for c in candidates[:5]:
+            peri = cv2.arcLength(c, True)
+            approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+
+            if len(approx) == 4 and cv2.isContourConvex(approx):
+                rect = _order_points(approx)
+            else:
+                min_rect = cv2.minAreaRect(c)
+                box = cv2.boxPoints(min_rect)
+                rect = _order_points(box)
+
+            if not _aspect_ok(rect):
+                continue
+
+            rect = _expand_rect(rect)
+            width, height = out_size
+            dst = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype="float32")
+            M = cv2.getPerspectiveTransform(rect, dst)
+            return cv2.warpPerspective(image_np, M, (width, height), flags=cv2.INTER_CUBIC)
+
+    return None
+
+
+def manual_crop_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE, margin_ratio=CROP_MARGIN_RATIO) -> np.ndarray | None:
+    display = image_np.copy()
+    h, w = display.shape[:2]
+    max_display_height = 800
+    scale = max_display_height / h if h > max_display_height else 1.0
+    if scale != 1.0:
+        display = cv2.resize(display, (int(w * scale), int(h * scale)))
+
+    print("[*] Drag kotak di sekeliling kartu, lalu tekan ENTER.")
+    print("    Tekan ESC untuk skip dan pakai deteksi otomatis.")
+    roi = cv2.selectROI("Pilih area kartu", display, showCrosshair=True)
+    cv2.destroyWindow("Pilih area kartu")
+
+    x, y, w_roi, h_roi = roi
+    if w_roi == 0 or h_roi == 0:
+        return None
+
+    x, y, w_roi, h_roi = [v / scale for v in (x, y, w_roi, h_roi)]
+
+    # tambahkan margin di semua sisi, clamp supaya tidak keluar batas gambar asli
+    img_h, img_w = image_np.shape[:2]
+    mx, my = w_roi * margin_ratio, h_roi * margin_ratio
+    x1 = max(0, int(x - mx))
+    y1 = max(0, int(y - my))
+    x2 = min(img_w, int(x + w_roi + mx))
+    y2 = min(img_h, int(y + h_roi + my))
+
+    cropped = image_np[y1:y2, x1:x2]
+    return cv2.resize(cropped, out_size, interpolation=cv2.INTER_CUBIC)
+
+
+def get_card_crop(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray:
+    cropped = manual_crop_card(image_np, out_size)
+    if cropped is not None:
+        return cropped
+
+    print("[*] Mencoba deteksi otomatis...")
+    cropped = auto_detect_card(image_np, out_size)
+    if cropped is not None:
+        return cropped
+
+    print("[!] Deteksi otomatis gagal, memakai resize seadanya.")
+    return cv2.resize(image_np, out_size, interpolation=cv2.INTER_AREA)
 
 
 def send_frame_to_roboflow(image: np.ndarray) -> dict | None:
-    """Mengubah numpy array image ke JPEG memory dan mengirimnya ke API."""
     try:
-        # Encode ke JPEG (Kualitas 95 - Sangat Tinggi)
         success, buffer = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
         if not success:
             print("[!] ERROR: Gagal melakukan encode gambar ke JPEG.")
             return None
 
-        # Konversi byte stream ke Base64
         image_data = base64.b64encode(buffer.tobytes()).decode("utf-8")
-
-        print(f"[*] Mengirim gambar ke API Roboflow...")
         response = requests.post(
             API_URL,
             data=image_data,
@@ -96,34 +177,55 @@ def send_frame_to_roboflow(image: np.ndarray) -> dict | None:
         return None
 
 
-def draw_detections(frame: np.ndarray, result: dict) -> np.ndarray:
-    """Menggambar bounding box di atas gambar."""
-    overlay = frame.copy()
-    predictions = result.get("predictions", [])
+def classify_defect_severity(predictions: list[dict],
+                              low_thresh=LOW_THRESH,
+                              high_thresh=HIGH_THRESH) -> list[dict]:
+    results = []
+    for pred in predictions:
+        if pred.get("class") == "Card":
+            continue
 
+        conf = float(pred.get("confidence", 0.0))
+        if conf < low_thresh:
+            continue
+
+        certainty = "Terindikasi (perlu verifikasi ulang)" if conf < high_thresh else "Terdeteksi"
+
+        results.append({
+            "class": pred["class"],
+            "confidence": conf,
+            "certainty": certainty,
+            "x": pred.get("x"),
+            "y": pred.get("y"),
+            "width": pred.get("width"),
+            "height": pred.get("height"),
+        })
+    return results
+
+
+def draw_detections(frame: np.ndarray, detections: list[dict]) -> np.ndarray:
+    overlay = frame.copy()
     height, width = overlay.shape[:2]
     scale_factor = max(width, height) / 1000.0
     line_thick = max(2, int(2 * scale_factor))
     font_scale = max(0.6, 0.6 * scale_factor)
 
-    for pred in predictions:
-        label = pred.get("class", "unknown")
-        confidence = pred.get("confidence", 0)
-        
-        cx = int(pred["x"])
-        cy = int(pred["y"])
-        w = int(pred["width"])
-        h = int(pred["height"])
+    for det in detections:
+        label = det["class"]
+        confidence = det["confidence"]
+        certainty = det["certainty"]
 
-        x1 = cx - w // 2
-        y1 = cy - h // 2
-        x2 = cx + w // 2
-        y2 = cy + h // 2
+        cx, cy = int(det["x"]), int(det["y"])
+        w, h = int(det["width"]), int(det["height"])
+        x1, y1 = cx - w // 2, cy - h // 2
+        x2, y2 = cx + w // 2, cy + h // 2
 
         color = CLASS_COLORS.get(label, DEFAULT_COLOR)
+        thickness = line_thick if certainty == "Terdeteksi" else max(1, line_thick - 1)
 
-        cv2.rectangle(overlay, (x1, y1), (x2, y2), color, line_thick)
-        text = f"{label} {confidence:.1%}"
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), color, thickness)
+        tag = "✓" if certainty == "Terdeteksi" else "?"
+        text = f"{label} {confidence:.1%} {tag}"
         (tw, th), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, line_thick)
         cv2.rectangle(overlay, (x1, y1 - th - baseline - 10), (x1 + tw + 10, y1), color, -1)
         cv2.putText(overlay, text, (x1 + 5, y1 - baseline - 5),
@@ -132,99 +234,88 @@ def draw_detections(frame: np.ndarray, result: dict) -> np.ndarray:
     return overlay
 
 
-def print_summary(result: dict):
-    """Mencetak ringkasan hasil prediksi ke terminal."""
-    predictions = result.get("predictions", [])
-    print(f"\n[+] Analisis selesai — {len(predictions)} prediksi ditemukan")
+def print_summary(detections: list[dict]):
+    print(f"\n[+] Analisis selesai — {len(detections)} defect terklasifikasi\n")
+    print("    -----------------------------------")
+    for cls in ["Corner Wear", "Edge Wear", "Scratch"]:
+        matches = [d for d in detections if d["class"] == cls]
+        if matches:
+            best = max(matches, key=lambda d: d["confidence"])
+            print(f"    {cls:<12s} : {best['confidence']:.1%}  [{best['certainty']}]")
+        else:
+            print(f"    {cls:<12s} : tidak terdeteksi")
+    print("    -----------------------------------")
 
-    conf = {label: 0.0 for label in ALL_CLASSES}
-    for pred in predictions:
-        label = pred.get("class")
-        c = float(pred.get("confidence", 0.0))
-        if label in conf:
-            conf[label] = max(conf[label], c)
+    solid = [d for d in detections if d["certainty"] == "Terdeteksi"]
+    indicated = [d for d in detections if d["certainty"] != "Terdeteksi"]
 
-    print(f"\n    -----------------------------------")
-    for label in ALL_CLASSES:
-        c = conf[label]
-        status = f"{c:.1%}" if c > 0 else "tidak terdeteksi"
-        print(f"    {label:<12s} : {status}")
-    print(f"    -----------------------------------")
-
-    defects = [p for p in predictions if p.get("class") != "Card"]
     print("\nKESIMPULAN:")
-    if defects:
-        print(f"[!] Ditemukan {len(defects)} defect pada kartu ini.")
-        for d in defects:
+    if solid:
+        print(f"[!] {len(solid)} defect terkonfirmasi solid:")
+        for d in solid:
             print(f"    - {d['class']} ({d['confidence']:.1%})")
-    else:
-        print("[✓] Kartu dalam kondisi baik (Tidak ada defect terdeteksi).")
+    if indicated:
+        print(f"[?] {len(indicated)} defect di zona abu-abu:")
+        for d in indicated:
+            print(f"    - {d['class']} ({d['confidence']:.1%})")
+    if not solid and not indicated:
+        print("[✓] Kartu dalam kondisi baik (tidak ada indikasi defect).")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Test Card Grader dengan gambar statis")
-    parser.add_argument("image_path", nargs="?", help="Path ke file gambar (opsional)")
+    parser.add_argument("image_path", nargs="?", help="Path ke file gambar")
+    parser.add_argument("--low-thresh", type=float, default=LOW_THRESH)
+    parser.add_argument("--high-thresh", type=float, default=HIGH_THRESH)
     args = parser.parse_args()
 
     image_path = args.image_path
     if not image_path:
         print("=" * 60)
-        print("  Image Card Condition Tester (with Preprocessing)")
+        print("  Image Card Condition Tester")
         print("=" * 60)
-        image_path = input("Masukkan path file gambar (misal: C:/Users/gambar.jpg): ").strip()
-        image_path = image_path.replace('"', '').replace("'", "")
+        image_path = input("Masukkan path file gambar: ").strip().strip('"').strip("'")
 
-    if not image_path:
-        print("Path gambar tidak boleh kosong.")
-        sys.exit(1)
-
-    if not os.path.exists(image_path):
+    if not image_path or not os.path.exists(image_path):
         print(f"ERROR: File tidak ditemukan di -> {image_path}")
         sys.exit(1)
 
-    print(f"\n[*] Membaca gambar asli: {image_path}")
+    print(f"\n[*] Membaca gambar: {image_path}")
     image = cv2.imread(image_path)
     if image is None:
         print("ERROR: Tidak dapat membaca gambar. Pastikan format file didukung (JPG, PNG).")
         sys.exit(1)
-        
-    orig_h, orig_w = image.shape[:2]
-    print(f"[*] Resolusi asli: {orig_w}x{orig_h} piksel")
 
-    # ----- PROSES PREPROCESSING -----
-    print("[*] Mengaplikasikan Image Preprocessing (Smart Resize & CLAHE)...")
-    processed_image = preprocess_image(image)
-    proc_h, proc_w = processed_image.shape[:2]
-    print(f"[*] Resolusi pasca-processing: {proc_w}x{proc_h} piksel")
-    # --------------------------------
+    cropped_card = get_card_crop(image)
+    print("[*] Mengirim ke API dengan confidence=0 (ambil semua raw score)...")
 
-    # Kirim gambar hasil preprocess ke API (bukan gambar asli)
-    result = send_frame_to_roboflow(processed_image)
+    result = send_frame_to_roboflow(cropped_card)
+    if result is None:
+        sys.exit(1)
 
-    if result is not None:
-        print_summary(result)
-        
-        # Gambar deteksi di atas gambar yang sudah dipreprocess agar kita melihat apa yang AI lihat
-        annotated_image = draw_detections(processed_image, result)
-        
-        # Simpan output
-        filename = Path(image_path).stem
-        save_path = _script_dir / f"{filename}_preprocessed_result.jpg"
-        cv2.imwrite(str(save_path), annotated_image)
-        print(f"\n[+] Gambar hasil deteksi disimpan ke: {save_path}")
+    detections = classify_defect_severity(
+        result.get("predictions", []),
+        args.low_thresh, args.high_thresh
+    )
+    print_summary(detections)
 
-        # Tampilkan di layar
-        display_img = annotated_image.copy()
-        max_display_height = 800
-        if proc_h > max_display_height:
-            scale = max_display_height / proc_h
-            display_img = cv2.resize(display_img, (int(proc_w * scale), max_display_height))
-        
-        print("\n[*] Menampilkan gambar... Tekan sembarang tombol pada jendela gambar untuk keluar.")
-        window_name = f"Hasil Deteksi: {filename} (PREPROCESSED)"
-        cv2.imshow(window_name, display_img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    annotated_image = draw_detections(cropped_card, detections)
+    filename = Path(image_path).stem
+    save_path = _script_dir / f"{filename}_result.jpg"
+    cv2.imwrite(str(save_path), annotated_image)
+    print(f"\n[+] Gambar hasil deteksi disimpan ke: {save_path}")
+
+    display_img = annotated_image.copy()
+    proc_h, proc_w = display_img.shape[:2]
+    max_display_height = 800
+    if proc_h > max_display_height:
+        scale = max_display_height / proc_h
+        display_img = cv2.resize(display_img, (int(proc_w * scale), max_display_height))
+
+    print("\n[*] Menampilkan gambar... Tekan sembarang tombol pada jendela gambar untuk keluar.")
+    cv2.imshow(f"Hasil Deteksi: {filename}", display_img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
