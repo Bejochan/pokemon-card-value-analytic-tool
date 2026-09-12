@@ -36,6 +36,7 @@ backend/dataset/card-condition-dataset/
 backend/dataset/pokemon-cards-dataset/
 backend/dataset/raw_images/
 backend/dataset/compressed_images/
+debug_manual_aligned.jpg
 
 # ============================================
 # Node.js & Frontend
