@@ -99,9 +99,13 @@ class CardIdentifier:
         w = (np.linalg.norm(tr - tl) + np.linalg.norm(br - bl)) / 2.0
         h = (np.linalg.norm(bl - tl) + np.linalg.norm(br - tr)) / 2.0
         if h == 0:
-            return False
+            return None
         ratio = w / h
-        return abs(ratio - CARD_ASPECT_RATIO) / CARD_ASPECT_RATIO < tol
+        if abs(ratio - CARD_ASPECT_RATIO) / CARD_ASPECT_RATIO < tol:
+            return "portrait"
+        if abs(ratio - (1.0 / CARD_ASPECT_RATIO)) / (1.0 / CARD_ASPECT_RATIO) < tol:
+            return "landscape"
+        return None
 
     def _align_card_image_debug(self, image_np, out_size=(448, 625)):
         h_img, w_img = image_np.shape[:2]
@@ -109,10 +113,9 @@ class CardIdentifier:
         min_area = 0.05 * frame_area
         max_area = 0.92 * frame_area
         border_margin = 2
-        max_sides_touch = 2     # v2.3: dilonggarkan dari 1 -- foto close-up yang pas-pasan
-                                # bisa nempel di 2 sisi frame; tolak baru kalau nempel 3-4 sisi
-                                # (indikasi kuat noise/background yang membungkus seluruh frame)
-        solidity_thresh = 0.80  # diturunkan dari 0.85 -- tepi kartu low-contrast sering agak pecah
+        max_sides_touch = 2
+        solidity_thresh = 0.80
+        extent_thresh = 0.80
 
         try:
             gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
@@ -120,6 +123,8 @@ class CardIdentifier:
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             gray_eq = clahe.apply(smooth)
             edges_base = cv2.Canny(gray_eq, 40, 120)
+
+            best = None  # (area, rect, status, orientation)
 
             for ksize, iters in [(5, 2), (7, 2), (9, 3), (11, 3), (13, 4)]:
                 kernel = np.ones((ksize, ksize), np.uint8)
@@ -166,25 +171,45 @@ class CardIdentifier:
                         (rw, rh) = min_rect[1]
                         rect_area = rw * rh
                         extent = (area / rect_area) if rect_area > 0 else 0
-                        if extent < 0.85:
+                        if extent < extent_thresh:
                             continue
                         box = cv2.boxPoints(min_rect)
                         rect = self._order_points(box)
                         local_status = f"ALIGNED_MINAREARECT_k{ksize}"
 
-                    if not self._aspect_ok(rect):
+                    orientation = self._aspect_ok(rect)
+                    if orientation is None:
                         continue
 
-                    width, height = out_size
-                    dst = np.array([
-                        [0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]
-                    ], dtype="float32")
+                    # JANGAN langsung return -- simpan sebagai kandidat terbaik SEJAUH
+                    # INI, lanjut cek kernel lebih besar siapa tahu nemu area lebih besar.
+                    if best is None or area > best[0]:
+                        best = (area, rect, local_status, orientation)
 
-                    M = cv2.getPerspectiveTransform(rect, dst)
-                    warped = cv2.warpPerspective(image_np, M, (width, height))
-                    return warped, local_status
+            if best is None:
+                return image_np, "NO_VALID_CANDIDATE"
 
-            return image_np, "NO_VALID_CANDIDATE"
+            _, rect, local_status, orientation = best
+            width, height = out_size
+
+            if orientation == "landscape":
+                # warp ke ukuran ALAMI (landscape) dulu -- reorientasi final
+                # (0/+90/-90 derajat) diputuskan di identify_card berdasar
+                # similarity ke database, bukan ditebak di sini.
+                dst = np.array([
+                    [0, 0], [height - 1, 0], [height - 1, width - 1], [0, width - 1]
+                ], dtype="float32")
+                M = cv2.getPerspectiveTransform(rect, dst)
+                warped = cv2.warpPerspective(image_np, M, (height, width))
+                local_status += "_LANDSCAPE"
+            else:
+                dst = np.array([
+                    [0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]
+                ], dtype="float32")
+                M = cv2.getPerspectiveTransform(rect, dst)
+                warped = cv2.warpPerspective(image_np, M, (width, height))
+
+            return warped, local_status
         except Exception as e:
             return image_np, f"EXCEPTION:{e}"
 
@@ -293,6 +318,27 @@ class CardIdentifier:
             aligned_bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
         else:
             raise ValueError("Format image_input tidak valid! Gunakan path str, PIL Image, atau np.ndarray.")
+
+        # v2.4: kalau alignment menghasilkan gambar LANDSCAPE (kartu ke-foto
+        # miring ~90 derajat), coba 2 arah rotasi ke portrait dan pilih mana
+        # yang similarity-nya lebih tinggi ke database. Geometri kontur saja
+        # tidak bisa menentukan arah rotasi yang benar (perlu tahu orientasi
+        # baca teks di kartu) -- jadi diputuskan lewat similarity, bukan ditebak.
+        if aligned_bgr.shape[1] > aligned_bgr.shape[0]:
+            rot_cw = cv2.rotate(aligned_bgr, cv2.ROTATE_90_CLOCKWISE)
+            rot_ccw = cv2.rotate(aligned_bgr, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            best_rot_bgr, best_rot_sim = aligned_bgr, -1.0
+            for candidate_bgr in (rot_cw, rot_ccw):
+                candidate_pil = Image.fromarray(cv2.cvtColor(candidate_bgr, cv2.COLOR_BGR2RGB))
+                candidate_feat = self._extract_embedding(candidate_pil)
+                faiss.normalize_L2(candidate_feat)
+                d, _ = self.index.search(candidate_feat, 1)
+                sim = float(d[0][0])
+                if sim > best_rot_sim:
+                    best_rot_sim = sim
+                    best_rot_bgr = candidate_bgr
+            aligned_bgr = best_rot_bgr
+            pil_img = Image.fromarray(cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2RGB))
 
         if debug_save_path:
             cv2.imwrite(debug_save_path, aligned_bgr)
