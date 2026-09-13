@@ -417,6 +417,20 @@ class CardIdentifier:
         # kandidat jadi kacau/tidak sinkron dengan raw_similarity_score-nya sendiri.
         if self.use_orb_rerank:
             raw_candidates.sort(key=lambda e: e["blended_score"], reverse=True)
+
+            # v2.6: confidence yang lama (margin embedding SEBELUM rerank) jadi
+            # menyesatkan begitu ORB mengubah urutan drastis -- kartu yang
+            # "diselamatkan" ORB dari peringkat jauh ke #1 tetap menampilkan
+            # confidence rendah, padahal sudah dikonfirmasi oleh 2 sinyal
+            # independen (embedding + verifikasi keypoint). Hitung ulang margin
+            # & confidence untuk rank-0 berdasar blended_score PASCA-rerank,
+            # bukan margin embedding-only yang sudah tidak relevan lagi.
+            if len(raw_candidates) > 1:
+                post_margin = max(raw_candidates[0]["blended_score"] - raw_candidates[1]["blended_score"], 0.0)
+                z = post_margin / self.confidence_temperature
+                post_conf_pct = 100.0 / (1.0 + np.exp(-z))
+                raw_candidates[0]["calibrated_confidence_pct"] = float(post_conf_pct)
+                raw_candidates[0]["margin"] = float(post_margin)
         # kalau tidak, biarkan urutan asli dari FAISS (sudah terurut menurun by similarity)
         raw_candidates = raw_candidates[:top_k]
 
