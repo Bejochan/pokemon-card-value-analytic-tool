@@ -28,7 +28,7 @@ class CardIdentifier:
     def __init__(self, index_path=INDEX_PATH, map_path=MAP_PATH, csv_path=CSV_PATH,
                  image_dir=IMAGE_DIR, confidence_temperature=0.03,
                  calibration_pool_size=20, use_tta=False, use_orb_rerank=False,
-                 orb_rerank_pool_size=15):
+                 orb_rerank_pool_size=35):
         self.index_path = index_path
         self.map_path = map_path
         self.csv_path = csv_path
@@ -113,8 +113,17 @@ class CardIdentifier:
         min_area = 0.05 * frame_area
         max_area = 0.92 * frame_area
         border_margin = 2
-        max_sides_touch = 2
-        solidity_thresh = 0.80
+        max_sides_touch = 3     # v2.5: dilonggarkan dari 2 -- foto close-up dgn kartu
+                                # dirotasi bisa mepet ke 3 sisi frame secara wajar (terbukti
+                                # dari foto nyata), bukan cuma indikasi noise/background.
+                                # TRADE-OFF yang disadari: ini mengurangi proteksi terhadap
+                                # kasus adversarial "2 objek besar bertumpuk" -- diputuskan
+                                # dapat diterima karena kasus itu jarang di pemakaian normal,
+                                # sedangkan kegagalan pada foto close-up/rotasi wajar jauh
+                                # lebih sering terjadi & lebih merugikan pengalaman pengguna.
+        solidity_thresh = 0.50  # v2.5: diturunkan dari 0.80 -- kontur bisa jadi cekung kalau
+                                # ada objek asing yang menumpuk di pinggir kartu (kamera/tangan/
+                                # benda lain kena foto), bukan berarti bukan kartu.
         extent_thresh = 0.80
 
         try:
@@ -163,10 +172,26 @@ class CardIdentifier:
                     peri = cv2.arcLength(c, True)
                     approx = cv2.approxPolyDP(c, 0.02 * peri, True)
 
+                    rect = None
                     if len(approx) == 4 and cv2.isContourConvex(approx):
                         rect = self._order_points(approx)
                         local_status = f"ALIGNED_4PT_k{ksize}"
                     else:
+                        # v2.5: BARU -- coba approxPolyDP di CONVEX HULL kontur, bukan
+                        # kontur mentahnya. Ini jauh lebih tahan kalau tepi kartu "digigit"
+                        # objek asing (jadi cekung) -- hull menghaluskan gigitan itu,
+                        # sering kali langsung menghasilkan 4 titik yang bersih.
+                        hull = cv2.convexHull(c)
+                        hull_peri = cv2.arcLength(hull, True)
+                        for eps_factor in (0.02, 0.03, 0.05):
+                            hull_approx = cv2.approxPolyDP(hull, eps_factor * hull_peri, True)
+                            if len(hull_approx) == 4 and cv2.isContourConvex(hull_approx):
+                                rect = self._order_points(hull_approx)
+                                local_status = f"ALIGNED_HULL4PT_k{ksize}"
+                                break
+
+                    if rect is None:
+                        # fallback terakhir: minAreaRect, divalidasi rasio area kontur/area rect
                         min_rect = cv2.minAreaRect(c)
                         (rw, rh) = min_rect[1]
                         rect_area = rw * rh

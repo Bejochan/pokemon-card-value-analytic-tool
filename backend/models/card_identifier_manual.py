@@ -27,7 +27,6 @@ def pick_file_dialog():
     root.destroy()
     return file_path
 
-
 def find_full_rank_from_aligned(identifier, aligned_image_path, expected_card_id, use_tta=False):
     aligned_bgr = cv2.imread(aligned_image_path)
     if aligned_bgr is None:
@@ -78,7 +77,6 @@ def find_full_rank_from_aligned(identifier, aligned_image_path, expected_card_id
 
     return found_rank, found_sim
 
-
 def process_one(identifier, image_path, top_k, expected_card_id, use_tta, full_rank_search):
     if not os.path.exists(image_path):
         print(f"[error] File tidak ditemukan: {image_path}")
@@ -123,7 +121,6 @@ def process_one(identifier, image_path, top_k, expected_card_id, use_tta, full_r
         if full_rank_search or not in_topk:
             find_full_rank_from_aligned(identifier, debug_path, expected_card_id, use_tta=use_tta)
 
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("image_path", nargs="?",
@@ -132,6 +129,10 @@ def main():
     parser.add_argument("--use_tta", action="store_true", help="Aktifkan Test-Time Augmentation.")
     parser.add_argument("--no_orb_rerank", action="store_true",
                          help="Matikan ORB re-rank (default: AKTIF). Pakai ini kalau mau tes cepat tanpa verifikasi ORB.")
+    parser.add_argument("--orb_pool_size", type=int, default=35,
+                         help="Jumlah kandidat FAISS teratas yang ikut diverifikasi ORB (default: 35). "
+                              "Naikkan kalau kartu yang benar sering ranking-nya di luar jangkauan ini "
+                              "(cek lewat --expected_card_id), tapi makin besar makin lambat.")
     parser.add_argument("--expected_card_id", type=str, default=None,
                          help="card_id yang BENAR (kalau tahu), untuk validasi otomatis.")
     parser.add_argument("--full_rank_search", action="store_true",
@@ -139,8 +140,10 @@ def main():
     args = parser.parse_args()
 
     print("Memuat AI Engine dan Index (mohon tunggu)...")
-    identifier = CardIdentifier(use_tta=args.use_tta, use_orb_rerank=not args.no_orb_rerank)
+    identifier = CardIdentifier(use_tta=args.use_tta, use_orb_rerank=not args.no_orb_rerank,
+                                 orb_rerank_pool_size=args.orb_pool_size)
     print(f"[debug] use_tta={args.use_tta}  use_orb_rerank={not args.no_orb_rerank}  "
+          f"orb_pool_size={args.orb_pool_size}  "
           f"confidence_temperature={identifier.confidence_temperature}")
 
     if args.image_path:
