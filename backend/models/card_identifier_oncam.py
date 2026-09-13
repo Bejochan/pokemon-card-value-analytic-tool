@@ -1,6 +1,7 @@
+import os
 import cv2
 import numpy as np
-from card_identifier import CardIdentifier
+from card_identifier import CardIdentifier  # Sesuaikan dengan nama file engine kamu
 
 # Ambang batas ketajaman (variance of Laplacian). Nilai wajar untuk webcam biasa
 # ada di kisaran 60-150 tergantung resolusi & lensa -- kalibrasi ulang sesuai
@@ -8,9 +9,15 @@ from card_identifier import CardIdentifier
 SHARPNESS_THRESHOLD = 80.0
 BURST_FRAMES = 5
 
-USE_TTA = False
+# --- KONFIGURASI ENGINE ---
+USE_TTA = False              # rata-rata beberapa varian gambar; belum terbukti perlu, biarkan mati dulu
+USE_ORB_RERANK = True        # AKTIF DEFAULT -- prioritaskan akurasi (lihat docstring modul)
+ORB_POOL_SIZE = 35           # jumlah kandidat FAISS teratas yang diverifikasi ORB
+
+# --- MODE DEBUG (opsional, matikan kalau sudah tidak perlu detail teknis di konsol) ---
 DEBUG_MODE = True
 DEBUG_TOP_K = 5
+DEBUG_ALIGNED_PATH = "debug_last_scan_aligned.jpg"
 
 LABEL_COLOR = {
     "Tinggi": (0, 200, 0),      # hijau (BGR)
@@ -18,13 +25,10 @@ LABEL_COLOR = {
     "Rendah": (0, 0, 255),      # merah
 }
 
-
 def sharpness_score(gray_frame):
-    """Variance of Laplacian -- makin tinggi, makin tajam (tidak blur)."""
     return cv2.Laplacian(gray_frame, cv2.CV_64F).var()
 
 def capture_best_of_burst(cap, x1, y1, x2, y2, n_frames=BURST_FRAMES):
-    """Ambil beberapa frame berturut-turut, kembalikan crop yang paling tajam."""
     best_crop = None
     best_score = -1.0
     for _ in range(n_frames):
@@ -40,11 +44,22 @@ def capture_best_of_burst(cap, x1, y1, x2, y2, n_frames=BURST_FRAMES):
     return best_crop, best_score
 
 
+def show_scanning_indicator(window_name, frame, x1, y1, x2, y2):
+    overlay_frame = frame.copy()
+    cv2.rectangle(overlay_frame, (x1, y1), (x2, y2), (0, 200, 255), 3)
+    cv2.putText(overlay_frame, "Memindai... mohon tunggu", (x1 - 10, y1 - 15),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2)
+    cv2.imshow(window_name, overlay_frame)
+    cv2.waitKey(1)  # paksa refresh layar sebelum lanjut ke proses blocking
+
+
 def main():
     print("Memuat AI Engine dan Index (Mohon tunggu sebentar)...")
     try:
-        identifier = CardIdentifier(use_tta=USE_TTA)
-        print(f"[debug] use_tta={USE_TTA}  confidence_temperature={identifier.confidence_temperature}")
+        identifier = CardIdentifier(use_tta=USE_TTA, use_orb_rerank=USE_ORB_RERANK,
+                                     orb_rerank_pool_size=ORB_POOL_SIZE)
+        print(f"[debug] use_tta={USE_TTA}  use_orb_rerank={USE_ORB_RERANK}  "
+              f"orb_pool_size={ORB_POOL_SIZE}  confidence_temperature={identifier.confidence_temperature}")
     except Exception as e:
         print(f"Gagal memuat engine: {e}")
         return
@@ -55,10 +70,14 @@ def main():
         print("Error: Kamera tidak dapat diakses atau sedang digunakan aplikasi lain.")
         return
 
+    WINDOW_NAME = "Pemindai Kartu Pokemon"
+
     print("\n=======================================================")
     print("Kamera menyala!")
     print("Posisikan kartu TEPAT di dalam kotak hijau di layar.")
     print("Tekan 's' pada keyboard untuk SCAN kartu di layar.")
+    if USE_ORB_RERANK:
+        print("(ORB re-rank aktif -- tiap scan makan waktu ~0.8-1.2 detik, ini normal)")
     print("Tekan 'q' pada keyboard untuk KELUAR dari program.")
     print("=======================================================\n")
 
@@ -106,7 +125,7 @@ def main():
             cv2.putText(display_frame, last_result_text, (10, 60),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, last_result_color, 2)
 
-        cv2.imshow("Pemindai Kartu Pokemon", display_frame)
+        cv2.imshow(WINDOW_NAME, display_frame)
         cv2.imshow("Debug: Hasil Crop Kartu (Input AI)", cropped_frame)
 
         key = cv2.waitKey(1) & 0xFF
@@ -121,8 +140,15 @@ def main():
                 last_result_color = (0, 0, 255)
                 continue
 
+            if USE_ORB_RERANK:
+                show_scanning_indicator(WINDOW_NAME, frame, x1, y1, x2, y2)
+
             print(f"Memindai kartu (ketajaman terbaik: {best_score:.0f})... 🔍")
-            result = identifier.identify_card(best_crop, top_k=DEBUG_TOP_K, debug=DEBUG_MODE)
+            save_path = DEBUG_ALIGNED_PATH if DEBUG_MODE else None
+            result = identifier.identify_card(best_crop, top_k=DEBUG_TOP_K, debug=DEBUG_MODE,
+                                               debug_save_path=save_path)
+            if DEBUG_MODE:
+                print(f"[debug] gambar hasil alignment disimpan di: {os.path.abspath(DEBUG_ALIGNED_PATH)}")
 
             if result['status'] == 'success' and result['candidates']:
                 top_match = result['candidates'][0]
@@ -135,9 +161,10 @@ def main():
                     print(f"[debug] raw_similarity_score (top-1)  : {top_match.get('raw_similarity_score')}")
                     print(f"[debug] margin_to_runner_up            : {top_match.get('margin_to_runner_up')}")
                     print(f"[debug] temperature dipakai            : {result.get('debug_temperature')}")
-                    print(f"[debug] {DEBUG_TOP_K} kandidat teratas (nama - raw_sim - confidence):")
+                    print(f"[debug] {DEBUG_TOP_K} kandidat teratas (nama - raw_sim - conf - orb):")
                     for c in result['candidates']:
-                        print(f"         #{c['rank']} {c.get('name','?'):20s} raw={c['raw_similarity_score']:.4f}  conf={c['confidence_percentage']}%")
+                        orb_str = f" orb={c['orb_verification_score']:.3f}" if c.get('orb_verification_score') is not None else ""
+                        print(f"         #{c['rank']} {c.get('name','?'):20s} raw={c['raw_similarity_score']:.4f}  conf={c['confidence_percentage']}%{orb_str}")
                     pool = result.get('debug_similarity_pool', [])
                     print(f"[debug] seluruh pool similarity (top-{len(pool)}): {pool}")
 
@@ -157,7 +184,6 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     main()
