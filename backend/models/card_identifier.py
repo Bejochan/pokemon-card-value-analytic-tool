@@ -328,18 +328,20 @@ class CardIdentifier:
     # ------------------------------------------------------------------
     # MAIN ENTRY POINT
     # ------------------------------------------------------------------
-    def identify_card(self, image_input, top_k=3, debug=False, debug_save_path=None):
+    def identify_card(self, image_input, top_k=3, debug=False, debug_save_path=None, auto_align=True):
         t0 = time.time()
 
         if isinstance(image_input, str):
             image_np = cv2.imread(image_input)
-            aligned_bgr = self.align_card_image(image_np)
+            aligned_bgr = self.align_card_image(image_np) if auto_align else cv2.resize(image_np, (448, 625))
             pil_img = Image.fromarray(cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2RGB))
         elif isinstance(image_input, np.ndarray):
-            aligned_bgr = self.align_card_image(image_input)
+            aligned_bgr = self.align_card_image(image_input) if auto_align else cv2.resize(image_input, (448, 625))
             pil_img = Image.fromarray(cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2RGB))
         elif isinstance(image_input, Image.Image):
             pil_img = image_input.convert("RGB")
+            if not auto_align:
+                pil_img = pil_img.resize((448, 625), Image.Resampling.BILINEAR)
             aligned_bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
         else:
             raise ValueError("Format image_input tidak valid! Gunakan path str, PIL Image, atau np.ndarray.")
