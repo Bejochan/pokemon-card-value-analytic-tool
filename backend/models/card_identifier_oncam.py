@@ -1,20 +1,25 @@
 import os
+import sys
 import cv2
 import numpy as np
-from card_identifier import CardIdentifier  # Sesuaikan dengan nama file engine kamu
 
-# Ambang batas ketajaman (variance of Laplacian). Nilai wajar untuk webcam biasa
-# ada di kisaran 60-150 tergantung resolusi & lensa -- kalibrasi ulang sesuai
-# kamera Anda kalau terlalu sering "kurang tajam" padahal fotonya sudah jelas.
-SHARPNESS_THRESHOLD = 80.0
-BURST_FRAMES = 5
+# Pastikan folder model ada di python path
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
+
+from card_identifier import CardIdentifier
+
+# Ambang batas ketajaman (variance of Laplacian).
+SHARPNESS_THRESHOLD = 70.0
+BURST_FRAMES = 6
 
 # --- KONFIGURASI ENGINE ---
-USE_TTA = False              # rata-rata beberapa varian gambar; belum terbukti perlu, biarkan mati dulu
-USE_ORB_RERANK = True        # AKTIF DEFAULT -- prioritaskan akurasi (lihat docstring modul)
-ORB_POOL_SIZE = 35           # jumlah kandidat FAISS teratas yang diverifikasi ORB
+USE_TTA = False              # Rata-rata augmentasi gambar
+USE_ORB_RERANK = True        # AKTIF -- pencocokan keypoint fitur visual lokal
+ORB_POOL_SIZE = 50           # Naikkan ke 50 kandidat agar tahan terhadap noise/variasi cahaya
 
-# --- MODE DEBUG (opsional, matikan kalau sudah tidak perlu detail teknis di konsol) ---
+# --- MODE DEBUG ---
 DEBUG_MODE = True
 DEBUG_TOP_K = 5
 DEBUG_ALIGNED_PATH = "debug_last_scan_aligned.jpg"
@@ -43,15 +48,13 @@ def capture_best_of_burst(cap, x1, y1, x2, y2, n_frames=BURST_FRAMES):
             best_crop = crop
     return best_crop, best_score
 
-
 def show_scanning_indicator(window_name, frame, x1, y1, x2, y2):
     overlay_frame = frame.copy()
     cv2.rectangle(overlay_frame, (x1, y1), (x2, y2), (0, 200, 255), 3)
     cv2.putText(overlay_frame, "Memindai... mohon tunggu", (x1 - 10, y1 - 15),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2)
     cv2.imshow(window_name, overlay_frame)
-    cv2.waitKey(1)  # paksa refresh layar sebelum lanjut ke proses blocking
-
+    cv2.waitKey(1)
 
 def main():
     print("Memuat AI Engine dan Index (Mohon tunggu sebentar)...")
@@ -64,11 +67,19 @@ def main():
         print(f"Gagal memuat engine: {e}")
         return
 
+    # Inisialisasi Kamera dengan preferensi resolusi HD (1280x720)
     cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
     if not cap.isOpened():
         print("Error: Kamera tidak dapat diakses atau sedang digunakan aplikasi lain.")
         return
+
+    # Baca resolusi riil yang disetujui oleh driver kamera
+    actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print(f"[info] Resolusi Kamera Terdeteksi: {actual_w}x{actual_h}")
 
     WINDOW_NAME = "Pemindai Kartu Pokemon"
 
@@ -77,12 +88,14 @@ def main():
     print("Posisikan kartu TEPAT di dalam kotak hijau di layar.")
     print("Tekan 's' pada keyboard untuk SCAN kartu di layar.")
     if USE_ORB_RERANK:
-        print("(ORB re-rank aktif -- tiap scan makan waktu ~0.8-1.2 detik, ini normal)")
+        print(f"(ORB re-rank aktif -- top-{ORB_POOL_SIZE} kandidat diverifikasi keypoint)")
     print("Tekan 'q' pada keyboard untuk KELUAR dari program.")
     print("=======================================================\n")
 
-    CARD_WIDTH = 315
-    CARD_HEIGHT = 440
+    # Hitung proporsi kotak kartu berdasarkan aspek rasio standar kartu (63:88)
+    card_aspect = 63.0 / 88.0
+    CARD_HEIGHT = int(actual_h * 0.72)
+    CARD_WIDTH = int(CARD_HEIGHT * card_aspect)
 
     last_result_text = ""
     last_result_color = (255, 255, 255)
@@ -107,23 +120,34 @@ def main():
         display_frame = frame.copy()
         overlay = display_frame.copy()
         cv2.rectangle(overlay, (0, 0), (w, h), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.5, display_frame, 0.5, 0, display_frame)
+        cv2.addWeighted(overlay, 0.45, display_frame, 0.55, 0, display_frame)
         display_frame[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
 
         guide_color = (0, 255, 0) if is_sharp_enough else (0, 165, 255)
         cv2.rectangle(display_frame, (x1, y1), (x2, y2), guide_color, 2)
 
-        guide_text = "Posisikan kartu di dalam kotak" if is_sharp_enough else "Gambar kurang tajam - dekatkan/stabilkan"
+        # Corner accents
+        corner_len = 20
+        cv2.line(display_frame, (x1, y1), (x1 + corner_len, y1), (0, 255, 255), 3)
+        cv2.line(display_frame, (x1, y1), (x1, y1 + corner_len), (0, 255, 255), 3)
+        cv2.line(display_frame, (x2, y1), (x2 - corner_len, y1), (0, 255, 255), 3)
+        cv2.line(display_frame, (x2, y1), (x2, y1 + corner_len), (0, 255, 255), 3)
+        cv2.line(display_frame, (x1, y2), (x1 + corner_len, y2), (0, 255, 255), 3)
+        cv2.line(display_frame, (x1, y2), (x1, y2 - corner_len), (0, 255, 255), 3)
+        cv2.line(display_frame, (x2, y2), (x2 - corner_len, y2), (0, 255, 255), 3)
+        cv2.line(display_frame, (x2, y2), (x2, y2 - corner_len), (0, 255, 255), 3)
+
+        guide_text = "Posisikan kartu pas di dalam kotak" if is_sharp_enough else "Gambar buram/goyang - stabilkan posisi"
         cv2.putText(display_frame, guide_text, (x1 - 10, y1 - 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, guide_color, 2)
+        cv2.putText(display_frame, "[S] Scan | [Q] Keluar", (15, 35),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(display_frame, f"Ketajaman: {live_sharpness:.0f} (Target: >{SHARPNESS_THRESHOLD:.0f})", (15, h - 25),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, guide_color, 2)
-        cv2.putText(display_frame, "[S] Scan | [Q] Keluar", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        cv2.putText(display_frame, f"Ketajaman: {live_sharpness:.0f}", (10, h - 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, guide_color, 1)
 
         if last_result_text:
-            cv2.putText(display_frame, last_result_text, (10, 60),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, last_result_color, 2)
+            cv2.putText(display_frame, last_result_text, (15, 75),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, last_result_color, 2)
 
         cv2.imshow(WINDOW_NAME, display_frame)
         cv2.imshow("Debug: Hasil Crop Kartu (Input AI)", cropped_frame)
@@ -134,7 +158,7 @@ def main():
             print("\nMengambil beberapa frame untuk memilih yang paling tajam...")
             best_crop, best_score = capture_best_of_burst(cap, x1, y1, x2, y2)
 
-            if best_crop is None or best_score < SHARPNESS_THRESHOLD * 0.6:
+            if best_crop is None or best_score < SHARPNESS_THRESHOLD * 0.5:
                 print("Gambar terlalu blur untuk dipindai. Stabilkan kamera & coba lagi.")
                 last_result_text = "Terlalu blur, coba lagi"
                 last_result_color = (0, 0, 255)
@@ -145,10 +169,12 @@ def main():
 
             print(f"Memindai kartu (ketajaman terbaik: {best_score:.0f})... 🔍")
             save_path = DEBUG_ALIGNED_PATH if DEBUG_MODE else None
+
+            # Gunakan langsung crop kartu dari kotak panduan tanpa re-alignment yang merusak rasio/kontur
             result = identifier.identify_card(best_crop, top_k=DEBUG_TOP_K, debug=DEBUG_MODE,
-                                               debug_save_path=save_path)
+                                               debug_save_path=save_path, auto_align=False)
             if DEBUG_MODE:
-                print(f"[debug] gambar hasil alignment disimpan di: {os.path.abspath(DEBUG_ALIGNED_PATH)}")
+                print(f"[debug] gambar hasil scan disimpan di: {os.path.abspath(DEBUG_ALIGNED_PATH)}")
 
             if result['status'] == 'success' and result['candidates']:
                 top_match = result['candidates'][0]
