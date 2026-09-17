@@ -3,12 +3,27 @@ import sys
 import cv2
 import numpy as np
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # baca file .env di root project kalau ada
+except ImportError:
+    print("[peringatan] python-dotenv belum terinstall (pip install python-dotenv).")
+    print("             Lanjut tanpa .env -- CAMERA_SOURCE akan pakai fallback default.")
+
 # Pastikan folder model ada di python path
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
 from card_identifier import CardIdentifier
+
+# Sumber kamera dibaca dari .env (var CAMERA_SOURCE), BUKAN di-hardcode.
+# - Isi dengan URL kamera IP, mis. CAMERA_SOURCE=http://192.168.1.5:8080/video
+# - Atau isi index webcam biasa, mis. CAMERA_SOURCE=0
+# - Kalau .env tidak ada / variabel tidak diisi, fallback ke webcam default (index 0)
+# Lihat .env.example untuk template.
+_camera_source_raw = os.getenv("CAMERA_SOURCE", "0")
+CAMERA_SOURCE = int(_camera_source_raw) if _camera_source_raw.strip().isdigit() else _camera_source_raw
 
 # Ambang batas ketajaman (variance of Laplacian).
 SHARPNESS_THRESHOLD = 70.0
@@ -67,13 +82,16 @@ def main():
         print(f"Gagal memuat engine: {e}")
         return
 
-    # Inisialisasi Kamera dengan preferensi resolusi HD (1280x720)
-    cap = cv2.VideoCapture(1)
+    # Inisialisasi Kamera dari CAMERA_SOURCE (.env), preferensi resolusi HD (1280x720)
+    print(f"[info] Menghubungkan ke sumber kamera: {CAMERA_SOURCE}")
+    cap = cv2.VideoCapture(CAMERA_SOURCE)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
     if not cap.isOpened():
-        print("Error: Kamera tidak dapat diakses atau sedang digunakan aplikasi lain.")
+        print(f"Error: Kamera '{CAMERA_SOURCE}' tidak dapat diakses.")
+        print("Cek lagi CAMERA_SOURCE di file .env kamu, atau pastikan aplikasi kamera IP")
+        print("di HP sedang aktif & terhubung ke jaringan WiFi yang sama.")
         return
 
     # Baca resolusi riil yang disetujui oleh driver kamera
@@ -170,9 +188,16 @@ def main():
             print(f"Memindai kartu (ketajaman terbaik: {best_score:.0f})... 🔍")
             save_path = DEBUG_ALIGNED_PATH if DEBUG_MODE else None
 
-            # Gunakan langsung crop kartu dari kotak panduan tanpa re-alignment yang merusak rasio/kontur
+            # v3.2 FIX: kembalikan ke auto_align=True (default). Kotak panduan cuma
+            # bantu POSISI kartu di frame, BUKAN pengganti alignment. Menonaktifkan
+            # alignment (auto_align=False) berarti gambar langsung di-resize paksa
+            # ke 448x625 tanpa deteksi tepi, tanpa koreksi rotasi/kemiringan, dan
+            # tanpa buang sisa background -- ini kemungkinan besar penyebab utama
+            # banyak kartu gagal terdeteksi & confidence rendah, karena akurasi
+            # sepenuhnya bergantung pada presisi tangan memposisikan kartu pas di
+            # kotak panduan (yang hampir mustahil sempurna).
             result = identifier.identify_card(best_crop, top_k=DEBUG_TOP_K, debug=DEBUG_MODE,
-                                               debug_save_path=save_path, auto_align=False)
+                                               debug_save_path=save_path)
             if DEBUG_MODE:
                 print(f"[debug] gambar hasil scan disimpan di: {os.path.abspath(DEBUG_ALIGNED_PATH)}")
 
