@@ -87,7 +87,20 @@ class PokemonCardDataset(Dataset):
             return torch.zeros((3, 224, 224)), idx, card_id
 
 
-def build_index(batch_size=128, num_workers=2):
+def build_index(batch_size=64, num_workers=0):
+    """
+    v1.1: num_workers default diubah ke 0 (bukan multiprocessing), dan
+    pin_memory dikondisikan hanya nyala kalau ada GPU (CUDA). Ini perbaikan
+    dari error "not enough memory" untuk alokasi kecil (~600KB) yang muncul
+    di Windows -- itu BUKAN benar-benar kehabisan RAM, tapi gejala klasik
+    worker process DataLoader Windows yang crash/corrupt secara acak saat
+    num_workers>0, terutama kalau dikombinasikan pin_memory=True padahal
+    jalan di CPU (pin_memory cuma berguna untuk transfer CPU->GPU).
+
+    Kalau proses ini terasa lambat & komputer kamu punya banyak core CPU
+    nganggur, boleh coba naikkan num_workers ke 2 -- tapi kalau muncul error
+    "not enough memory" lagi, turunkan lagi ke 0.
+    """
     start_time = time.time()
 
     print(f"1. Memuat model CLIP ({CLIP_MODEL_NAME}/{CLIP_PRETRAINED}) ke {DEVICE}...")
@@ -105,8 +118,9 @@ def build_index(batch_size=128, num_workers=2):
     print(f"2. Ditemukan {total_images:,} berkas gambar di {IMAGE_DIR}")
 
     dataset = PokemonCardDataset(IMAGE_DIR, image_files, transform=preprocess)
+    use_pin_memory = torch.cuda.is_available()  # cuma berguna kalau ada GPU
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False,
-                             num_workers=num_workers, pin_memory=True)
+                             num_workers=num_workers, pin_memory=use_pin_memory)
 
     card_id_map = {}
     embeddings_list = []
