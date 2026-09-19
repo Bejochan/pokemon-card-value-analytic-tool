@@ -13,6 +13,7 @@ import sys
 import base64
 import argparse
 from pathlib import Path
+from collections import defaultdict
 
 import cv2
 import requests
@@ -38,14 +39,65 @@ CLASS_COLORS = {
 }
 DEFAULT_COLOR = (255, 255, 0)
 
-LOW_THRESH = 0.25
+LOW_THRESH = 0.20   
 HIGH_THRESH = 0.55
 SHARPNESS_THRESHOLD = 70.0
 
 CARD_ASPECT_RATIO = 63.0 / 88.0
-CARD_OUT_SIZE = (600, 837)
-CROP_MARGIN_RATIO = 0.08
+CARD_OUT_SIZE = (600, 837)  # Ukuran kartu asli (belum termasuk margin)
 
+def nms(detections: list[dict], iou_threshold: float = 0.4) -> list[dict]:
+    if not detections:
+        return []
+
+    def iou(a, b):
+        ax1, ay1 = a["x"] - a["width"]/2,  a["y"] - a["height"]/2
+        ax2, ay2 = a["x"] + a["width"]/2,  a["y"] + a["height"]/2
+        bx1, by1 = b["x"] - b["width"]/2,  b["y"] - b["height"]/2
+        bx2, by2 = b["x"] + b["width"]/2,  b["y"] + b["height"]/2
+        inter_w = max(0, min(ax2, bx2) - max(ax1, bx1))
+        inter_h = max(0, min(ay2, by2) - max(ay1, by1))
+        inter   = inter_w * inter_h
+        union   = (ax2-ax1)*(ay2-ay1) + (bx2-bx1)*(by2-by1) - inter
+        return inter / union if union > 0 else 0
+
+    # Kelompokkan per class, lalu NMS per class
+    by_class = defaultdict(list)
+    for d in detections:
+        by_class[d["class"]].append(d)
+
+    kept = []
+    for cls_dets in by_class.values():
+        cls_dets.sort(key=lambda d: d["confidence"], reverse=True)
+        suppressed = set()
+        for i, a in enumerate(cls_dets):
+            if i in suppressed:
+                continue
+            kept.append(a)
+            for j, b in enumerate(cls_dets[i+1:], i+1):
+                if iou(a, b) > iou_threshold:
+                    suppressed.add(j)
+    return kept
+
+def filter_edge_detections(detections: list[dict], img_w: int, img_h: int,
+                            border_ratio: float = 0.25) -> list[dict]:
+    """Buang deteksi Edge Wear / Corner Wear yang posisinya jauh dari tepi kartu."""
+    result = []
+    for d in detections:
+        if d["class"] in ["Scratch", "Card"]:
+            result.append(d)  # Scratch dan Card tidak difilter lokasinya
+            continue
+        
+        cx, cy = d["x"], d["y"]
+        near_edge = (
+            cx < img_w * border_ratio or
+            cx > img_w * (1 - border_ratio) or
+            cy < img_h * border_ratio or
+            cy > img_h * (1 - border_ratio)
+        )
+        if near_edge:
+            result.append(d)
+    return result
 
 def sharpness_score(gray_frame: np.ndarray) -> float:
     return cv2.Laplacian(gray_frame, cv2.CV_64F).var()
@@ -78,11 +130,6 @@ def _aspect_ok(rect, tol=0.20):
     return None
 
 
-def _expand_rect(rect, ratio=CROP_MARGIN_RATIO):
-    center = rect.mean(axis=0)
-    return (center + (rect - center) * (1 + ratio)).astype("float32")
-
-
 def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray | None:
     h_img, w_img = image_np.shape[:2]
     frame_area = h_img * w_img
@@ -90,98 +137,117 @@ def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray
     max_area = 0.92 * frame_area
     border_margin = 2
     max_sides_touch = 3
-    solidity_thresh = 0.50
-    extent_thresh = 0.80
+    solidity_thresh = 0.40
+    extent_thresh = 0.75
 
     gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
-    smooth = cv2.bilateralFilter(gray, d=9, sigmaColor=60, sigmaSpace=60)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray_eq = clahe.apply(smooth)
-    edges_base = cv2.Canny(gray_eq, 40, 120)
 
-    best = None  # (area, rect, orientation)
+    # Otsu-based segmentation
+    # Blur sangat agresif untuk mematikan total tekstur bg
+    blurred = cv2.GaussianBlur(gray, (51, 51), 0)
+    # Otsu otomatis cari threshold optimal antara kartu vs bg
+    _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # Morphology untuk tutup gap dan buang noise kecil
+    kernel_close = np.ones((25, 25), np.uint8)
+    kernel_open  = np.ones((15, 15), np.uint8)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_close, iterations=3)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN,  kernel_open,  iterations=2)
 
-    for ksize, iters in [(5, 2), (7, 2), (9, 3), (11, 3), (13, 4)]:
-        kernel = np.ones((ksize, ksize), np.uint8)
-        edges = cv2.morphologyEx(edges_base, cv2.MORPH_CLOSE, kernel, iterations=iters)
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not contours:
+    # Pakai binary mask sebagai sumber kontur, bukan edges
+    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    best = None
+
+    if not contours:
+        return None
+
+    candidates = []
+    for c in contours:
+        area = cv2.contourArea(c)
+        if area < min_area or area > max_area:
             continue
+        x, y, w, h = cv2.boundingRect(c)
+        sides_touched = sum([
+            x <= border_margin, y <= border_margin,
+            x + w >= w_img - border_margin, y + h >= h_img - border_margin
+        ])
+        if sides_touched > max_sides_touch:
+            continue
+        hull = cv2.convexHull(c)
+        hull_area = cv2.contourArea(hull)
+        solidity = area / hull_area if hull_area > 0 else 0
+        if solidity < solidity_thresh:
+            continue
+        candidates.append((area, c))
 
-        candidates = []
-        for c in contours:
-            area = cv2.contourArea(c)
-            if area < min_area or area > max_area:
-                continue
-            x, y, w, h = cv2.boundingRect(c)
-            sides_touched = sum([
-                x <= border_margin, y <= border_margin,
-                x + w >= w_img - border_margin, y + h >= h_img - border_margin
-            ])
-            if sides_touched > max_sides_touch:
-                continue
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda t: t[0], reverse=True)
+
+    for area, c in candidates[:5]:
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+
+        rect = None
+        if len(approx) == 4 and cv2.isContourConvex(approx):
+            rect = _order_points(approx)
+        else:
             hull = cv2.convexHull(c)
-            hull_area = cv2.contourArea(hull)
-            solidity = area / hull_area if hull_area > 0 else 0
-            if solidity < solidity_thresh:
-                continue
-            candidates.append((area, c))
+            hull_peri = cv2.arcLength(hull, True)
+            for eps_factor in (0.02, 0.03, 0.05, 0.08):
+                hull_approx = cv2.approxPolyDP(hull, eps_factor * hull_peri, True)
+                if len(hull_approx) == 4 and cv2.isContourConvex(hull_approx):
+                    rect = _order_points(hull_approx)
+                    break
 
-        if not candidates:
+        if rect is None:
+            min_rect = cv2.minAreaRect(c)
+            (rw, rh) = min_rect[1]
+            rect_area = rw * rh
+            extent = (area / rect_area) if rect_area > 0 else 0
+            if extent < extent_thresh:
+                continue
+            box = cv2.boxPoints(min_rect)
+            rect = _order_points(box)
+
+        orientation = _aspect_ok(rect)
+        if orientation is None:
             continue
-        candidates.sort(key=lambda t: t[0], reverse=True)
 
-        for area, c in candidates[:5]:
-            peri = cv2.arcLength(c, True)
-            approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-
-            rect = None
-            if len(approx) == 4 and cv2.isContourConvex(approx):
-                rect = _order_points(approx)
-            else:
-                hull = cv2.convexHull(c)
-                hull_peri = cv2.arcLength(hull, True)
-                for eps_factor in (0.02, 0.03, 0.05):
-                    hull_approx = cv2.approxPolyDP(hull, eps_factor * hull_peri, True)
-                    if len(hull_approx) == 4 and cv2.isContourConvex(hull_approx):
-                        rect = _order_points(hull_approx)
-                        break
-
-            if rect is None:
-                min_rect = cv2.minAreaRect(c)
-                (rw, rh) = min_rect[1]
-                rect_area = rw * rh
-                extent = (area / rect_area) if rect_area > 0 else 0
-                if extent < extent_thresh:
-                    continue
-                box = cv2.boxPoints(min_rect)
-                rect = _order_points(box)
-
-            orientation = _aspect_ok(rect)
-            if orientation is None:
-                continue
-
-            if best is None or area > best[0]:
-                best = (area, rect, orientation)
+        if best is None or area > best[0]:
+            best = (area, rect, orientation)
 
     if best is None:
         return None
 
     _, rect, orientation = best
-    rect = _expand_rect(rect)
     width, height = out_size
+    margin = 120  # Margin 120 piksel agar background terlihat sangat luas dan tidak mepet
+
+    out_w = width + 2 * margin
+    out_h = height + 2 * margin
 
     if orientation == "landscape":
-        dst = np.array([[0, 0], [height - 1, 0], [height - 1, width - 1], [0, width - 1]], dtype="float32")
+        dst = np.array([
+            [margin, margin], 
+            [margin + height - 1, margin], 
+            [margin + height - 1, margin + width - 1], 
+            [margin, margin + width - 1]
+        ], dtype="float32")
         M = cv2.getPerspectiveTransform(rect, dst)
-        warped = cv2.warpPerspective(image_np, M, (height, width), flags=cv2.INTER_CUBIC)
-
+        warped = cv2.warpPerspective(image_np, M, (out_h, out_w), flags=cv2.INTER_CUBIC)
         warped = cv2.rotate(warped, cv2.ROTATE_90_CLOCKWISE)
         return warped
 
-    dst = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype="float32")
+    dst = np.array([
+        [margin, margin], 
+        [margin + width - 1, margin], 
+        [margin + width - 1, margin + height - 1], 
+        [margin, margin + height - 1]
+    ], dtype="float32")
     M = cv2.getPerspectiveTransform(rect, dst)
-    return cv2.warpPerspective(image_np, M, (width, height), flags=cv2.INTER_CUBIC)
+    return cv2.warpPerspective(image_np, M, (out_w, out_h), flags=cv2.INTER_CUBIC)
 
 
 def send_frame_to_roboflow(image: np.ndarray) -> dict | None:
@@ -208,6 +274,12 @@ def classify_defect_severity(predictions: list[dict],
     results = []
     for pred in predictions:
         if pred.get("class") == "Card":
+            # Card tidak disaring ketat seperti defect
+            results.append({
+                "class": pred["class"], "confidence": float(pred.get("confidence", 0)), 
+                "certainty": "Terdeteksi", "x": pred.get("x"), "y": pred.get("y"),
+                "width": pred.get("width"), "height": pred.get("height")
+            })
             continue
         conf = float(pred.get("confidence", 0.0))
         if conf < low_thresh:
@@ -238,7 +310,7 @@ def draw_detections(frame: np.ndarray, detections: list[dict]) -> np.ndarray:
         thickness = line_thick if certainty == "Terdeteksi" else max(1, line_thick - 1)
         cv2.rectangle(overlay, (x1, y1), (x2, y2), color, thickness)
 
-        tag = "✓" if certainty == "Terdeteksi" else "?"
+        tag = "[V]" if certainty == "Terdeteksi" else "[?]"
         text = f"{label} {confidence:.1%} {tag}"
         (tw, th), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, line_thick)
         cv2.rectangle(overlay, (x1, y1 - th - baseline - 10), (x1 + tw + 10, y1), color, -1)
@@ -248,10 +320,12 @@ def draw_detections(frame: np.ndarray, detections: list[dict]) -> np.ndarray:
 
 
 def print_side_summary(side_label: str, detections: list[dict]):
-    print(f"\n[+] {side_label} — {len(detections)} defect terklasifikasi\n")
+    # Jangan hitung kelas 'Card' sebagai defect
+    defects = [d for d in detections if d["class"] != "Card"]
+    print(f"\n[+] {side_label} — {len(defects)} defect terklasifikasi\n")
     print("    -----------------------------------")
     for cls in ["Corner Wear", "Edge Wear", "Scratch"]:
-        matches = [d for d in detections if d["class"] == cls]
+        matches = [d for d in defects if d["class"] == cls]
         if matches:
             best = max(matches, key=lambda d: d["confidence"])
             print(f"    {cls:<12s} : {best['confidence']:.1%}  [{best['certainty']}]")
@@ -270,21 +344,41 @@ def process_side(image_path: str, side_label: str,
 
     cropped_card = auto_detect_card(image)
     if cropped_card is None:
-        print(f"[!] Deteksi kartu otomatis gagal untuk {side_label}. Coba foto dengan background lebih kontras/rata.")
+        debug_path = _script_dir / f"debug_{side_label.replace(' ', '_')}.jpg"
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        smooth = cv2.bilateralFilter(gray, 9, 60, 60)
+        clahe = cv2.createCLAHE(2.0, (8, 8))
+        edges = cv2.Canny(clahe.apply(smooth), 40, 120)
+        cv2.imwrite(str(debug_path), edges)
+        print(f"[DEBUG] Edge map disimpan ke: {debug_path} — cek apakah outline kartu terlihat")
+        
+        print(f"[!] Deteksi kartu otomatis gagal...")
         return None
 
     gray = cv2.cvtColor(cropped_card, cv2.COLOR_BGR2GRAY)
     score = sharpness_score(gray)
     print(f"[*] Skor ketajaman: {score:.1f} (ambang: {SHARPNESS_THRESHOLD:.0f})")
     if score < SHARPNESS_THRESHOLD:
-        print(f"[!] Gambar {side_label} terlalu blur, hasil defect detection mungkin tidak akurat.")
+        print(f"[!] Gambar {side_label} agak blur — menerapkan preprocessing tambahan...")
+
+    # Terapkan CLAHE untuk meningkatkan kontras sebelum dikirim ke API
+    lab = cv2.cvtColor(cropped_card, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+    enhanced = cv2.merge((clahe.apply(l), a, b))
+    send_image = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
 
     print(f"[*] Mengirim {side_label} ke API...")
-    result = send_frame_to_roboflow(cropped_card)
+    result = send_frame_to_roboflow(send_image)
     if result is None:
         return None
 
-    detections = classify_defect_severity(result.get("predictions", []), low_thresh, high_thresh)
+    # ── Filter & deduplikasi ──
+    raw_preds = result.get("predictions", [])
+    detections = classify_defect_severity(raw_preds, low_thresh, high_thresh)
+    detections = nms(detections)
+    h, w = cropped_card.shape[:2]
+    detections = filter_edge_detections(detections, w, h, border_ratio=0.25)
     print_side_summary(side_label, detections)
 
     annotated = draw_detections(cropped_card, detections)
@@ -297,13 +391,25 @@ def process_side(image_path: str, side_label: str,
 
 
 def print_combined_conclusion(front_detections: list[dict] | None, back_detections: list[dict] | None):
+    print("\n" + "=" * 40)
+    print("KESIMPULAN GABUNGAN (DEPAN + BELAKANG)")
+    print("=" * 40)
+
+    # ← Tambahkan ini
+    if front_detections is None and back_detections is None:
+        print("[✗] Kedua sisi GAGAL dianalisis — kartu tidak terdeteksi.")
+        print("    Coba foto ulang dengan background kontras & pencahayaan merata.")
+        return
+
+    if front_detections is None:
+        print("[!] PERINGATAN: Sisi DEPAN gagal dianalisis, kesimpulan hanya dari sisi belakang.")
+    if back_detections is None:
+        print("[!] PERINGATAN: Sisi BELAKANG gagal dianalisis, kesimpulan hanya dari sisi depan.")
+
     all_detections = (front_detections or []) + (back_detections or [])
     solid = [d for d in all_detections if d["certainty"] == "Terdeteksi"]
     indicated = [d for d in all_detections if d["certainty"] != "Terdeteksi"]
 
-    print("\n" + "=" * 40)
-    print("KESIMPULAN GABUNGAN (DEPAN + BELAKANG)")
-    print("=" * 40)
     if solid:
         print(f"[!] {len(solid)} defect terkonfirmasi solid:")
         for d in solid:
