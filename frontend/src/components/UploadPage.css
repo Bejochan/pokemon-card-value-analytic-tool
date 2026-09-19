@@ -1,0 +1,178 @@
+.upload-container {
+  position: relative;
+  width: 100%;
+  min-height: calc(100vh - 70px);
+  
+  /* GANTI NAMA FILE DI BAWAH INI SESUAI BACKGROUND BARUMU */
+  background-image: url('/bg-upload.jpg'); 
+  
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* KARTU DI BELAKANG TABLET */
+.bg-card {
+  position: absolute;
+  width: 350px; 
+  
+  /* HAPUS border-radius dan box-shadow yang membuat kotak aneh */
+  /* GANTI dengan filter drop-shadow agar mengikuti bentuk asli PNG */
+  filter: drop-shadow(5px 15px 25px rgba(0,0,0,0.5));
+  
+  z-index: 1; 
+}
+
+.left-card {
+  /* Menggeser kartu ke kiri dulu, baru dimiringkan agar menyembul pas */
+  transform: translateX(-170px) rotate(-12deg);
+}
+
+.right-card {
+  /* Menggeser kartu ke kanan dulu, baru dimiringkan */
+  transform: translateX(170px) rotate(12deg);
+}
+
+/* BINGKAI TABLET GELAP */
+.device-frame {
+  position: relative;
+  z-index: 10; 
+  background-color: #1e1b4b; 
+  padding: 20px 12px; /* Sedikit menipiskan bezel layar */
+  border-radius: 20px;
+  box-shadow: 0px 20px 40px rgba(0,0,0,0.5);
+  
+  /* Mengecilkan ukuran tablet agar memberikan ruang kosong di atas dan bawah layar */
+  width: 380px;
+  height: 500px;
+  
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* --- LAYAR DAN PEMBUNGKUS KONTEN --- */
+.upload-screen {
+  background-color: #ffffff;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+  box-sizing: border-box;
+}
+
+/* Membungkus drop zone dan tombol kamera untuk digeser sedikit ke atas */
+.upload-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: -20px; 
+}
+
+/* --- KOTAK UPLOAD --- */
+.drop-zone {
+  border: 2px dashed #312e81; 
+  border-radius: 10px;
+  width: 100%;
+  padding: 30px 20px; /* Sedikit dikecilkan agar muat */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.upload-icon { font-size: 32px; margin-bottom: 10px; }
+.main-text { font-size: 16px; font-weight: bold; color: #333; margin: 0 0 5px 0; }
+.sub-text { font-size: 12px; color: #888; margin: 0 0 20px 0; }
+
+.browse-btn {
+  background-color: #e84588; 
+  color: #ffffff;
+  border: none;
+  padding: 10px 30px;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.browse-btn:hover { background-color: #312e81; }
+
+/* --- TOMBOL KAMERA --- */
+.or-text {
+  margin: 20px 0;
+  color: #bbb;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.open-camera-btn {
+  background-color: #ebc257; /* Menyamakan dengan warna frame tablet */
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s;
+  width: 80%;
+}
+.open-camera-btn:hover {
+  background-color: #312e81;
+}
+
+/* --- TAMPILAN KAMERA AKTIF --- */
+.camera-view {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.video-feed {
+  width: 100%;
+  border-radius: 10px;
+  background-color: #000;
+  border: 2px solid #1e1b4b;
+  margin-bottom: 20px;
+}
+
+.camera-controls {
+  display: flex;
+  gap: 15px;
+  width: 100%;
+}
+
+.scan-btn {
+  flex: 2;
+  background-color: #e83e8c; /* Pink utama */
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.cancel-btn {
+  flex: 1;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+}
+@keyframes scan {
+  0% { top: 0; }
+  100% { top: 100%; }
+}

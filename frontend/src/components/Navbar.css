@@ -1,0 +1,70 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #ffffff;
+  padding: 12px 20px;
+  /* Dibuat lebih tipis dari shadow tebal sebelumnya agar lebih premium */
+  border-bottom: 1px solid #eaeaea; 
+  font-family: 'Montserrat', sans-serif; /* Lexar menggunakan font sans-serif modern */
+}
+
+/* Membagi area menjadi 3 bagian yang simetris */
+.navbar-left {
+  display: flex;
+  align-items: center;
+  flex: 1; /* Memakan porsi 1 bagian */
+}
+
+.logo {
+  height: 45px; 
+}
+
+.navbar-center {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  flex: 2; /* Diberi porsi 2 bagian agar menempati ruang tengah penuh */
+}
+
+.navbar-right {
+  display: flex;
+  gap: 25px; /* Jarak antar ikon */
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1; /* Memakan porsi 1 bagian, menyeimbangkan sisi kiri */
+}
+
+/* GAYA FONT ALA LEXAR (Hitam, Kecil, Tebal, Kapital, Renggang) */
+.nav-link {
+  text-decoration: none;
+  color: #e83e8c; 
+  font-weight: 700;
+  font-size: 13px; 
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  transition: color 0.2s;
+}
+
+/* Saat disentuh mouse, warna berubah menjadi warna pink khas tema websitemu #e83e8c #000000 */
+.nav-link:hover {
+  color: #000000; 
+}
+
+/* GAYA TOMBOL IKON DUMMY */
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #e83e8c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  transition: transform 0.2s, color 0.2s;
+}
+
+.icon-btn:hover {
+  color: #000000;
+  transform: scale(1.1); /* Membesar sedikit saat disentuh */
+}

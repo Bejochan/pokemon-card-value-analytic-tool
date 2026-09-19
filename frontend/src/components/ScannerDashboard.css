@@ -1,0 +1,471 @@
+.dashboard-container {
+  position: relative;
+  width: 100%;
+  min-height: calc(100vh - 70px);
+  background-image: url('/bg-dashboard.jpg'); 
+  
+  /* Kembalikan ke cover agar rasio gambar tetap proporsional dan tidak melar */
+  background-size: cover; 
+  
+  background-position: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.price-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* EFEK CAHAYA (GLOW) DI BELAKANG KARTU */
+.glow-effect {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -70%);
+  width: 350px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 65%);
+  z-index: 1;
+}
+
+/* GAMBAR KARTU */
+.scanned-card {
+  width: 280px;
+  border-radius: 15px;
+  /* Properti box-shadow dihapus sepenuhnya dari sini */
+  z-index: 2;
+  position: relative;
+  margin-top: 20px;
+  margin-bottom: -30px;
+}
+
+/* 1. KONTAINER UTAMA (Sang Jangkar) */
+.price-tag-container {
+  position: relative;
+  /* Kita berikan ukuran pasti agar tidak melar mengikuti gambar */
+  width: 400px;
+  height: 120px;
+  
+  /* Jarak dengan kartu (atas) dan panah (bawah) murni diatur dari sini */
+  margin-top: 60px;    
+  margin-bottom: 60px; 
+}
+
+/* 2. GAMBAR HIJAU */
+.price-shape {
+  /* Kembali menjadi absolute agar ukuran raksasanya tidak merusak layar */
+  position: absolute; 
+  z-index: 1;
+  width: 1000px; 
+  
+  /* Posisikan tepat di tengah jangkar */
+  top: 50%;
+  left: 55%;
+  
+  /* Trik jitu: Pusatkan (-50%), LALU dorong ke kanan sejauh 250px */
+  /* Ubah angka 250px ini untuk mengatur seberapa jauh ia menembus layar kanan */
+  transform: translate(calc(-50% + 250px), -50%); 
+}
+
+/* 3. TEKS HARGA */
+.price-text {
+  position: absolute; 
+  z-index: 2;
+  font-size: 100px; 
+  
+  /* Karena titik pusatnya sekarang ada di bagian bawah teks, */
+  /* kamu perlu membesarkan angka top ini (misal 60%, 70%, 75%) */
+  /* agar teksnya kembali turun ke tengah kotak hijau. */
+  top: 80%;  
+  left: 55%; 
+  
+  /* INI KUNCINYA: Kombinasi translate dan translateY di ujung kiri dan kanan */
+  /* akan memaksa perspektif 3D hanya melengkungkan bagian atas teks saja. */
+  transform: translate(-50%, 0%) perspective(500px) rotateY(25deg) translateY(-50%); 
+  
+  color: white;
+  font-family: 'Anton', sans-serif;
+  letter-spacing: 3px;
+  text-shadow: 6px 6px 0px rgba(0,0,0,0.15);
+}
+
+/* TOMBOL PANAH BAWAH (Dengan animasi mengambang) */
+.down-arrow-btn {
+  position: absolute;
+  bottom: -35px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  z-index: 10;
+  /* animation: bounceArrow 2s infinite ease-in-out; */
+}
+
+.down-arrow-btn:hover {
+  transform: scale(1.1);
+}
+
+@keyframes bounceArrow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(10px); }
+}
+
+/* ANIMASI TRANSISI HALAMAN */
+.fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.slide-up {
+  animation: slideUp 0.6s ease-out forwards;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(50px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- TATA LETAK HALAMAN DETAIL -------------------------------------------------------------------------------------------------------------- */
+.details-view {
+  width: 100%;
+  /* 1. Ubah 100vh menjadi 100% agar ukurannya pas mengikuti sisa ruang di bawah navbar */
+  height: 100%; 
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  padding: 0;
+  box-sizing: border-box;
+  /* 2. Tambahkan margin negatif untuk menarik seluruh tata letak sedikit lebih tinggi lagi */
+  margin-top: -30px; 
+}
+
+.up-arrow-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 0px;
+  transition: transform 0.2s;
+}
+.up-arrow-btn:hover {
+  transform: translateY(-5px);
+}
+
+.details-grid {
+  display: flex;
+  gap: 30px;
+  width: 100%;
+  max-width: 100%;
+  height: 580px;
+}
+
+.info-box {
+  background-color: #ffffff;
+  border-radius: 25px;
+  padding: 30px;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+  flex: 1; /* Membuat kedua kotak berukuran sama besar */
+  display: flex;
+  box-sizing: border-box;
+}
+
+/* --- KOTAK KIRI (KARTU & TABEL) --- */
+.card-info-box {
+  border-radius: 0 25px 25px 0; /* Atas-kiri, Atas-kanan, Bawah-kanan, Bawah-kiri */
+}
+
+.card-visuals {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.detail-card-img {
+  width: 100%;
+  max-width: 260px;
+  border-radius: 12px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+}
+
+.celebration-logo {
+  margin-top: 20px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #1e1b4b;
+}
+
+.card-specs {
+  flex: 1.2;
+}
+
+/* RAHASIA TABEL INNER BORDER */
+.specs-table {
+  width: 100%;
+  border-collapse: collapse; /* Menyatukan garis yang bersentuhan */
+}
+
+.specs-table td {
+  padding: 14px 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #1e1b4b;
+  font-size: 13px;
+}
+
+/* Memberikan garis bawah pada semua baris, KECUALI baris terakhir (menghilangkan outer bawah) */
+.specs-table tr:not(:last-child) {
+  border-bottom: 2px solid #1e1b4b;
+}
+
+/* Memberikan garis kanan HANYA pada kolom pertama (membelah tengah) */
+.specs-table td:first-child {
+  border-right: 2px solid #1e1b4b;
+  width: 45%;
+}
+
+/* --- DETAIL FISIK KARTU --- */
+.specs-table td {
+  /* Kurangkan padding atas-bawah daripada 14px kepada 8px agar muat lebih banyak baris */
+  padding: 7px 10px; 
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #1e1b4b;
+  font-size: 12px; /* Teks dikecilkan sedikit */
+}
+
+/* GAYA BAHAGIAN KECACATAN FIZIKAL (BAHARU) */
+.defect-section {
+  margin-top: 15px; /* Jarak antara jadual atas dan bahagian amaran */
+  display: flex;
+  flex-direction: column;
+}
+
+.defect-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  margin: 0 0 5px 0;
+  font-weight: 800;
+}
+
+.defect-title.warning {
+  color: #d97706; /* Oren/Kuning untuk cacat */
+}
+
+.defect-title.success {
+  color: #00d26a; /* Hijau untuk aman */
+}
+
+.defect-clear-msg {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  color: #6c757d;
+  font-weight: 600;
+  margin: 0 0 15px 0;
+  padding-left: 5px;
+}
+
+.defect-list {
+  margin: 0 0 15px 0;
+  padding-left: 20px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  color: #1e1b4b;
+  font-weight: 600;
+}
+
+.defect-list li {
+  margin-bottom: 4px;
+}
+
+/* WARNA KHAS UNTUK TEKS JADUAL HARGA */
+.text-danger {
+  color: #dc2626 !important;
+}
+
+.text-success {
+  color: #00d26a !important;
+}
+
+/* --- KOTAK KANAN (ANALITIK) --- */
+.analytics-box {
+  border-radius: 25px 0 0 25px;
+  /* INI KUNCINYA: Memaksa elemen berbaris dari atas ke bawah */
+  display: flex;
+  flex-direction: column; 
+  /* Menyebarkan elemen agar mengisi ruang kosong secara merata */
+  justify-content: flex-start; 
+  /* gap diperkecil agar compact (sebelumnya 15px) */
+  gap: 15px; 
+}
+
+.analytics-title {
+  font-family: 'Montserrat', sans-serif; /* Ubah dari Anton ke Montserrat */
+  font-weight: 800; /* Ditebalkan */
+  color: #1e1b4b;
+  font-size: 17px; /* Dikecilkan */
+  letter-spacing: 0px; /* Hapus letter-spacing */
+  /* margin bawah diperkecil agar compact (sebelumnya 15px) */
+  margin: 0 0 0px 0; 
+}
+
+/* --- TATA LETAK KOTAK STATISTIK --- */
+.stats-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Spasi antar baris diperkecil */
+  /* Jarak bawah diminimalkan (sebelumnya 15px) agar teks grafik naik */
+  margin-bottom: 2px; 
+}
+
+.stats-row {
+  display: flex;
+  gap: 8px; /* Spasi antar kotak diperkecil */
+}
+
+.stat-card {
+  flex: 1;
+  background-color: #f8f9fa;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  padding: 20px; /* Padding diminimalkan agar compact */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.stat-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px; /* Teks label lebih kecil */
+  font-weight: 700;
+  color: #6c757d;
+  text-transform: uppercase;
+  margin-bottom: 2px; /* Didekatkan ke angka */
+}
+
+.stat-value {
+  font-family: 'Anton', sans-serif;
+  font-size: 18px; /* Angka sedikit dikecilkan */
+  letter-spacing: 1px;
+  color: #1e1b4b;
+}
+
+/* Teks tambahan kecil seperti "/100" atau persentase umur */
+.stat-sub {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 3px;
+  color: #adb5bd;
+}
+
+.text-green { color: #00d26a !important; }
+.text-pink { color: #e83e8c !important; }
+
+/* Desain Khusus untuk Kotak Trading Signal */
+.stat-card.signal-buy {
+  background-color: #00d26a; 
+  border-color: #00d26a;
+  box-shadow: none; /* Shadow dihilangkan agar rata (flat) */
+}
+
+.stat-card.signal-buy .stat-label,
+.stat-card.signal-buy .stat-value {
+  color: #ffffff; /* Mengubah teks menjadi putih agar kontras */
+}
+
+/* GRAFIK SVG */
+.chart-container {
+  background-color: #ffffff;
+  border-radius: 15px;
+  /* Ubah flex: 1 menjadi flex-grow yang lebih kecil agar tidak terlalu tinggi */
+  flex-grow: 0; 
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* Kurangi margin bottom agar tombol naik */
+  margin-bottom: 0px; 
+  width: 100%;
+  min-height: 0px; /* INIIIIIIIIII */
+}
+
+.svg-wrapper {
+  width: 100%;
+  /* Sisakan sedikit ruang margin agar titik ujung tidak terpotong tepi putih */
+  padding: 0 15px; 
+  box-sizing: border-box;
+}
+
+.chart-subtitle {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #1e1b4b;
+  font-size: 14px; 
+  /* Jarak vertikal diperkecil (sebelumnya 10px) agar compact */
+  margin: 10px 0 5px 0; /* Iniiiiiiii */
+}
+
+.market-chart {
+  width: 100%;
+  height: auto;
+  
+  /* 1. HAPUS atau komentari max-height yang mencekik grafik ini */
+  /* max-height: 120px; */ 
+  
+  /* 2. AKTIFKAN KEMBALI aspect-ratio ini. 
+        Rasio 5/2 persis sama dengan viewBox 500/200, 
+        sehingga lingkaran dijamin bulat sempurna meskipun ditarik selebar apa pun */
+  aspect-ratio: 5 / 2; 
+  
+  display: block; 
+  overflow: visible;
+}
+
+.chart-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  /* Padding 5px memastikan TENGAH teks sejajar dengan titik ujung grafik di atasnya */
+  padding: 0 5px; 
+  box-sizing: border-box;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #adb5bd;
+}
+
+.marketplace-btn {
+  flex-shrink: 0; 
+  /* Jarak atas diperkecil (sebelumnya 15px) agar compact */
+  margin-top: 5px; 
+  background-color: #e83e8c; 
+  color: white;
+  font-family: 'Anton', sans-serif;
+  font-size: 16px; 
+  letter-spacing: 1px;
+  border: none;
+  border-radius: 8px;
+  padding: 12px; 
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%; /* Pastikan tombol mengambil ruang penuh */
+}
+
+.marketplace-btn:hover {
+  background-color: #d83680;
+}
