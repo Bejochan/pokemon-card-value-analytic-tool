@@ -1,5 +1,3 @@
-PokeScan_Project_Documentation.md
-
 # ============================================
 # Python & Virtual Environments
 # ============================================
@@ -34,7 +32,14 @@ venv.bak/
 pokemon-cards/
 backend/models/*.pt
 backend/dataset/*.zip
+backend/dataset/card-condition-dataset/
+backend/dataset/pokemon-cards-dataset/
 backend/dataset/raw_images/
+backend/dataset/compressed_images/
+debug_manual_aligned.jpg
+debug_manual_aligned_clip.jpg
+debug_last_scan_aligned.jpg
+debug_last_scan_aligned_clip.jpg
 
 # ============================================
 # Node.js & Frontend
