@@ -19,10 +19,16 @@ import cv2
 import requests
 import numpy as np
 from dotenv import load_dotenv
+from pathlib import Path
 
+# Mendapatkan rute folder 'models' tempat script ini berada
 _script_dir = Path(__file__).resolve().parent
-_project_root = _script_dir.parent.parent
-load_dotenv(_project_root / ".env")
+
+# Mundur satu tingkat ke folder parent, yaitu 'backend'
+_backend_dir = _script_dir.parent
+
+# Memuat file .env yang ada di dalam folder 'backend'
+load_dotenv(_backend_dir / ".env")
 
 ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY")
 if not ROBOFLOW_API_KEY:
