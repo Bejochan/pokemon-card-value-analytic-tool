@@ -1,3 +1,19 @@
+"""
+=============================================================================
+Pokemon Card Value Analytic Tool — Model 1: Card Identifier Engine
+=============================================================================
+Arsitektur Utama: OpenAI CLIP (Vision Transformer ViT-B-32) + FAISS Index
++ ORB Keypoint Verification + 4-Way Smart Auto-Orientation.
+
+Engine ini adalah model resmi Model 1 untuk Regokemon:
+- Backbone: CLIP ViT-B-32 (openai pre-trained) untuk semantic visual retrieval.
+- Database: FAISS IndexFlatIP (20.426 kartu) dengan pencarian sub-milidetik.
+- Verifikasi: ORB local feature re-ranking untuk diskriminasi kartu varian mirip.
+- Ketahanan: 4-Way Auto-Orientation (0°, 90°, 180°, 270°) agar kartu selalu
+  dianalisis dalam posisi tegak lurus terlepas dari sudut pemotretan pengguna.
+=============================================================================
+"""
+
 import os
 import json
 import time
@@ -5,11 +21,9 @@ import cv2
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
-import torchvision.models as models
 from PIL import Image, ImageEnhance
 import faiss
+import open_clip
 
 # Configuration Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,18 +31,21 @@ MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 INDEX_PATH = os.path.join(MODEL_DIR, "card_embeddings.index")
 MAP_PATH = os.path.join(MODEL_DIR, "card_id_map.json")
 CSV_PATH = os.path.join(BASE_DIR, "dataset", "pokemon_cards_dataset_cleaned.csv")
-IMAGE_DIR = os.path.join(BASE_DIR, "dataset", "compressed_images")  # dipakai untuk ORB re-ranking (opsional)
+IMAGE_DIR = os.path.join(BASE_DIR, "dataset", "compressed_images")
+
+# Arsitektur CLIP Default
+CLIP_MODEL_NAME = "ViT-B-32"
+CLIP_PRETRAINED = "openai"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+CARD_ASPECT_RATIO = 63.0 / 88.0  # 0.7159
 
-# Rasio standar kartu Pokemon (lebar:tinggi = 63mm:88mm)
-CARD_ASPECT_RATIO = 63.0 / 88.0
 
 class CardIdentifier:
     def __init__(self, index_path=INDEX_PATH, map_path=MAP_PATH, csv_path=CSV_PATH,
                  image_dir=IMAGE_DIR, confidence_temperature=0.03,
-                 calibration_pool_size=20, use_tta=False, use_orb_rerank=False,
-                 orb_rerank_pool_size=35):
+                 calibration_pool_size=20, use_tta=False, use_orb_rerank=True,
+                 orb_rerank_pool_size=50):
         self.index_path = index_path
         self.map_path = map_path
         self.csv_path = csv_path
@@ -43,17 +60,17 @@ class CardIdentifier:
         self.index = None
         self.card_id_map = {}
         self.df_metadata = None
-        self.feature_extractor = None
+        self.clip_model = None
         self.transform = None
-        self._orb = None  # lazy init, cuma dibuat kalau use_orb_rerank dipakai
+        self._orb = None
 
         self._load_resources()
 
     def _load_resources(self):
         if not os.path.exists(self.index_path) or not os.path.exists(self.map_path):
             raise FileNotFoundError(
-                "Berkas model FAISS belum dibuat! Silakan jalankan "
-                "`python backend/models/build_card_index.py` terlebih dahulu."
+                f"Berkas index tidak ditemukan di {self.index_path}! "
+                "Silakan jalankan `python backend/models/build_card_index.py` terlebih dahulu."
             )
 
         self.index = faiss.read_index(self.index_path)
@@ -63,23 +80,16 @@ class CardIdentifier:
         if os.path.exists(self.csv_path):
             self.df_metadata = pd.read_csv(self.csv_path).set_index("card_id", drop=False)
 
-        weights = models.MobileNet_V3_Small_Weights.DEFAULT
-        backbone = models.mobilenet_v3_small(weights=weights)
-        self.feature_extractor = nn.Sequential(*list(backbone.children())[:-1], nn.Flatten())
-        self.feature_extractor.to(DEVICE)
-        self.feature_extractor.eval()
-
-        self.transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225]
-            )
-        ])
+        print(f"Memuat model CLIP ({CLIP_MODEL_NAME}/{CLIP_PRETRAINED}) ke {DEVICE}...")
+        model, _, preprocess = open_clip.create_model_and_transforms(
+            CLIP_MODEL_NAME, pretrained=CLIP_PRETRAINED, device=DEVICE
+        )
+        model.eval()
+        self.clip_model = model
+        self.transform = preprocess
 
     # ------------------------------------------------------------------
-    # ALIGNMENT — deteksi & luruskan kartu (v2: berlapis & ada fallback)
+    # ALIGNMENT & GEOMETRI
     # ------------------------------------------------------------------
     @staticmethod
     def _order_points(pts):
@@ -113,17 +123,8 @@ class CardIdentifier:
         min_area = 0.05 * frame_area
         max_area = 0.92 * frame_area
         border_margin = 2
-        max_sides_touch = 3     # v2.5: dilonggarkan dari 2 -- foto close-up dgn kartu
-                                # dirotasi bisa mepet ke 3 sisi frame secara wajar (terbukti
-                                # dari foto nyata), bukan cuma indikasi noise/background.
-                                # TRADE-OFF yang disadari: ini mengurangi proteksi terhadap
-                                # kasus adversarial "2 objek besar bertumpuk" -- diputuskan
-                                # dapat diterima karena kasus itu jarang di pemakaian normal,
-                                # sedangkan kegagalan pada foto close-up/rotasi wajar jauh
-                                # lebih sering terjadi & lebih merugikan pengalaman pengguna.
-        solidity_thresh = 0.50  # v2.5: diturunkan dari 0.80 -- kontur bisa jadi cekung kalau
-                                # ada objek asing yang menumpuk di pinggir kartu (kamera/tangan/
-                                # benda lain kena foto), bukan berarti bukan kartu.
+        max_sides_touch = 3
+        solidity_thresh = 0.50
         extent_thresh = 0.80
 
         try:
@@ -133,7 +134,7 @@ class CardIdentifier:
             gray_eq = clahe.apply(smooth)
             edges_base = cv2.Canny(gray_eq, 40, 120)
 
-            best = None  # (area, rect, status, orientation)
+            best = None
 
             for ksize, iters in [(5, 2), (7, 2), (9, 3), (11, 3), (13, 4)]:
                 kernel = np.ones((ksize, ksize), np.uint8)
@@ -177,10 +178,6 @@ class CardIdentifier:
                         rect = self._order_points(approx)
                         local_status = f"ALIGNED_4PT_k{ksize}"
                     else:
-                        # v2.5: BARU -- coba approxPolyDP di CONVEX HULL kontur, bukan
-                        # kontur mentahnya. Ini jauh lebih tahan kalau tepi kartu "digigit"
-                        # objek asing (jadi cekung) -- hull menghaluskan gigitan itu,
-                        # sering kali langsung menghasilkan 4 titik yang bersih.
                         hull = cv2.convexHull(c)
                         hull_peri = cv2.arcLength(hull, True)
                         for eps_factor in (0.02, 0.03, 0.05):
@@ -191,7 +188,6 @@ class CardIdentifier:
                                 break
 
                     if rect is None:
-                        # fallback terakhir: minAreaRect, divalidasi rasio area kontur/area rect
                         min_rect = cv2.minAreaRect(c)
                         (rw, rh) = min_rect[1]
                         rect_area = rw * rh
@@ -206,8 +202,6 @@ class CardIdentifier:
                     if orientation is None:
                         continue
 
-                    # JANGAN langsung return -- simpan sebagai kandidat terbaik SEJAUH
-                    # INI, lanjut cek kernel lebih besar siapa tahu nemu area lebih besar.
                     if best is None or area > best[0]:
                         best = (area, rect, local_status, orientation)
 
@@ -218,9 +212,6 @@ class CardIdentifier:
             width, height = out_size
 
             if orientation == "landscape":
-                # warp ke ukuran ALAMI (landscape) dulu -- reorientasi final
-                # (0/+90/-90 derajat) diputuskan di identify_card berdasar
-                # similarity ke database, bukan ditebak di sini.
                 dst = np.array([
                     [0, 0], [height - 1, 0], [height - 1, width - 1], [0, width - 1]
                 ], dtype="float32")
@@ -243,24 +234,74 @@ class CardIdentifier:
         return warped
 
     # ------------------------------------------------------------------
-    # FEATURE EXTRACTION
+    # FEATURE EXTRACTION (CLIP)
     # ------------------------------------------------------------------
     def _extract_embedding(self, pil_img):
         tensor_img = self.transform(pil_img).unsqueeze(0).to(DEVICE)
         with torch.no_grad():
-            feat = self.feature_extractor(tensor_img).cpu().numpy().astype("float32")
-        return feat
+            feat = self.clip_model.encode_image(tensor_img)
+            feat = feat / feat.norm(dim=-1, keepdim=True)
+        return feat.cpu().numpy().astype("float32")
 
     def _extract_embedding_tta(self, pil_img):
         variants = [pil_img]
-        for factor in (0.85, 1.15):
+        for factor in (0.88, 1.12):
             variants.append(ImageEnhance.Brightness(pil_img).enhance(factor))
-        for angle in (3, -3):
-            variants.append(pil_img.rotate(angle, resample=Image.BILINEAR,
-                                            fillcolor=(128, 128, 128)))
+        for angle in (-2, 2):
+            variants.append(pil_img.rotate(angle, resample=Image.Resampling.BILINEAR))
+
         feats = [self._extract_embedding(v) for v in variants]
-        feat = np.mean(np.vstack(feats), axis=0, keepdims=True).astype("float32")
-        return feat
+        avg_feat = np.mean(feats, axis=0)
+        faiss.normalize_L2(avg_feat)
+        return avg_feat
+
+    # ------------------------------------------------------------------
+    # 4-WAY SMART AUTO-ORIENTATION (0°, 90°, 180°, 270°)
+    # ------------------------------------------------------------------
+    def _ensure_best_orientation(self, aligned_bgr):
+        """
+        Memastikan kartu berada dalam orientasi TEGAK LURUS (portrait normal).
+        Mengevaluasi varian rotasi dan memilih arah yang menghasilkan
+        kemiripan tertinggi ke database FAISS.
+        """
+        h, w = aligned_bgr.shape[:2]
+        candidates = []
+
+        if w > h:
+            # Gambar berformat landscape -> uji putar 90° CW dan 90° CCW
+            rot_cw = cv2.rotate(aligned_bgr, cv2.ROTATE_90_CLOCKWISE)
+            rot_ccw = cv2.rotate(aligned_bgr, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            candidates = [rot_cw, rot_ccw]
+        else:
+            # Gambar berformat portrait -> uji tegak normal (0°) dan terbalik (180°)
+            rot_0 = aligned_bgr
+            rot_180 = cv2.rotate(aligned_bgr, cv2.ROTATE_180)
+            candidates = [rot_0, rot_180]
+
+            # Kasus kartu landscape di dalam kotak portrait (misal Hoothoot):
+            # jika rasio kartu tampak tertekan, siapkan juga varian rotasi 90°
+            rot_90 = cv2.resize(cv2.rotate(aligned_bgr, cv2.ROTATE_90_CLOCKWISE), (w, h))
+            rot_270 = cv2.resize(cv2.rotate(aligned_bgr, cv2.ROTATE_90_COUNTERCLOCKWISE), (w, h))
+            candidates.extend([rot_90, rot_270])
+
+        best_bgr = aligned_bgr
+        best_sim = -1.0
+
+        for cand_bgr in candidates:
+            cand_pil = Image.fromarray(cv2.cvtColor(cand_bgr, cv2.COLOR_BGR2RGB))
+            cand_feat = self._extract_embedding(cand_pil)
+            faiss.normalize_L2(cand_feat)
+            d, _ = self.index.search(cand_feat, 1)
+            sim = float(d[0][0])
+            if sim > best_sim:
+                best_sim = sim
+                best_bgr = cand_bgr
+
+        # Pastikan ukuran akhir presisi portrait (448 x 625)
+        if best_bgr.shape[0] != 625 or best_bgr.shape[1] != 448:
+            best_bgr = cv2.resize(best_bgr, (448, 625), interpolation=cv2.INTER_AREA)
+
+        return best_bgr
 
     # ------------------------------------------------------------------
     # CONFIDENCE CALIBRATION
@@ -269,25 +310,23 @@ class CardIdentifier:
         sims = np.asarray(sims_pool, dtype=np.float64)
         n = len(sims)
         margins = np.zeros(n)
-        for i in range(n - 1):
-            margins[i] = sims[i] - sims[i + 1]
-        # kandidat terakhir dalam pool tidak punya "kandidat di bawahnya" -> margin 0
-
+        if n > 1:
+            margins[:-1] = sims[:-1] - sims[1:]
+            margins[-1] = 0.0
         z = margins / self.confidence_temperature
-        probs = 1.0 / (1.0 + np.exp(-z))  # sigmoid per-rank, BUKAN softmax (tidak perlu jumlah ke 1)
-
+        probs = 1.0 / (1.0 + np.exp(-z))
         return probs, margins
 
     @staticmethod
     def _confidence_label(margin):
-        if margin >= 0.05:
+        if margin >= 0.035:
             return "Tinggi"
-        if margin >= 0.015:
+        if margin >= 0.010:
             return "Sedang"
         return "Rendah"
 
     # ------------------------------------------------------------------
-    # OPSIONAL: RE-RANKING DENGAN ORB LOCAL FEATURE MATCHING
+    # ORB KEYPOINT VERIFICATION
     # ------------------------------------------------------------------
     def _get_orb(self):
         if self._orb is None:
@@ -295,8 +334,6 @@ class CardIdentifier:
         return self._orb
 
     def _find_reference_image_path(self, card_id):
-        if not self.image_dir or not os.path.isdir(self.image_dir):
-            return None
         for ext in (".jpg", ".jpeg", ".png"):
             p = os.path.join(self.image_dir, f"{card_id}{ext}")
             if os.path.exists(p):
@@ -321,7 +358,7 @@ class CardIdentifier:
 
         bf = cv2.BFMatcher(cv2.NORM_HAMMING)
         matches = bf.knnMatch(d1, d2, k=2)
-        good = [m for m, n in matches if m.distance < ratio * n.distance]
+        good = [m for m, n in matches if len(m) == 2 and m[0].distance < ratio * m[1].distance] if isinstance(matches[0], list) and len(matches[0]) == 2 else [m for m, n in matches if m.distance < ratio * n.distance]
         denom = min(len(k1), len(k2))
         return len(good) / denom if denom > 0 else 0.0
 
@@ -334,38 +371,19 @@ class CardIdentifier:
         if isinstance(image_input, str):
             image_np = cv2.imread(image_input)
             aligned_bgr = self.align_card_image(image_np) if auto_align else cv2.resize(image_np, (448, 625))
-            pil_img = Image.fromarray(cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2RGB))
         elif isinstance(image_input, np.ndarray):
             aligned_bgr = self.align_card_image(image_input) if auto_align else cv2.resize(image_input, (448, 625))
-            pil_img = Image.fromarray(cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2RGB))
         elif isinstance(image_input, Image.Image):
-            pil_img = image_input.convert("RGB")
+            pil_img_temp = image_input.convert("RGB")
+            aligned_bgr = cv2.cvtColor(np.array(pil_img_temp), cv2.COLOR_RGB2BGR)
             if not auto_align:
-                pil_img = pil_img.resize((448, 625), Image.Resampling.BILINEAR)
-            aligned_bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+                aligned_bgr = cv2.resize(aligned_bgr, (448, 625))
         else:
             raise ValueError("Format image_input tidak valid! Gunakan path str, PIL Image, atau np.ndarray.")
 
-        # v2.4: kalau alignment menghasilkan gambar LANDSCAPE (kartu ke-foto
-        # miring ~90 derajat), coba 2 arah rotasi ke portrait dan pilih mana
-        # yang similarity-nya lebih tinggi ke database. Geometri kontur saja
-        # tidak bisa menentukan arah rotasi yang benar (perlu tahu orientasi
-        # baca teks di kartu) -- jadi diputuskan lewat similarity, bukan ditebak.
-        if aligned_bgr.shape[1] > aligned_bgr.shape[0]:
-            rot_cw = cv2.rotate(aligned_bgr, cv2.ROTATE_90_CLOCKWISE)
-            rot_ccw = cv2.rotate(aligned_bgr, cv2.ROTATE_90_COUNTERCLOCKWISE)
-            best_rot_bgr, best_rot_sim = aligned_bgr, -1.0
-            for candidate_bgr in (rot_cw, rot_ccw):
-                candidate_pil = Image.fromarray(cv2.cvtColor(candidate_bgr, cv2.COLOR_BGR2RGB))
-                candidate_feat = self._extract_embedding(candidate_pil)
-                faiss.normalize_L2(candidate_feat)
-                d, _ = self.index.search(candidate_feat, 1)
-                sim = float(d[0][0])
-                if sim > best_rot_sim:
-                    best_rot_sim = sim
-                    best_rot_bgr = candidate_bgr
-            aligned_bgr = best_rot_bgr
-            pil_img = Image.fromarray(cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2RGB))
+        # Lakukan 4-Way Smart Auto-Orientation agar kartu selalu tegak
+        aligned_bgr = self._ensure_best_orientation(aligned_bgr)
+        pil_img = Image.fromarray(cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2RGB))
 
         if debug_save_path:
             cv2.imwrite(debug_save_path, aligned_bgr)
@@ -373,9 +391,6 @@ class CardIdentifier:
         feat = self._extract_embedding_tta(pil_img) if self.use_tta else self._extract_embedding(pil_img)
         faiss.normalize_L2(feat)
 
-        # Pool pencarian: cukup besar untuk kalibrasi confidence & (opsional) re-ranking,
-        # tapi tetap dibatasi ke ukuran index. Karena index-nya IndexFlatIP (brute-force),
-        # mencari top-20 vs top-3 nyaris tidak menambah latency.
         rerank_pool = max(top_k, self.orb_rerank_pool_size) if self.use_orb_rerank else top_k
         pool_k = min(max(rerank_pool, self.calibration_pool_size), self.index.ntotal)
 
@@ -383,7 +398,6 @@ class CardIdentifier:
         sims_pool = distances[0]
         probs, margins = self._compute_calibrated_confidence(sims_pool)
 
-        # Susun kandidat mentah (sebanyak rerank_pool) sebelum diurutkan ulang
         raw_candidates = []
         n_avail = min(rerank_pool, len(indices[0]))
         for rank in range(n_avail):
@@ -400,40 +414,22 @@ class CardIdentifier:
                 "margin": margin_r,
             }
             if self.use_orb_rerank:
-                # Blend untuk RE-RANKING pakai raw similarity + ORB, BUKAN confidence_pct --
-                # confidence_pct sekarang berbasis margin LOKAL per-rank (buat ditampilkan),
-                # jadi tidak monoton mengikuti similarity dan TIDAK BOLEH dipakai sebagai
-                # kunci urutan (ini bug yang sempat kejadian: urutan tampilan jadi acak).
                 orb_score = self._orb_match_score(aligned_bgr, card_id)
                 entry["orb_verification_score"] = orb_score
-                entry["blended_score"] = 0.6 * dist + 0.4 * (orb_score or 0.0)
+                entry["blended_score"] = 0.60 * dist + 0.40 * (orb_score or 0.0)
             else:
-                # Tanpa ORB re-rank: pertahankan urutan similarity asli dari FAISS apa adanya.
                 entry["blended_score"] = dist
             raw_candidates.append(entry)
 
-        # PENTING (fix v2.2): pengurutan ulang pakai blended_score HANYA masuk akal
-        # kalau use_orb_rerank aktif (menggabungkan skor embedding + verifikasi ORB).
-        # Sebelumnya baris sort ini SELALU jalan walau ORB mati, dan karena
-        # blended_score berbasis margin (bukan raw similarity), urutan tampilan
-        # kandidat jadi kacau/tidak sinkron dengan raw_similarity_score-nya sendiri.
         if self.use_orb_rerank:
             raw_candidates.sort(key=lambda e: e["blended_score"], reverse=True)
-
-            # v2.6: confidence yang lama (margin embedding SEBELUM rerank) jadi
-            # menyesatkan begitu ORB mengubah urutan drastis -- kartu yang
-            # "diselamatkan" ORB dari peringkat jauh ke #1 tetap menampilkan
-            # confidence rendah, padahal sudah dikonfirmasi oleh 2 sinyal
-            # independen (embedding + verifikasi keypoint). Hitung ulang margin
-            # & confidence untuk rank-0 berdasar blended_score PASCA-rerank,
-            # bukan margin embedding-only yang sudah tidak relevan lagi.
             if len(raw_candidates) > 1:
                 post_margin = max(raw_candidates[0]["blended_score"] - raw_candidates[1]["blended_score"], 0.0)
                 z = post_margin / self.confidence_temperature
                 post_conf_pct = 100.0 / (1.0 + np.exp(-z))
                 raw_candidates[0]["calibrated_confidence_pct"] = float(post_conf_pct)
                 raw_candidates[0]["margin"] = float(post_margin)
-        # kalau tidak, biarkan urutan asli dari FAISS (sudah terurut menurun by similarity)
+
         raw_candidates = raw_candidates[:top_k]
 
         candidates = []
@@ -453,46 +449,24 @@ class CardIdentifier:
                 card_info["orb_verification_score"] = round(orb_score, 3) if orb_score is not None else None
 
             if self.df_metadata is not None and card_id in self.df_metadata.index:
-                row = self.df_metadata.loc[card_id]
-                card_info.update({
-                    "name": str(row.get("name", "")),
-                    "supertype": str(row.get("supertype", "")),
-                    "subtypes": str(row.get("subtypes", "")),
-                    "types": str(row.get("types", "")) if pd.notnull(row.get("types")) else None,
-                    "hp": float(row.get("hp")) if pd.notnull(row.get("hp")) else None,
-                    "number": str(row.get("number", "")),
-                    "rarity": str(row.get("rarity", "")) if pd.notnull(row.get("rarity")) else None,
-                    "artist": str(row.get("artist", "")) if pd.notnull(row.get("artist")) else None,
-                    "set_id": str(row.get("set.id", "")),
-                    "set_name": str(row.get("set.name", "")),
-                    "set_series": str(row.get("set.series", "")),
-                    "release_year": int(row.get("release_year")) if pd.notnull(row.get("release_year")) else None,
-                    "effective_market_price": float(row.get("effective_market_price")) if pd.notnull(row.get("effective_market_price")) else None,
-                    "image_url_large": str(row.get("images.large", ""))
-                })
-
+                meta = self.df_metadata.loc[card_id]
+                for col in ["name", "supertype", "subtypes", "types", "hp", "number",
+                            "rarity", "artist", "set.id", "set.name", "set.series",
+                            "release_year", "effective_market_price", "images.large"]:
+                    if col in meta and pd.notna(meta[col]):
+                        clean_col = col.replace(".", "_").replace("images_large", "image_url_large")
+                        card_info[clean_col] = meta[col]
             candidates.append(card_info)
 
-        elapsed_ms = round((time.time() - t0) * 1000, 2)
-        top_match = candidates[0] if candidates else None
-
-        result = {
+        t1 = time.time()
+        output = {
             "status": "success",
-            "execution_time_ms": elapsed_ms,
-            "top_match": top_match,
-            "candidates": candidates
+            "execution_time_ms": round((t1 - t0) * 1000, 2),
+            "top_match": candidates[0] if candidates else None,
+            "candidates": candidates,
         }
-
         if debug:
-            # Mentah, sebelum dikalibrasi -- buat lihat sebenarnya seberapa
-            # jauh sebaran similarity di pool kandidat (top-1 s/d top-N).
-            result["debug_similarity_pool"] = [round(float(s), 4) for s in sims_pool]
-            result["debug_temperature"] = self.confidence_temperature
+            output["debug_similarity_pool"] = [round(float(s), 4) for s in sims_pool]
+            output["debug_temperature"] = self.confidence_temperature
 
-        return result
-
-# Quick test interface
-if __name__ == "__main__":
-    print("Testing CardIdentifier engine initialization...")
-    identifier = CardIdentifier()
-    print("Model 1 CardIdentifier Engine (v2) siap digunakan!")
+        return output
