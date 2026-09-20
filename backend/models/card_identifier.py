@@ -265,37 +265,43 @@ class CardIdentifier:
         kemiripan tertinggi ke database FAISS.
         """
         h, w = aligned_bgr.shape[:2]
-        candidates = []
 
         if w > h:
-            # Gambar berformat landscape -> uji putar 90° CW dan 90° CCW
+            # Gambar berformat landscape -> uji putar 90° CW dan 90° CCW ke portrait
             rot_cw = cv2.rotate(aligned_bgr, cv2.ROTATE_90_CLOCKWISE)
             rot_ccw = cv2.rotate(aligned_bgr, cv2.ROTATE_90_COUNTERCLOCKWISE)
             candidates = [rot_cw, rot_ccw]
+            best_bgr = rot_cw
+            best_sim = -1.0
+            for cand_bgr in candidates:
+                cand_pil = Image.fromarray(cv2.cvtColor(cand_bgr, cv2.COLOR_BGR2RGB))
+                cand_feat = self._extract_embedding(cand_pil)
+                faiss.normalize_L2(cand_feat)
+                d, _ = self.index.search(cand_feat, 1)
+                sim = float(d[0][0])
+                if sim > best_sim:
+                    best_sim = sim
+                    best_bgr = cand_bgr
         else:
-            # Gambar berformat portrait -> uji tegak normal (0°) dan terbalik (180°)
-            rot_0 = aligned_bgr
+            # Gambar sudah berformat portrait -> orientasi normal (0°) diutamakan
+            best_bgr = aligned_bgr
+            cand_pil_0 = Image.fromarray(cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2RGB))
+            feat_0 = self._extract_embedding(cand_pil_0)
+            faiss.normalize_L2(feat_0)
+            d0, _ = self.index.search(feat_0, 1)
+            sim_0 = float(d0[0][0])
+
             rot_180 = cv2.rotate(aligned_bgr, cv2.ROTATE_180)
-            candidates = [rot_0, rot_180]
+            cand_pil_180 = Image.fromarray(cv2.cvtColor(rot_180, cv2.COLOR_BGR2RGB))
+            feat_180 = self._extract_embedding(cand_pil_180)
+            faiss.normalize_L2(feat_180)
+            d180, _ = self.index.search(feat_180, 1)
+            sim_180 = float(d180[0][0])
 
-            # Kasus kartu landscape di dalam kotak portrait (misal Hoothoot):
-            # jika rasio kartu tampak tertekan, siapkan juga varian rotasi 90°
-            rot_90 = cv2.resize(cv2.rotate(aligned_bgr, cv2.ROTATE_90_CLOCKWISE), (w, h))
-            rot_270 = cv2.resize(cv2.rotate(aligned_bgr, cv2.ROTATE_90_COUNTERCLOCKWISE), (w, h))
-            candidates.extend([rot_90, rot_270])
-
-        best_bgr = aligned_bgr
-        best_sim = -1.0
-
-        for cand_bgr in candidates:
-            cand_pil = Image.fromarray(cv2.cvtColor(cand_bgr, cv2.COLOR_BGR2RGB))
-            cand_feat = self._extract_embedding(cand_pil)
-            faiss.normalize_L2(cand_feat)
-            d, _ = self.index.search(cand_feat, 1)
-            sim = float(d[0][0])
-            if sim > best_sim:
-                best_sim = sim
-                best_bgr = cand_bgr
+            # Hanya putar 180° jika posisi terbalik memiliki keunggulan margin sangat signifikan (>0.08)
+            # Ini mencegah kecocokan palsu (false-positive lookalike) pada database 20.426 kartu
+            if sim_180 > sim_0 + 0.08:
+                best_bgr = rot_180
 
         # Pastikan ukuran akhir presisi portrait (448 x 625)
         if best_bgr.shape[0] != 625 or best_bgr.shape[1] != 448:
