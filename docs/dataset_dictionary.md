@@ -1,10 +1,11 @@
 # 📚 Kamus Data & Dokumentasi Dataset (Dataset Dictionary)
 
-> **Pokemon Card Value Analytic Tool (PokeScan)**  
+> **Pokemon Card Value Analytic Tool (REGOKEMON)**  
 > **Berkas Dataset:** `backend/dataset/pokemon_cards_dataset_cleaned.csv`  
-> **Versi Dataset:** 2.0 (Cleaned & Synchronized)  
-> **Jumlah Baris:** 19.926 Kartu (100% Konsisten dengan Gambar Fisik `compressed_images/*.jpg`)  
+> **Versi Dataset:** 3.0 (Cleaned, Synchronized & Seeded to Supabase)  
+> **Jumlah Baris:** 20.426 Kartu (100% Konsisten dengan Supabase & Gambar Fisik `compressed_images/*.jpg`)  
 > **Jumlah Fitur:** 22 Kolom Fitur  
+> **Dokumentasi Database Supabase:** Lihat [`docs/supabase_database_dictionary.md`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/docs/supabase_database_dictionary.md)
 
 ---
 
@@ -42,33 +43,33 @@ Berikut adalah rincian 22 variabel fitur yang ada di dalam berkas `pokemon_cards
 ## 💡 2. Aturan Domain Knowledge & Data Integrity
 
 ### A. Alasan Terjadinya *Missing Values* (Data Kosong)
-Berdasarkan hasil Data Quality Audit pada 19.926 kartu:
-1. **`types` (Kosong pada 3.078 baris) & `hp` (Kosong pada 3.047 baris):**
-   * **Bukan Error/Typo:** Kartu ber-supertype `Trainer` (2.718 kartu) dan `Energy` (373 kartu) secara resmi di dalam aturan Pokémon TCG **tidak memiliki poin HP maupun tipe elemen**.
-   * Kartu `Pokémon` (16.835 kartu) memiliki data `types` dan `hp` **100% lengkap**.
-2. **`effective_market_price` (Kosong pada 740 baris / 3.71%):**
-   * Kartu yang tidak memiliki harga umumnya merupakan kartu edisi khusus promo lawas atau kartu yang tidak pernah diperjualbelikan secara umum di marketplace.
+Berdasarkan hasil Data Quality Audit pada 20.426 kartu:
+1. **`types` & `hp`:**
+   * **Bukan Error/Typo:** Kartu ber-supertype `Trainer` dan `Energy` secara resmi di dalam aturan Pokémon TCG **tidak memiliki poin HP maupun tipe elemen**.
+   * Kartu ber-supertype `Pokémon` memiliki data `types` dan `hp` **100% lengkap**.
+2. **`effective_market_price` (Coverage 96.29%):**
+   * Kartu yang tidak memiliki harga umumnya merupakan kartu edisi khusus promo lawas atau kartu langka yang tidak memiliki transaksi aktif di marketplace.
    * **Strategi Fallback Backend:** Saat kalkulasi $P_{final}$, jika `effective_market_price` bernilai *NaN*, engine akan menggunakan *median price* dari kelompok `rarity` dan `release_year` yang sejenis.
 
 ### B. Penanganan Kasus Khusus File System (Windows Reserved Character)
 * **Kasus Kartu Unown ? (`ex10-?`):**
   Kartu edisi *Unseen Forces (2005)* ini memiliki nomor resmi `?`. Karena karakter `?` dilarang oleh Windows File System (`< > : " / \ | ? *`), gambar kartu diunduh dan disimpan dengan nama **`question_hires.jpg`**.
-* **Solusi Pemetaan:** Skrip `json_to_csv.py` secara otomatis memetakan `question_hires.jpg` $\leftrightarrow$ `ex10-?` sehingga seluruh 19.926 kartu sinkron 1-to-1 secara sempurna.
+* **Solusi Pemetaan:** Skrip pemrosesan secara otomatis memetakan `question_hires.jpg` $\leftrightarrow$ `ex10-?` sehingga seluruh 20.426 kartu sinkron 1-to-1 secara sempurna antara database, CSV, dan file gambar fisik.
 
 ---
 
 ## ⚙️ 3. Integrasi Fitur Terhadap AI Engine & Valuasi
 
 ```text
-[ Fitur CSV / JSON ] ───► [ Variabel Perhitungan ] ───► [ Formula Valuation ]
+[ Fitur Database / CSV ] ───► [ Variabel Perhitungan ] ───► [ Formula Valuation ]
 1. effective_market_price ──► P_base (Harga Pasar)  ──┐
 2. release_year (< 2005)  ──► M_vintage (+20-50%)   ├──► P_final = P_base * M_variant * F_condition * F_market
 3. rarity (Secret/Holo)   ──► M_rarity (+15-35%)    ──┘
 ```
 
-1. **Model 1: Card Identifier (FAISS Vector Search):**
-   - Menghubungkan hasil pencarian visual FAISS (berdasarkan `compressed_images/*.jpg`) kembali ke `card_id` pada CSV ini untuk menarik seluruh informasi metadata kartu.
+1. **Model 1: Card Identifier (CLIP ViT-B-32 + FAISS Vector Search):**
+   - Menghubungkan hasil pencarian visual FAISS (berdasarkan `compressed_images/*.jpg`) kembali ke `card_id` pada database/CSV ini untuk menarik seluruh informasi metadata kartu.
 2. **Model 2: Condition Grader (YOLOv8):**
-   - Menghasilkan pengali kondisi fisik ($F_{condition}$) yang memotong nilai dari $P_{base}$ di CSV.
+   - Menghasilkan pengali kondisi fisik ($F_{condition}$) yang memotong nilai dari $P_{base}$ di database.
 3. **Analytics Valuation Engine:**
    - Menggunakan `effective_market_price`, `release_year`, dan `rarity` untuk menghitung deviasi penawaran penjual di marketplace dan menghasilkan sinyal **BUY**, **HOLD**, atau **SELL**.

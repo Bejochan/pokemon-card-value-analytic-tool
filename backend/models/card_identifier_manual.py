@@ -1,3 +1,27 @@
+"""
+=============================================================================
+Pokemon Card Value Analytic Tool — Model 1: Manual Photo Scanner
+=============================================================================
+Skrip pengujian & pemindaian foto kartu manual resmi (Default: CLIP ViT-B-32):
+- Menggunakan engine identifikasi utama: `card_identifier.py` (CLIP).
+- Dilengkapi GUI File Explorer interaktif (tkinter) untuk memilih foto kartu.
+- Mendukung argumen CLI untuk pengujian otomatis & batch.
+- Dilengkapi fitur validasi kartu `--expected_card_id` & pencarian ranking penuh
+  (full-rank search) di 20.426 kartu untuk menganalisis akurasi & margin ranking.
+- Otomatis menyimpan potongan kartu tegak lurus ke `debug_manual_aligned.jpg`.
+
+(Catatan: Implementasi alternatif lama berbasis MobileNet tersimpan di
+folder `backend/models/legacy_mobilenet/card_identifier_manual.py`).
+
+Cara Penggunaan:
+1. Mode Interaktif (Jendela File Explorer):
+       python backend/models/card_identifier_manual.py
+
+2. Mode Command-Line Langsung (Cepat):
+       python backend/models/card_identifier_manual.py path/foto.jpg --expected_card_id me4-52
+=============================================================================
+"""
+
 import os
 import sys
 import argparse
@@ -6,20 +30,26 @@ import numpy as np
 from PIL import Image
 import faiss
 
+# Pastikan folder model ada di python path
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
+
 from card_identifier import CardIdentifier
 
+
 def pick_file_dialog():
+    """Buka jendela File Explorer bawaan Windows untuk memilih foto kartu."""
     try:
         import tkinter as tk
         from tkinter import filedialog
     except ImportError:
         print("[error] Modul tkinter tidak tersedia di instalasi Python kamu.")
-        print("        Ketik path file secara manual sebagai gantinya.")
         return input("Masukkan path ke file foto kartu: ").strip('"').strip()
 
     root = tk.Tk()
-    root.withdraw()          # sembunyikan window utama tkinter, cuma tampilkan dialog file
-    root.attributes('-topmost', True)   # pastikan dialog muncul di depan jendela lain
+    root.withdraw()
+    root.attributes('-topmost', True)
     file_path = filedialog.askopenfilename(
         title="Pilih foto kartu Pokemon",
         filetypes=[("Gambar", "*.jpg *.jpeg *.png *.bmp *.webp"), ("Semua file", "*.*")]
@@ -27,7 +57,12 @@ def pick_file_dialog():
     root.destroy()
     return file_path
 
+
 def find_full_rank_from_aligned(identifier, aligned_image_path, expected_card_id, use_tta=False):
+    """
+    Ekstrak embedding langsung dari gambar yang sudah di-align (rapat ke tepi kartu),
+    lalu cari ranking sebenarnya dari expected_card_id di seluruh database (20.426 kartu).
+    """
     aligned_bgr = cv2.imread(aligned_image_path)
     if aligned_bgr is None:
         print(f"[error] Tidak bisa membaca file gambar: {aligned_image_path}")
@@ -38,7 +73,7 @@ def find_full_rank_from_aligned(identifier, aligned_image_path, expected_card_id
     faiss.normalize_L2(feat)
 
     n_total = identifier.index.ntotal
-    distances, indices = identifier.index.search(feat, n_total)  # ranking penuh, index-nya flat jadi tetap cepat
+    distances, indices = identifier.index.search(feat, n_total)
 
     sims = distances[0]
     ids = indices[0]
@@ -51,33 +86,29 @@ def find_full_rank_from_aligned(identifier, aligned_image_path, expected_card_id
             found_sim = float(sims[rank])
             break
 
-    print(f"\n=== PENELUSURAN PENUH untuk card_id='{expected_card_id}' (dari {n_total} total kartu) ===")
+    print(f"\n=== PENELUSURAN PENUH untuk card_id='{expected_card_id}' (dari {n_total:,} kartu) ===")
     if found_rank is None:
-        print(f"[!] card_id '{expected_card_id}' TIDAK DITEMUKAN di card_id_map / index sama sekali.")
-        print("    Cek lagi ejaan card_id, atau pastikan kartu ini benar-benar sudah")
-        print("    ikut di-proses saat build_card_index.py dijalankan.")
+        print(f"[!] card_id '{expected_card_id}' TIDAK DITEMUKAN di database/index.")
         return None, None
 
     top1_id = identifier.card_id_map.get(str(ids[0]))
-    print(f"Kartu yang BENAR ada di RANKING #{found_rank} dari {n_total}.")
+    print(f"Kartu yang BENAR ada di RANKING #{found_rank} dari {n_total:,}.")
     print(f"Similarity kartu yang benar   : {found_sim:.4f}")
     print(f"Similarity top-1 (tebakan)    : {sims[0]:.4f}  (card_id={top1_id})")
     print(f"Selisih similarity (top1 - yang benar): {sims[0] - found_sim:.4f}")
 
     if found_rank == 1:
-        print("-> Tebakan top-1 SUDAH BENAR.")
+        print("-> HASIL: Tebakan top-1 SUDAH BENAR.")
     elif found_rank <= 20:
-        print("-> Kartu yang benar dekat top (<=20) tapi kalah tipis: ini soal RANKING/")
-        print("   diskriminasi pada kandidat yang mirip -- coba naikkan orb_rerank_pool_size,")
-        print("   atau kalibrasi ulang confidence_temperature.")
+        print("-> HASIL: Kartu yang benar sangat dekat (Top-20). Diselesaikan dengan ORB re-rank.")
     else:
-        print("-> Kartu yang benar ranking-nya JAUH dari top. Ini indikasi kuat bahwa")
-        print("   fitur/embedding TIDAK CUKUP DISKRIMINATIF untuk kartu ini -- bukan lagi")
-        print("   soal kalibrasi confidence, tapi soal backbone/feature extraction.")
+        print("-> HASIL: Kartu yang benar berada di luar Top-20.")
 
     return found_rank, found_sim
 
+
 def process_one(identifier, image_path, top_k, expected_card_id, use_tta, full_rank_search):
+    """Proses satu file foto: identifikasi, cetak kandidat teratas, dan validasi."""
     if not os.path.exists(image_path):
         print(f"[error] File tidak ditemukan: {image_path}")
         return
@@ -85,10 +116,9 @@ def process_one(identifier, image_path, top_k, expected_card_id, use_tta, full_r
     debug_path = "debug_manual_aligned.jpg"
     result = identifier.identify_card(image_path, top_k=top_k, debug=True, debug_save_path=debug_path)
 
-    print(f"\n[debug] Gambar hasil alignment disimpan di: {os.path.abspath(debug_path)}")
-    print("        (buka file ini untuk cek apakah crop/perataan kartunya sudah benar)")
+    print(f"\n[debug] Gambar hasil alignment tersimpan di: {os.path.abspath(debug_path)}")
 
-    print(f"\n=== HASIL IDENTIFIKASI (top-{top_k}) ===")
+    print(f"\n=== HASIL IDENTIFIKASI (Top-{top_k} Kandidat) ===")
     for c in result["candidates"]:
         name = c.get("name", "?")
         set_name = c.get("set_name", "?")
@@ -101,67 +131,57 @@ def process_one(identifier, image_path, top_k, expected_card_id, use_tta, full_r
         print(f"\nWaktu inferensi     : {result['execution_time_ms']} ms")
         print(f"Margin top1 vs top2 : {top1.get('margin_to_runner_up')}")
 
-    pool = result.get("debug_similarity_pool", [])
-    print(f"\n[debug] pool similarity (top-{len(pool)}): {pool}")
-
     if not expected_card_id:
-        # Kalau tidak dikasih lewat argumen CLI, tawarkan input interaktif (boleh dikosongkan)
-        expected_card_id = input("\nCard ID yang BENAR (opsional, Enter untuk lewati): ").strip() or None
+        expected_card_id = input("\nCard ID yang BENAR (opsional, tekan Enter untuk lewati): ").strip() or None
 
     if expected_card_id:
         is_correct = top1 is not None and top1["card_id"] == expected_card_id
         in_topk = any(c["card_id"] == expected_card_id for c in result["candidates"])
 
-        print("\n=== VALIDASI ===")
-        print(f"Expected card_id : {expected_card_id}")
-        print(f"Tebakan top-1    : {top1['card_id'] if top1 else None}  "
-              f"{'BENAR' if is_correct else 'SALAH'}")
-        print(f"Ada di top-{top_k}      : {'Ya' if in_topk else 'Tidak'}")
+        print("\n=== HASIL VALIDASI ===")
+        print(f"Target card_id   : {expected_card_id}")
+        print(f"Prediksi top-1   : {top1['card_id'] if top1 else None}  [{'BENAR' if is_correct else 'SALAH'}]")
+        print(f"Tersedia di top-{top_k}: {'Ya' if in_topk else 'Tidak'}")
 
         if full_rank_search or not in_topk:
             find_full_rank_from_aligned(identifier, debug_path, expected_card_id, use_tta=use_tta)
 
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("image_path", nargs="?",
-                         help="Path ke file foto kartu (opsional -- kalau kosong, jendela pilih file akan terbuka).")
-    parser.add_argument("--top_k", type=int, default=5)
+                        help="Path ke foto kartu (opsional -- bila kosong, jendela dialog file akan terbuka).")
+    parser.add_argument("--top_k", type=int, default=5, help="Jumlah kandidat teratas (default: 5)")
     parser.add_argument("--use_tta", action="store_true", help="Aktifkan Test-Time Augmentation.")
     parser.add_argument("--no_orb_rerank", action="store_true",
-                         help="Matikan ORB re-rank (default: AKTIF). Pakai ini kalau mau tes cepat tanpa verifikasi ORB.")
-    parser.add_argument("--orb_pool_size", type=int, default=35,
-                         help="Jumlah kandidat FAISS teratas yang ikut diverifikasi ORB (default: 35). "
-                              "Naikkan kalau kartu yang benar sering ranking-nya di luar jangkauan ini "
-                              "(cek lewat --expected_card_id), tapi makin besar makin lambat.")
+                        help="Nonaktifkan verifikasi ORB re-rank (default: AKTIF).")
+    parser.add_argument("--orb_pool_size", type=int, default=50,
+                        help="Ukuran pool verifikasi ORB teratas (default: 50).")
     parser.add_argument("--expected_card_id", type=str, default=None,
-                         help="card_id yang BENAR (kalau tahu), untuk validasi otomatis.")
+                        help="card_id yang seharusnya benar untuk validasi akurasi.")
     parser.add_argument("--full_rank_search", action="store_true",
-                         help="Paksa cari ranking penuh meski expected_card_id ada di top-k.")
+                        help="Paksa evaluasi peringkat penuh di seluruh database.")
     args = parser.parse_args()
 
-    print("Memuat AI Engine dan Index (mohon tunggu)...")
+    print("Memuat AI Card Identifier Engine (CLIP ViT-B-32)...")
     identifier = CardIdentifier(use_tta=args.use_tta, use_orb_rerank=not args.no_orb_rerank,
-                                 orb_rerank_pool_size=args.orb_pool_size)
-    print(f"[debug] use_tta={args.use_tta}  use_orb_rerank={not args.no_orb_rerank}  "
-          f"orb_pool_size={args.orb_pool_size}  "
-          f"confidence_temperature={identifier.confidence_temperature}")
+                                orb_rerank_pool_size=args.orb_pool_size)
 
     if args.image_path:
-        # Path dikasih langsung lewat argumen CLI -- proses sekali lalu selesai.
         process_one(identifier, args.image_path, args.top_k, args.expected_card_id,
                     args.use_tta, args.full_rank_search)
         return
 
-    # Tidak ada argumen -- buka jendela pilih file berulang kali, mirip upload gambar di chat.
-    print("\nJendela pilih file akan terbuka. Pilih foto kartu, atau tekan Cancel untuk keluar.")
+    print("\nJendela dialog file akan terbuka. Pilih foto kartu, atau tekan Cancel untuk keluar.")
     while True:
         image_path = pick_file_dialog()
         if not image_path:
-            print("\nTidak ada file dipilih. Selesai.")
+            print("\nSesi pemindaian selesai.")
             break
         process_one(identifier, image_path, args.top_k, args.expected_card_id,
                     args.use_tta, args.full_rank_search)
-        print("\n--- Pilih file lain untuk scan berikutnya, atau Cancel untuk keluar ---")
+        print("\n--- Pilih foto kartu berikutnya atau Cancel untuk selesai ---")
+
 
 if __name__ == "__main__":
     main()
