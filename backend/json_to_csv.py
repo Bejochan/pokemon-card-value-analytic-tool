@@ -113,6 +113,6 @@ with open(cleaned_json, 'w', encoding='utf-8') as f:
     json.dump(raw_data_cleaned, f, ensure_ascii=False, indent=2)
 print(f"   JSON Bersih (Cleaned) berhasil disimpan ({len(raw_data_cleaned)} item): {cleaned_json}")
 
-print("\n✨ PROSES KONVERSI & SINKRONISASI SELESAI!")
-print(f"   • Total Fitur di CSV  : {len(kolom_tersedia)} kolom")
-print(f"   • Coverage Harga      : {df_cleaned['effective_market_price'].notna().sum()} / {len(df_cleaned)} ({df_cleaned['effective_market_price'].notna().mean()*100:.2f}%)")
+print("\n=== PROSES KONVERSI & SINKRONISASI SELESAI ===")
+print(f"   - Total Fitur di CSV  : {len(kolom_tersedia)} kolom")
+print(f"   - Coverage Harga      : {df_cleaned['effective_market_price'].notna().sum()} / {len(df_cleaned)} ({df_cleaned['effective_market_price'].notna().mean()*100:.2f}%)")
