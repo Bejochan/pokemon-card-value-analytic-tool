@@ -19,10 +19,30 @@ function UploadPage({ onUploadComplete }) {
     const selectedFile = event.target.files[0];
     if (selectedFile) {
       setIsUploading(true);
-      setTimeout(() => {
-        setIsUploading(false);
-        onUploadComplete();
-      }, 3000);
+      
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result;
+        try {
+          const response = await fetch('http://127.0.0.1:8000/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64String })
+          });
+          const data = await response.json();
+          if (data.status === 'success') {
+            onUploadComplete(data);
+          } else {
+            alert(data.message || 'Error dari AI');
+          }
+        } catch (error) {
+          console.error('Error uploading file:', error);
+          alert('Gagal terhubung ke backend');
+        } finally {
+          setIsUploading(false);
+        }
+      };
+      reader.readAsDataURL(selectedFile);
     }
   };
 
@@ -49,13 +69,40 @@ function UploadPage({ onUploadComplete }) {
   };
 
   const handleCameraScan = () => {
+    if (!videoRef.current) return;
     setIsScanning(true);
-    // Simulasi pura-pura memindai wajah kartu
-    setTimeout(() => {
-      setIsScanning(false);
-      stopCamera(); // Matikan kamera sebelum pindah halaman
-      onUploadComplete();
-    }, 3000);
+    
+    // Buat canvas sementara untuk menangkap frame dari video
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    
+    // Ubah gambar menjadi Base64
+    const base64String = canvas.toDataURL('image/jpeg');
+
+    setTimeout(async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64String })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+          stopCamera();
+          onUploadComplete(data);
+        } else {
+          alert(data.message || 'Error dari AI');
+        }
+      } catch (error) {
+        console.error('Error scanning camera:', error);
+        alert('Gagal terhubung ke backend');
+      } finally {
+        setIsScanning(false);
+      }
+    }, 1500); // Simulasi animasi scan sebentar
   };
 
   // --- PENGAMANAN ---
