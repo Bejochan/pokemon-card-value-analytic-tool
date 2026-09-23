@@ -45,7 +45,7 @@ class CardIdentifier:
     def __init__(self, index_path=INDEX_PATH, map_path=MAP_PATH, csv_path=CSV_PATH,
                  image_dir=IMAGE_DIR, confidence_temperature=0.03,
                  calibration_pool_size=20, use_tta=False, use_orb_rerank=True,
-                 orb_rerank_pool_size=50):
+                 orb_rerank_pool_size=150):
         self.index_path = index_path
         self.map_path = map_path
         self.csv_path = csv_path
@@ -117,115 +117,82 @@ class CardIdentifier:
             return "landscape"
         return None
 
+    @staticmethod
+    def _get_quad_tilt_angle(pts):
+        v_top = pts[1] - pts[0]
+        angle_rad = np.arctan2(v_top[1], v_top[0])
+        angle_deg = np.degrees(angle_rad) % 180
+        return min(angle_deg, abs(angle_deg - 90), abs(angle_deg - 180))
+
+    @staticmethod
+    def _expand_rect(rect, factor=0.05):
+        center = np.mean(rect, axis=0)
+        return center + (rect - center) * (1.0 + factor)
+
     def _align_card_image_debug(self, image_np, out_size=(448, 625)):
         h_img, w_img = image_np.shape[:2]
         frame_area = h_img * w_img
-        min_area = 0.05 * frame_area
-        max_area = 0.92 * frame_area
-        border_margin = 2
-        max_sides_touch = 3
-        solidity_thresh = 0.50
-        extent_thresh = 0.80
 
         try:
             gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
             smooth = cv2.bilateralFilter(gray, d=9, sigmaColor=60, sigmaSpace=60)
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             gray_eq = clahe.apply(smooth)
-            edges_base = cv2.Canny(gray_eq, 40, 120)
+            edges = cv2.Canny(gray_eq, 40, 120)
 
-            best = None
+            best_quad = None
+            min_area = 0.20 * frame_area
+            max_area = 0.90 * frame_area
 
-            for ksize, iters in [(5, 2), (7, 2), (9, 3), (11, 3), (13, 4)]:
+            for ksize in (5, 7):
                 kernel = np.ones((ksize, ksize), np.uint8)
-                edges = cv2.morphologyEx(edges_base, cv2.MORPH_CLOSE, kernel, iterations=iters)
-                contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+                contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 if not contours:
                     continue
 
-                candidates = []
                 for c in contours:
                     area = cv2.contourArea(c)
                     if area < min_area or area > max_area:
                         continue
-
-                    x, y, w, h = cv2.boundingRect(c)
-                    sides_touched = sum([
-                        x <= border_margin, y <= border_margin,
-                        x + w >= w_img - border_margin, y + h >= h_img - border_margin
-                    ])
-                    if sides_touched > max_sides_touch:
-                        continue
-
                     hull = cv2.convexHull(c)
-                    hull_area = cv2.contourArea(hull)
-                    solidity = area / hull_area if hull_area > 0 else 0
-                    if solidity < solidity_thresh:
-                        continue
-
-                    candidates.append((area, c))
-
-                if not candidates:
-                    continue
-                candidates.sort(key=lambda t: t[0], reverse=True)
-
-                for area, c in candidates[:5]:
-                    peri = cv2.arcLength(c, True)
-                    approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-
-                    rect = None
-                    if len(approx) == 4 and cv2.isContourConvex(approx):
-                        rect = self._order_points(approx)
-                        local_status = f"ALIGNED_4PT_k{ksize}"
-                    else:
-                        hull = cv2.convexHull(c)
-                        hull_peri = cv2.arcLength(hull, True)
-                        for eps_factor in (0.02, 0.03, 0.05):
-                            hull_approx = cv2.approxPolyDP(hull, eps_factor * hull_peri, True)
-                            if len(hull_approx) == 4 and cv2.isContourConvex(hull_approx):
-                                rect = self._order_points(hull_approx)
-                                local_status = f"ALIGNED_HULL4PT_k{ksize}"
+                    hull_peri = cv2.arcLength(hull, True)
+                    for eps in (0.02, 0.03):
+                        approx = cv2.approxPolyDP(hull, eps * hull_peri, True)
+                        if len(approx) == 4 and cv2.isContourConvex(approx):
+                            rect = self._order_points(approx)
+                            pts = rect.reshape(4, 2)
+                            if np.any(pts[:, 0] <= 12) or np.any(pts[:, 0] >= w_img - 12) or \
+                               np.any(pts[:, 1] <= 12) or np.any(pts[:, 1] >= h_img - 12):
+                                continue
+                            ori = self._aspect_ok(rect, tol=0.18)
+                            if ori is not None:
+                                tilt = self._get_quad_tilt_angle(pts)
+                                if best_quad is None or area > best_quad[0]:
+                                    best_quad = (area, rect, ori, tilt)
                                 break
 
-                    if rect is None:
-                        min_rect = cv2.minAreaRect(c)
-                        (rw, rh) = min_rect[1]
-                        rect_area = rw * rh
-                        extent = (area / rect_area) if rect_area > 0 else 0
-                        if extent < extent_thresh:
-                            continue
-                        box = cv2.boxPoints(min_rect)
-                        rect = self._order_points(box)
-                        local_status = f"ALIGNED_MINAREARECT_k{ksize}"
+            if best_quad is not None:
+                area, rect, ori, tilt = best_quad
+                if tilt > 8.0:
+                    rect_padded = self._expand_rect(rect, factor=0.05)
+                    width, height = out_size
+                    if ori == "landscape":
+                        dst = np.array([[0, 0], [height - 1, 0], [height - 1, width - 1], [0, width - 1]], dtype="float32")
+                        M = cv2.getPerspectiveTransform(rect_padded.astype(np.float32), dst)
+                        warped = cv2.warpPerspective(image_np, M, (height, width))
+                    else:
+                        dst = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype="float32")
+                        M = cv2.getPerspectiveTransform(rect_padded.astype(np.float32), dst)
+                        warped = cv2.warpPerspective(image_np, M, (width, height))
+                    return warped, f"WARPED_TILT_{tilt:.1f}deg"
 
-                    orientation = self._aspect_ok(rect)
-                    if orientation is None:
-                        continue
-
-                    if best is None or area > best[0]:
-                        best = (area, rect, local_status, orientation)
-
-            if best is None:
-                return image_np, "NO_VALID_CANDIDATE"
-
-            _, rect, local_status, orientation = best
-            width, height = out_size
-
-            if orientation == "landscape":
-                dst = np.array([
-                    [0, 0], [height - 1, 0], [height - 1, width - 1], [0, width - 1]
-                ], dtype="float32")
-                M = cv2.getPerspectiveTransform(rect, dst)
-                warped = cv2.warpPerspective(image_np, M, (height, width))
-                local_status += "_LANDSCAPE"
+            if w_img > h_img * 1.15:
+                direct = cv2.rotate(image_np, cv2.ROTATE_90_CLOCKWISE)
             else:
-                dst = np.array([
-                    [0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]
-                ], dtype="float32")
-                M = cv2.getPerspectiveTransform(rect, dst)
-                warped = cv2.warpPerspective(image_np, M, (width, height))
+                direct = image_np
 
-            return warped, local_status
+            return cv2.resize(direct, out_size), "DIRECT_UPRIGHT"
         except Exception as e:
             return image_np, f"EXCEPTION:{e}"
 
