@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
 import './ScannerDashboard.css';
 
-function ScannerDashboard() {
+function ScannerDashboard({ scanResult }) {
   // State untuk mengontrol halaman mana yang sedang aktif di dalam Dasbor
   const [dashboardView, setDashboardView] = useState('price');
-  // Data simulasi hasil deteksi (Nanti akan didapat dari backend)
-  // Coba ubah menjadi array kosong [] untuk melihat tampilan "No defect detected"
-  const detectedDefects = ['Surface scratches', 'Dents']; /* --- UBAH SESUAI FISIK --- */ 
-  const originalPrice = 920.00;
+
+  // Gunakan data dari backend jika tersedia, atau fallback ke dummy
+  const cardName = scanResult ? scanResult.message.replace('Berhasil mendeteksi: ', '') : 'Unknown Card';
+  const originalPrice = scanResult ? scanResult.estimated_price : 920.00;
+  const officialImage = scanResult && scanResult.official_image_url ? scanResult.official_image_url : '/card-result.png';
+
+  // Data simulasi hasil deteksi (Nanti akan didapat dari backend YOLO)
+  const detectedDefects = []; // Sementara kosong karena "Menunggu Deteksi Kondisi"
   // Jika ada cacat, diskon 2.28%. Jika tidak ada, diskon 0%
   const conditionDiscount = detectedDefects.length > 0 ? 0.0228 : 0; 
   const finalPrice = originalPrice - (originalPrice * conditionDiscount);
   const conditionTier = detectedDefects.length > 0 ? "Lightly used" : "Mint / Near Mint";
+
+  // Format harga (IDR)
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(price);
+  };
 
   return (
     <div className="dashboard-container">
@@ -24,12 +33,12 @@ function ScannerDashboard() {
           <div className="glow-effect"></div>
           
           {/* Gambar Kartu Hasil Scan */}
-          <img src="/card-result.png" alt="Scanned Card" className="scanned-card" />
+          <img src={officialImage} alt="Scanned Card" className="scanned-card" />
           
           {/* Label Harga Hijau (Dipisah antara background dan teks) */}
           <div className="price-tag-container">
             <img src="/price-shape.png" alt="Background Harga" className="price-shape" />
-            <div className="price-text">$&nbsp;899.00</div>
+            <div className="price-text">{formatPrice(originalPrice)}</div>
           </div>
 
           {/* Tombol Panah Bawah */}
@@ -61,7 +70,7 @@ function ScannerDashboard() {
             {/* KOTAK KIRI: Detail Kartu & Tabel */}
             <div className="info-box card-info-box">
               <div className="card-visuals">
-                <img src="/card-result.png" alt="Card Detail" className="detail-card-img" />
+                <img src={officialImage} alt="Card Detail" className="detail-card-img" />
                 <div className="celebration-logo">30th Celebration</div>
               </div>
               
@@ -69,8 +78,8 @@ function ScannerDashboard() {
                 {/* Jadual Spesifikasi Kad (Dipadatkan) */}
                 <table className="specs-table">
                   <tbody>
-                    <tr><td>Name</td><td>Fuecoco</td></tr>
-                    <tr><td>Rarity</td><td>Common</td></tr>
+                    <tr><td>Name</td><td>{cardName}</td></tr>
+                    <tr><td>Condition</td><td>{scanResult ? scanResult.card_condition : "Menunggu Deteksi"}</td></tr>
                     <tr><td>Holofoil type</td><td>Reverse holofoil</td></tr>
                     <tr><td>Language</td><td>English 🇬🇧</td></tr>
                     <tr><td>Set number</td><td>036 / 084</td></tr>
@@ -106,7 +115,7 @@ function ScannerDashboard() {
                     <tbody>
                       <tr>
                         <td><strong>Original value</strong></td>
-                        <td><strong>$ {originalPrice.toFixed(2)}</strong></td>
+                        <td><strong>{formatPrice(originalPrice)}</strong></td>
                       </tr>
                       <tr>
                         <td><strong>Physical condition</strong></td>
@@ -116,7 +125,7 @@ function ScannerDashboard() {
                       </tr>
                       <tr>
                         <td><strong>Final value</strong></td>
-                        <td className="text-success"><strong>$ {finalPrice.toFixed(2)}</strong></td>
+                        <td className="text-success"><strong>{formatPrice(finalPrice)}</strong></td>
                       </tr>
                       <tr>
                         <td>Condition tier</td>
