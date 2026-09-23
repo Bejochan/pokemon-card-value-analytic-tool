@@ -48,7 +48,7 @@ TILT_WARNING_DEGREES = 14.0
 # Konfigurasi Engine
 USE_TTA = False
 USE_ORB_RERANK = True
-ORB_POOL_SIZE = 50
+ORB_POOL_SIZE = 150
 
 # Mode Debug
 DEBUG_MODE = True

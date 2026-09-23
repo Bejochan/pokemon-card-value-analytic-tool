@@ -32,8 +32,8 @@ from app.analytics_engine import evaluate_card_valuation, DEFAULT_USD_TO_IDR
 # =====================================================================
 
 print("[INFO] [CV Service] Menginisialisasi Model 1 (Card Identifier CLIP + FAISS)...")
-# use_orb_rerank=False untuk performa responsif sub-50ms di endpoint web
-_card_identifier = CardIdentifier(use_orb_rerank=False)
+# Menggunakan default CardIdentifier (use_orb_rerank=True, orb_rerank_pool_size=150) untuk akurasi maksimal
+_card_identifier = CardIdentifier()
 print("[OK] [CV Service] Model 1 siap digunakan!")
 
 ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY", "")
