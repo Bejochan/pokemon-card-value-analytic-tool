@@ -1,103 +1,177 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import base64
-import cv2
-import numpy as np
-import json
+"""
+backend/app/main.py
+===================
+Entrypoint Server REST API Regokemon (FastAPI).
+Menyediakan antarmuka routing modular untuk integrasi Frontend React:
+- GET  /           : Informasi status API
+- GET  /health     : Healthcheck endpoint untuk Docker & Load Balancer
+- POST /identify   : Khusus On-Cam / Scanner Cepat (Model 1 CLIP saja)
+- POST /analyze    : Khusus Upload Foto Statis (Model 1 + Model 2 YOLO Condition Grader)
+- POST /upload/identify : Upload file gambar langsung untuk On-Cam
+- POST /upload/analyze  : Upload file gambar langsung untuk Full Analysis
+"""
+
 import os
+import sys
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
-from models.card_identifier import CardIdentifier
+# Pastikan terminal Windows tidak crash saat print karakter/emoji
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
-app = FastAPI()
+# Path setup
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.dirname(CURRENT_DIR)
+load_dotenv(os.path.join(BACKEND_DIR, ".env"))
+
+from app.schemas import ImageDataRequest, IdentifyResponse, AnalyzeResponse
+from app.cv_service import (
+    decode_base64_to_cv2,
+    decode_bytes_to_cv2,
+    run_identify_flow,
+    run_analyze_flow
+)
+
+# ---------------------------------------------------------------------
+# 1. INISIALISASI FASTAPI APP & CORS
+# ---------------------------------------------------------------------
+
+app = FastAPI(
+    title="Regokemon Analytics & Valuation API",
+    description="Dual-Model Computer Vision & Fair Value Estimator for Pokémon TCG Marketplace.",
+    version="3.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------------------------------------------------------
-# 1. FASE PEMANASAN DATABASE JSON
-# ---------------------------------------------------------
-print("Memuat dataset JSON...")
-json_path = os.path.join(os.path.dirname(__file__), "../dataset/pokemon_cards_dataset_cleaned.json")
-try:
-    with open(json_path, "r", encoding="utf-8") as f:
-        pokemon_db = json.load(f)
-    print(f"SUKSES: {len(pokemon_db)} data kartu berhasil dimuat ke memori!")
-except FileNotFoundError:
-    print(f"ERROR: File JSON tidak ditemukan di {json_path}")
-    pokemon_db = []
 
-# ---------------------------------------------------------
-# 2. FASE INISIALISASI AI (Ini yang tadi terhapus)
-# ---------------------------------------------------------
-print("Menghidupkan Mesin AI Pokemai...")
-ai_engine = CardIdentifier(use_orb_rerank=False)
-print("Mesin AI siap digunakan!")
+# ---------------------------------------------------------------------
+# 2. HEALTHCHECK & INFO ENDPOINTS
+# ---------------------------------------------------------------------
 
-# ---------------------------------------------------------
-# 3. FORMAT DATA DARI REACT
-# ---------------------------------------------------------
-class ImageData(BaseModel):
-    image: str 
+@app.get("/")
+def read_root():
+    return {
+        "app": "Regokemon Analytics API",
+        "version": "3.0.0",
+        "status": "online",
+        "docs_url": "/docs",
+        "endpoints": {
+            "oncam_identify": "POST /identify",
+            "upload_analyze": "POST /analyze",
+            "healthcheck": "GET /health"
+        }
+    }
 
-# ---------------------------------------------------------
-# 4. FASE PENERIMAAN REQUEST DARI WEB
-# ---------------------------------------------------------
-@app.post("/analyze")
-async def analyze_card(data: ImageData):
-    try:
-        print("Menerima foto dari web...")
 
-        # 1. Membersihkan teks Base64
-        image_b64 = data.image.split(",")[1] if "," in data.image else data.image
-        img_bytes = base64.b64decode(image_b64)
-        img_arr = np.frombuffer(img_bytes, np.uint8)
-        
-        # 2. Biarkan dalam format BGR (OpenCV bawaan)
-        img_cv2_bgr = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+@app.get("/health")
+def healthcheck():
+    return {"status": "healthy", "service": "regokemon-backend"}
 
-        # 3. Masukkan langsung ke AI (AI akan mengubahnya ke RGB secara internal)
-        ai_result = ai_engine.identify_card(
-            image_input=img_cv2_bgr, 
-            top_k=1, 
-            debug=True, 
-            debug_save_path="debug_gambar_dari_web.jpg"
+
+# ---------------------------------------------------------------------
+# 3. ROUTE ON-CAM: IDENTIFIKASI CEPAT (MODEL 1 CLIP SAJA)
+# ---------------------------------------------------------------------
+
+@app.post("/identify", response_model=IdentifyResponse)
+async def identify_card_base64(data: ImageDataRequest):
+    """
+    Endpoint pemindaian kamera langsung (On-Cam).
+    Menerima Base64 gambar kartu, menjalankan Model 1 CLIP ViT-B-32 sub-milidetik,
+    dan mengembalikan metadata spesifikasi kartu lengkap tanpa beban deteksi cacat fisik.
+    """
+    img_bgr, _ = decode_base64_to_cv2(data.image)
+    if img_bgr is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Format Base64 gambar tidak valid atau gambar rusak."
         )
-        
-        if ai_result["status"] == "success" and ai_result["top_match"]:
-            kartu_tebakan_ai = ai_result["top_match"]
-            ai_detected_id = kartu_tebakan_ai.get("id")
-            
-            # Cari di JSON
-            found_card = next((card for card in pokemon_db if card.get("id") == ai_detected_id), None)
-            
-            if found_card:
-                nama_kartu = found_card.get("name", "Tidak Diketahui")
-                official_image = found_card.get("images", {}).get("large", "") 
-                
-                # Ambil Harga
-                price_usd = found_card.get("tcgplayer", {}).get("prices", {}).get("normal", {}).get("market", 0)
-                if price_usd == 0:
-                    price_usd = kartu_tebakan_ai.get("effective_market_price", 0)
-                price_idr = int(price_usd * 15500) 
-                
-                return {
-                    "status": "success",
-                    "message": f"Berhasil mendeteksi: {nama_kartu}",
-                    "estimated_price": price_idr,
-                    "card_condition": "Menunggu Deteksi Kondisi", 
-                    "official_image_url": official_image 
-                }
-            else:
-                return {"status": "error", "message": "Data tidak ada di JSON lokal."}
-        else:
-            return {"status": "error", "message": "AI gagal mengenali kartu."}
 
-    except Exception as e:
-        print(f"Error pada server: {e}")
-        return {"status": "error", "message": str(e)}
+    result = run_identify_flow(img_bgr, top_k=4)
+    if result["status"] == "error":
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    return result
+
+
+@app.post("/upload/identify", response_model=IdentifyResponse)
+async def identify_card_file(file: UploadFile = File(...)):
+    """Versi Multipart Form-Data untuk endpoint On-Cam / Identify."""
+    contents = await file.read()
+    img_bgr, _ = decode_bytes_to_cv2(contents)
+    if img_bgr is None:
+        raise HTTPException(status_code=400, detail="Berkas gambar tidak dapat dibaca.")
+
+    result = run_identify_flow(img_bgr, top_k=4)
+    if result["status"] == "error":
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    return result
+
+
+# ---------------------------------------------------------------------
+# 4. ROUTE UPLOAD: FULL ANALYSIS (MODEL 1 CLIP + MODEL 2 YOLO DEFECTS)
+# ---------------------------------------------------------------------
+
+@app.post("/analyze", response_model=AnalyzeResponse)
+async def analyze_card_base64(data: ImageDataRequest):
+    """
+    Endpoint analisis komprehensif untuk halaman Upload Foto.
+    Menjalankan Model 1 (CLIP) + Model 2 (Roboflow YOLOv8 Condition Grader),
+    menghitung persentase diskon kerusakan fisik, dan mengestimasi harga wajar akhir (P_final).
+    """
+    img_bgr, clean_b64 = decode_base64_to_cv2(data.image)
+    if img_bgr is None or clean_b64 is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Format Base64 gambar tidak valid atau gambar rusak."
+        )
+
+    result = run_analyze_flow(img_bgr, clean_b64, top_k=4)
+    if result["status"] == "error":
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    # Menyediakan backward-compatibility field untuk UI ScannerDashboard.jsx yang sudah ada
+    # scanResult.estimated_price & scanResult.official_image_url
+    result["estimated_price"] = result["pricing"]["final_price_idr"]
+
+    return result
+
+
+@app.post("/upload/analyze", response_model=AnalyzeResponse)
+async def analyze_card_file(file: UploadFile = File(...)):
+    """Versi Multipart Form-Data untuk endpoint Full Analysis."""
+    contents = await file.read()
+    img_bgr, clean_b64 = decode_bytes_to_cv2(contents)
+    if img_bgr is None or clean_b64 is None:
+        raise HTTPException(status_code=400, detail="Berkas gambar tidak dapat dibaca.")
+
+    result = run_analyze_flow(img_bgr, clean_b64, top_k=4)
+    if result["status"] == "error":
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    result["estimated_price"] = result["pricing"]["final_price_idr"]
+
+    return result
+
+
+# ---------------------------------------------------------------------
+# 5. RUNNER LOKAL
+# ---------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import uvicorn
+    print("\n[INFO] Menjalankan Server Regokemon API di http://127.0.0.1:8000 ...")
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
