@@ -48,7 +48,7 @@ TILT_WARNING_DEGREES = 14.0
 # Konfigurasi Engine
 USE_TTA = False
 USE_ORB_RERANK = True
-ORB_POOL_SIZE = 150
+ORB_POOL_SIZE = 100
 
 # Mode Debug
 DEBUG_MODE = True
@@ -283,9 +283,9 @@ def main():
             print(f"Memindai kartu (skor ketajaman: {best_score:.0f})... 🔍")
             save_path = DEBUG_ALIGNED_PATH if DEBUG_MODE else None
 
-            # Kirim direct clean crop ke engine CLIP (dengan 4-way auto-orientation)
+            # Kirim crop ke engine CLIP (dengan Dual-View Retrieval & 4-Way Auto-Orientation)
             result = identifier.identify_card(best_crop, top_k=DEBUG_TOP_K, debug=DEBUG_MODE,
-                                               debug_save_path=save_path, auto_align=False)
+                                               debug_save_path=save_path, auto_align=True)
 
             if result['status'] == 'success' and result['candidates']:
                 top_match = result['candidates'][0]
@@ -304,7 +304,8 @@ def main():
                     print(f"[debug] Top-{DEBUG_TOP_K} kandidat:")
                     for c in result['candidates']:
                         orb_str = f" orb={c['orb_verification_score']:.3f}" if c.get('orb_verification_score') is not None else ""
-                        print(f"         #{c['rank']} {c.get('name','?'):20s} raw={c['raw_similarity_score']:.4f}  conf={c['confidence_percentage']}%{orb_str}")
+                        set_str = f" [{c.get('set_name', '')}]" if c.get('set_name') else ""
+                        print(f"         #{c['rank']} {c.get('name','?'):18s}{set_str:25s} raw={c['raw_similarity_score']:.4f}  conf={c['confidence_percentage']}%{orb_str}")
 
                 last_result_text = f"{top_match.get('name', 'Unknown')} - {top_match['confidence_percentage']}% ({label})"
                 last_result_color = LABEL_COLOR.get(label, (255, 255, 255))

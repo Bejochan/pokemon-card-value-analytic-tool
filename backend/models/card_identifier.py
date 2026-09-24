@@ -45,7 +45,7 @@ class CardIdentifier:
     def __init__(self, index_path=INDEX_PATH, map_path=MAP_PATH, csv_path=CSV_PATH,
                  image_dir=IMAGE_DIR, confidence_temperature=0.03,
                  calibration_pool_size=20, use_tta=False, use_orb_rerank=True,
-                 orb_rerank_pool_size=150):
+                 orb_rerank_pool_size=100):
         self.index_path = index_path
         self.map_path = map_path
         self.csv_path = csv_path
@@ -335,6 +335,18 @@ class CardIdentifier:
         denom = min(len(k1), len(k2))
         return len(good) / denom if denom > 0 else 0.0
 
+    @staticmethod
+    def _enhance_contrast_glare(bgr):
+        """
+        Meredam pantulan cahaya (glare / specular reflection) dan meningkatkan
+        kontras lokal dengan CLAHE pada kanal L (Luminance) dalam ruang warna LAB.
+        """
+        lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        l_enh = clahe.apply(l)
+        return cv2.cvtColor(cv2.merge([l_enh, a, b]), cv2.COLOR_LAB2BGR)
+
     # ------------------------------------------------------------------
     # MAIN ENTRY POINT
     # ------------------------------------------------------------------
@@ -356,52 +368,94 @@ class CardIdentifier:
 
         # Lakukan 4-Way Smart Auto-Orientation agar kartu selalu tegak
         aligned_bgr = self._ensure_best_orientation(aligned_bgr)
-        pil_img = Image.fromarray(cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2RGB))
 
         if debug_save_path:
             cv2.imwrite(debug_save_path, aligned_bgr)
 
-        feat = self._extract_embedding_tta(pil_img) if self.use_tta else self._extract_embedding(pil_img)
-        faiss.normalize_L2(feat)
+        def _retrieve_and_rerank(clip_source_bgr, orb_query_bgr):
+            # View 1: Standard Portrait (448 x 625)
+            pil_p = Image.fromarray(cv2.cvtColor(clip_source_bgr, cv2.COLOR_BGR2RGB))
+            feat_p = self._extract_embedding_tta(pil_p) if self.use_tta else self._extract_embedding(pil_p)
+            faiss.normalize_L2(feat_p)
 
-        rerank_pool = max(top_k, self.orb_rerank_pool_size) if self.use_orb_rerank else top_k
-        pool_k = min(max(rerank_pool, self.calibration_pool_size), self.index.ntotal)
+            # View 2: Full Square (640 x 640) - mencakup 100% kartu tanpa terpotong CenterCrop OpenCLIP
+            sq_bgr = cv2.resize(clip_source_bgr, (640, 640))
+            pil_s = Image.fromarray(cv2.cvtColor(sq_bgr, cv2.COLOR_BGR2RGB))
+            feat_s = self._extract_embedding_tta(pil_s) if self.use_tta else self._extract_embedding(pil_s)
+            faiss.normalize_L2(feat_s)
 
-        distances, indices = self.index.search(feat, pool_k)
-        sims_pool = distances[0]
-        probs, margins = self._compute_calibrated_confidence(sims_pool)
+            rerank_pool = max(top_k, self.orb_rerank_pool_size) if self.use_orb_rerank else top_k
+            sub_k = min(max(rerank_pool // 2, self.calibration_pool_size), self.index.ntotal)
 
-        raw_candidates = []
-        n_avail = min(rerank_pool, len(indices[0]))
-        for rank in range(n_avail):
-            idx = indices[0][rank]
-            dist = float(distances[0][rank])
-            card_id = self.card_id_map.get(str(idx), "Unknown")
-            calibrated_pct = float(probs[rank] * 100)
-            margin_r = float(margins[rank])
+            distances_p, indices_p = self.index.search(feat_p, sub_k)
+            distances_s, indices_s = self.index.search(feat_s, sub_k)
 
-            entry = {
-                "card_id": card_id,
-                "raw_similarity_score": dist,
-                "calibrated_confidence_pct": calibrated_pct,
-                "margin": margin_r,
-            }
-            if self.use_orb_rerank:
-                orb_score = self._orb_match_score(aligned_bgr, card_id)
-                entry["orb_verification_score"] = orb_score
-                entry["blended_score"] = 0.60 * dist + 0.40 * (orb_score or 0.0)
-            else:
-                entry["blended_score"] = dist
-            raw_candidates.append(entry)
+            # Gabungkan kandidat dari kedua sudut pandang (Dual-View Pool)
+            cand_dict = {}
+            for rank in range(len(indices_p[0])):
+                cid = self.card_id_map.get(str(indices_p[0][rank]))
+                sim = float(distances_p[0][rank])
+                cand_dict[cid] = max(cand_dict.get(cid, 0.0), sim)
 
-        if self.use_orb_rerank:
-            raw_candidates.sort(key=lambda e: e["blended_score"], reverse=True)
-            if len(raw_candidates) > 1:
-                post_margin = max(raw_candidates[0]["blended_score"] - raw_candidates[1]["blended_score"], 0.0)
-                z = post_margin / self.confidence_temperature
-                post_conf_pct = 100.0 / (1.0 + np.exp(-z))
-                raw_candidates[0]["calibrated_confidence_pct"] = float(post_conf_pct)
-                raw_candidates[0]["margin"] = float(post_margin)
+            for rank in range(len(indices_s[0])):
+                cid = self.card_id_map.get(str(indices_s[0][rank]))
+                sim = float(distances_s[0][rank])
+                cand_dict[cid] = max(cand_dict.get(cid, 0.0), sim)
+
+            raw_cands = []
+            for card_id, dist in cand_dict.items():
+                entry = {
+                    "card_id": card_id,
+                    "raw_similarity_score": dist,
+                }
+                if self.use_orb_rerank:
+                    orb_score = self._orb_match_score(orb_query_bgr, card_id)
+                    entry["orb_verification_score"] = orb_score
+                    entry["blended_score"] = 0.60 * dist + 0.40 * (orb_score or 0.0)
+                else:
+                    entry["blended_score"] = dist
+
+                name = "Unknown"
+                if self.df_metadata is not None and card_id in self.df_metadata.index:
+                    name = str(self.df_metadata.loc[card_id].get("name", "Unknown"))
+                entry["name"] = name
+                raw_cands.append(entry)
+
+            raw_cands.sort(key=lambda e: e["blended_score"], reverse=True)
+            return raw_cands
+
+        # Eksekusi Pass 1: Standar
+        raw_candidates = _retrieve_and_rerank(aligned_bgr, aligned_bgr)
+        top_entry = raw_candidates[0]
+
+        # Hitung margin ke runner-up dengan nama kartu berbeda (mencegah penalti margin pada reprint varian set)
+        distinct_margin = 0.0
+        for cand in raw_candidates[1:]:
+            if cand["name"].lower() != top_entry["name"].lower():
+                distinct_margin = max(top_entry["blended_score"] - cand["blended_score"], 0.0)
+                break
+        if distinct_margin == 0.0 and len(raw_candidates) > 1:
+            distinct_margin = max(top_entry["blended_score"] - raw_candidates[1]["blended_score"], 0.0)
+
+        # Pass 2: Adaptive Fallback jika confidence Pass 1 masih 'Rendah' (mengatasi pantulan silau / sleeve glare)
+        if self._confidence_label(distinct_margin) == "Rendah":
+            enhanced_bgr = self._enhance_contrast_glare(aligned_bgr)
+            pass2_candidates = _retrieve_and_rerank(enhanced_bgr, aligned_bgr)
+            top_pass2 = pass2_candidates[0]
+            margin_pass2 = 0.0
+            for cand in pass2_candidates[1:]:
+                if cand["name"].lower() != top_pass2["name"].lower():
+                    margin_pass2 = max(top_pass2["blended_score"] - cand["blended_score"], 0.0)
+                    break
+            if margin_pass2 > distinct_margin:
+                raw_candidates = pass2_candidates
+                top_entry = top_pass2
+                distinct_margin = margin_pass2
+
+        z = distinct_margin / self.confidence_temperature
+        post_conf_pct = float(100.0 / (1.0 + np.exp(-z)))
+        top_entry["calibrated_confidence_pct"] = post_conf_pct
+        top_entry["margin"] = distinct_margin
 
         raw_candidates = raw_candidates[:top_k]
 
@@ -411,12 +465,12 @@ class CardIdentifier:
             card_info = {
                 "rank": rank + 1,
                 "card_id": card_id,
-                "confidence_percentage": round(entry["calibrated_confidence_pct"], 2),
+                "confidence_percentage": round(top_entry["calibrated_confidence_pct"] if rank == 0 else entry["blended_score"] * 100, 2),
                 "raw_similarity_score": round(entry["raw_similarity_score"], 4),
-                "confidence_label": self._confidence_label(entry["margin"]),
+                "confidence_label": self._confidence_label(distinct_margin) if rank == 0 else self._confidence_label(entry["blended_score"] - raw_candidates[min(rank+1, len(raw_candidates)-1)]["blended_score"]),
             }
             if rank == 0:
-                card_info["margin_to_runner_up"] = round(entry["margin"], 4)
+                card_info["margin_to_runner_up"] = round(distinct_margin, 4)
             if self.use_orb_rerank:
                 orb_score = entry.get("orb_verification_score")
                 card_info["orb_verification_score"] = round(orb_score, 3) if orb_score is not None else None
@@ -439,7 +493,7 @@ class CardIdentifier:
             "candidates": candidates,
         }
         if debug:
-            output["debug_similarity_pool"] = [round(float(s), 4) for s in sims_pool]
+            output["debug_distinct_margin"] = round(distinct_margin, 4)
             output["debug_temperature"] = self.confidence_temperature
 
         return output
