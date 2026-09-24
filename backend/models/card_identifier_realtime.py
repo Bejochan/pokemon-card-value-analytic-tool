@@ -142,27 +142,27 @@ class RealtimeInferenceWorker(threading.Thread):
 
 def draw_hud(frame, x1, y1, x2, y2, scan_ratio, prediction, latency_ms, cam_fps, live_sharpness, is_paused=False, current_rotation=0):
     """
-    Menggambar antarmuka Computer Vision bernuansa futuristik dengan scanner beam,
-    corner accents, FPS counter, dan kartu hasil deteksi secara real-time.
+    Menggambar antarmuka Computer Vision bernuansa futuristik dan rapi
+    tanpa overlap teks, dengan scanner beam, corner accents, dan status bar.
     """
     h, w = frame.shape[:2]
     out = frame.copy()
 
     # 1. Darken background di luar kotak deteksi
     overlay = out.copy()
-    cv2.rectangle(overlay, (0, 0), (w, h), (15, 15, 20), -1)
-    cv2.addWeighted(overlay, 0.40, out, 0.60, 0, out)
+    cv2.rectangle(overlay, (0, 0), (w, h), (14, 15, 20), -1)
+    cv2.addWeighted(overlay, 0.45, out, 0.55, 0, out)
     out[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
 
     # 2. Kotak pembatas kartu & corner accents
     border_color = (0, 255, 255) if is_paused else (0, 200, 255)
-    if prediction and prediction.get("candidates"):
+    if prediction and prediction.get("candidates") and live_sharpness >= SHARPNESS_MIN:
         top_label = prediction["candidates"][0].get("confidence_label", "Rendah")
         border_color = LABEL_COLOR.get(top_label, border_color)
 
-    cv2.rectangle(out, (x1, y1), (x2, y2), border_color, 1)
+    cv2.rectangle(out, (x1, y1), (x2, y2), border_color, 2)
 
-    corner_len = 26
+    corner_len = 28
     corner_thick = 3
     # TL
     cv2.line(out, (x1, y1), (x1 + corner_len, y1), border_color, corner_thick)
@@ -182,76 +182,102 @@ def draw_hud(frame, x1, y1, x2, y2, scan_ratio, prediction, latency_ms, cam_fps,
         beam_y = int(y1 + (y2 - y1) * scan_ratio)
         beam_overlay = out.copy()
         cv2.line(beam_overlay, (x1 + 2, beam_y), (x2 - 2, beam_y), (0, 255, 255), 2)
-        # Efek glowing laser
-        cv2.rectangle(beam_overlay, (x1 + 2, max(y1, beam_y - 8)), (x2 - 2, min(y2, beam_y + 8)), (0, 220, 255), -1)
+        cv2.rectangle(beam_overlay, (x1 + 2, max(y1, beam_y - 6)), (x2 - 2, min(y2, beam_y + 6)), (0, 220, 255), -1)
         cv2.addWeighted(beam_overlay, 0.25, out, 0.75, 0, out)
 
-    # 4. Header Bar Atas
-    cv2.rectangle(out, (0, 0), (w, 55), (20, 20, 25), -1)
-    cv2.line(out, (0, 55), (w, 55), (60, 60, 75), 1)
+    # 4. Header Bar Atas (Rapi dua baris terpisah, bebas tabrakan)
+    header_h = 70
+    cv2.rectangle(out, (0, 0), (w, header_h), (18, 20, 26), -1)
+    cv2.line(out, (0, header_h), (w, header_h), (50, 55, 70), 1)
 
-    title_text = "REGOKEMON — REAL-TIME CARD IDENTIFIER"
-    if is_paused:
-        title_text += " [PAUSED / FROZEN]"
-    cv2.putText(out, title_text, (20, 34), cv2.FONT_HERSHEY_DUPLEX, 0.72, (255, 255, 255), 2)
+    # Baris 1 Header: Judul App & Status Badge
+    title_text = "REGOKEMON - AI VISION SCANNER"
+    cv2.putText(out, title_text, (18, 30), cv2.FONT_HERSHEY_DUPLEX, 0.60, (255, 255, 255), 1)
 
-    # Stats: Camera FPS & Model Latency
+    status_tag = "PAUSED" if is_paused else "LIVE"
+    status_col = (0, 215, 255) if is_paused else (0, 240, 120)
+    tag_w = 75
+    cv2.rectangle(out, (w - tag_w - 18, 12), (w - 18, 36), (30, 35, 45), -1)
+    cv2.rectangle(out, (w - tag_w - 18, 12), (w - 18, 36), status_col, 1)
+    cv2.putText(out, status_tag, (w - tag_w - 8, 29), cv2.FONT_HERSHEY_DUPLEX, 0.44, status_col, 1)
+
+    # Baris 2 Header: FPS & AI Latency
     infer_fps = (1000.0 / latency_ms) if latency_ms > 0 else 0.0
-    stats_text = f"Cam: {cam_fps:.0f} FPS  |  AI Latency: {latency_ms:.0f} ms (~{infer_fps:.1f} deteksi/dtk)"
-    cv2.putText(out, stats_text, (w - 480, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 220, 255), 1)
+    stats_text = f"FPS: {cam_fps:.0f}  |  Inferensi: {latency_ms:.0f} ms (~{infer_fps:.1f}/s)"
+    cv2.putText(out, stats_text, (18, 56), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (0, 220, 255), 1)
 
-    # 5. Panel Informasi Hasil Deteksi Bawah
-    panel_h = 135
+    # 5. Panel Informasi Hasil Deteksi Bawah (Tinggi 185px)
+    panel_h = 185
     panel_y = h - panel_h
-    cv2.rectangle(out, (0, panel_y), (w, h), (20, 22, 30), -1)
-    cv2.line(out, (0, panel_y), (w, panel_y), (0, 200, 255), 1)
+    cv2.rectangle(out, (0, panel_y), (w, h), (18, 20, 26), -1)
+    cv2.line(out, (0, panel_y), (w, panel_y), (0, 200, 255), 2)
+
+    footer_h = 32
 
     if prediction and prediction.get("candidates") and live_sharpness >= SHARPNESS_MIN:
         cands = prediction["candidates"]
         top = cands[0]
-        name = top.get("name", "Unknown Card")
-        set_name = top.get("set_name", "Unknown Set")
+        raw_name = top.get("name", "Unknown Card")
+        name = raw_name if len(raw_name) <= 20 else raw_name[:18] + ".."
+        set_name = top.get("set_name", "-")
         card_id = top.get("card_id", "-")
         conf_pct = top.get("confidence_percentage", 0.0)
         label = top.get("confidence_label", "Rendah")
         label_col = LABEL_COLOR.get(label, (255, 255, 255))
 
-        # Nama Kartu Utama
-        cv2.putText(out, f"{name}", (25, panel_y + 36), cv2.FONT_HERSHEY_DUPLEX, 0.95, (255, 255, 255), 2)
-        cv2.putText(out, f"Set: {set_name}  |  ID: {card_id}", (25, panel_y + 65),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.58, (180, 190, 205), 1)
+        # Baris 1: Nama Kartu + Badge Confidence di kanan
+        cv2.putText(out, name, (18, panel_y + 36), cv2.FONT_HERSHEY_DUPLEX, 0.82, (255, 255, 255), 2)
 
-        # Badge Confidence
-        badge_x = min(w - 280, int(w * 0.65))
-        cv2.rectangle(out, (badge_x, panel_y + 15), (badge_x + 240, panel_y + 65), (35, 38, 50), -1)
-        cv2.rectangle(out, (badge_x, panel_y + 15), (badge_x + 240, panel_y + 65), label_col, 2)
-        cv2.putText(out, f"{conf_pct:.1f}% ({label})", (badge_x + 18, panel_y + 48),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.70, label_col, 2)
+        badge_w = 165
+        badge_h = 32
+        badge_x = w - badge_w - 18
+        badge_y = panel_y + 12
+        cv2.rectangle(out, (badge_x, badge_y), (badge_x + badge_w, badge_y + badge_h), (28, 32, 42), -1)
+        cv2.rectangle(out, (badge_x, badge_y), (badge_x + badge_w, badge_y + badge_h), label_col, 2)
+        badge_str = f"{conf_pct:.1f}% [{label}]"
+        cv2.putText(out, badge_str, (badge_x + 10, badge_y + 22), cv2.FONT_HERSHEY_DUPLEX, 0.48, label_col, 1)
 
-        # Runner-up candidates preview
+        # Baris 2: Set & ID Kartu
+        set_info = f"Set: {set_name}  |  ID: {card_id}"
+        if len(set_info) > 42:
+            set_info = set_info[:40] + ".."
+        cv2.putText(out, set_info, (18, panel_y + 68), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (175, 190, 210), 1)
+
+        # Baris 3: Runner-up candidates
         if len(cands) > 1:
-            runner_str = "Kandidat Lain: " + "  •  ".join(
-                [f"#{c['rank']} {c.get('name','?')[:14]} ({c.get('set_name','?')[:12]})" for c in cands[1:3]]
-            )
-            cv2.putText(out, runner_str, (25, panel_y + 100), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (140, 155, 175), 1)
-    else:
-        status_msg = "Mencari kartu... Arahkan kartu ke dalam kotak panduan"
-        if live_sharpness < SHARPNESS_MIN:
-            status_msg = "Gambar kurang tajam / bergerak... Tahan posisi kartu atau tekan 'F'"
-        cv2.putText(out, status_msg, (25, panel_y + 60), cv2.FONT_HERSHEY_SIMPLEX, 0.70, (0, 200, 255), 2)
-        cv2.putText(out, f"Ketajaman Sensor: {live_sharpness:.0f} (Min: {SHARPNESS_MIN:.0f})", (25, panel_y + 95),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.52, (150, 160, 175), 1)
+            runner_items = [f"#{c['rank']} {c.get('name','?')[:12]}" for c in cands[1:3]]
+            runner_str = "Lainnya: " + "  |  ".join(runner_items)
+            cv2.putText(out, runner_str, (18, panel_y + 98), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (135, 150, 170), 1)
 
-    # 6. Bar Petunjuk Kontrol
-    controls_text = f"[Spasi] Pause | [R] Rotasi:{current_rotation}° | [F] Focus | [L] Flash | [Q] Keluar"
-    cv2.putText(out, controls_text, (w - 530, h - 18), cv2.FONT_HERSHEY_SIMPLEX, 0.46, (130, 140, 160), 1)
+        # Baris 4: Ketajaman Sensor
+        sharp_str = f"Sensor: {live_sharpness:.0f} (Fokus Tajam)"
+        cv2.putText(out, sharp_str, (18, panel_y + 128), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 220, 120), 1)
+    else:
+        # Tampilan saat kartu belum pas / belum terdeteksi
+        status_msg = "Mencari kartu Pokemon..."
+        guide_sub = "Arahkan kartu pas di dalam kotak"
+        if live_sharpness < SHARPNESS_MIN:
+            status_msg = "Sensor Kurang Fokus / Goyang"
+            guide_sub = "Tahan HP lebih tenang atau tekan 'F'"
+
+        cv2.putText(out, status_msg, (18, panel_y + 42), cv2.FONT_HERSHEY_DUPLEX, 0.72, (0, 215, 255), 2)
+        cv2.putText(out, guide_sub, (18, panel_y + 78), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (180, 195, 210), 1)
+        sharp_col = (0, 220, 120) if live_sharpness >= SHARPNESS_MIN else (0, 120, 255)
+        cv2.putText(out, f"Ketajaman Sensor: {live_sharpness:.0f} (Min: {SHARPNESS_MIN:.0f})", (18, panel_y + 115),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.44, sharp_col, 1)
+
+    # 6. Bar Petunjuk Kontrol Paling Bawah (Dedicated Background, tidak pernah overlap)
+    cv2.rectangle(out, (0, h - footer_h), (w, h), (12, 13, 18), -1)
+    cv2.line(out, (0, h - footer_h), (w, h - footer_h), (35, 40, 50), 1)
+    controls_text = f"[Spasi] Pause | [R] Rotasi:{current_rotation} deg | [F] Fokus | [L] Flash | [Q] Keluar"
+    cv2.putText(out, controls_text, (15, h - 11), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (150, 165, 185), 1)
 
     return out
 
 
 def main():
     print("=================================================================")
-    print("Regokemon — Pemindai Kartu Pokemon Real-Time (Live Computer Vision)")
+    print("Regokemon - Pemindai Kartu Pokemon Real-Time (Live Computer Vision)")
     print("=================================================================")
     print("Memuat AI Engine (CLIP ViT-B-32 + FAISS + Realtime ORB)...")
 
@@ -278,12 +304,12 @@ def main():
 
     actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    print(f"[OK] Kamera terhubung! Resolusi: {actual_w}x{actual_h}")
+    print(f"[OK] Kamera terhubung! Resolusi Sensor: {actual_w}x{actual_h}")
 
-    WINDOW_NAME = "Regokemon — Real-Time Pokemon Card Scanner"
+    WINDOW_NAME = "Regokemon - Real-Time Pokemon Card Scanner"
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-
-    card_aspect = 63.0 / 88.0
+    # Tampilkan jendela proporsional dan nyaman di layar laptop
+    cv2.resizeWindow(WINDOW_NAME, 560, 920)
 
     is_phone_stream = isinstance(CAMERA_SOURCE, str) and CAMERA_SOURCE.startswith("http")
     default_rot = 90 if is_phone_stream else 0
@@ -332,18 +358,27 @@ def main():
 
             h, w, _ = active_frame.shape
 
-            # Hitung proporsi kotak kartu adaptif terhadap portrait/landscape
+            # Ruang vertikal antara Header (70px) dan Panel Bawah (185px)
+            top_margin = 75
+            bottom_margin = 195
+            available_h = h - top_margin - bottom_margin
+
+            # Hitung proporsi kotak kartu adaptif terhadap portrait/landscape (63:88)
+            card_aspect = 63.0 / 88.0
             if h > w:
                 # Mode Portrait (HP dipegang tegak)
-                CARD_WIDTH = int(w * 0.76)
+                CARD_WIDTH = int(w * 0.74)
                 CARD_HEIGHT = int(CARD_WIDTH / card_aspect)
+                if CARD_HEIGHT > available_h:
+                    CARD_HEIGHT = int(available_h * 0.92)
+                    CARD_WIDTH = int(CARD_HEIGHT * card_aspect)
             else:
                 # Mode Landscape
-                CARD_HEIGHT = int(h * 0.74)
+                CARD_HEIGHT = int(available_h * 0.85)
                 CARD_WIDTH = int(CARD_HEIGHT * card_aspect)
 
             x1 = int((w - CARD_WIDTH) / 2)
-            y1 = int((h - CARD_HEIGHT) / 2)
+            y1 = int(top_margin + (available_h - CARD_HEIGHT) / 2)
             x2 = x1 + CARD_WIDTH
             y2 = y1 + CARD_HEIGHT
 

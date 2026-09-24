@@ -171,6 +171,7 @@ def main():
 
     WINDOW_NAME = "Pemindai Kartu Pokemon (Redmi 15 Optimized)"
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(WINDOW_NAME, 560, 920)
 
     # Fitur klik mouse untuk scan langsung
     mouse_scan_triggered = False
@@ -271,12 +272,12 @@ def main():
                     cv2.FONT_HERSHEY_SIMPLEX, 0.65, guide_color, 2)
 
         # Status Bar Atas
-        controls_text = f"[S / Klik] Scan | [R] Rotasi:{current_rotation}° | [Q] Keluar"
+        controls_text = f"[S / Klik] Scan | [R] Rotasi:{current_rotation} deg | [Q] Keluar"
         if is_phone_stream:
             torch_status = "ON" if is_torch_on else "OFF"
             controls_text += f" | [F] Focus | [L] Flash:{torch_status}"
         cv2.putText(display_frame, controls_text, (15, 35),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1)
 
         # Indikator Ketajaman Sensor Redmi
         focus_label = "FOKUS TAJAM" if is_sharp_enough else "KURANG FOKUS"
