@@ -30,6 +30,11 @@ venv.bak/
 *.pkl
 *.tmp
 pokemon-cards/
+# Scratch & Debug Testing Files
+scratch/
+**/scratch/
+debug_*.jpg
+debug_*.png
 backend/models/*.pt
 *.index
 **/*.index

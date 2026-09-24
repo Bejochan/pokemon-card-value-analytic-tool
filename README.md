@@ -140,10 +140,11 @@ pokemon-card-value-analytic-tool/
 │       └── daily_price_cron.yml          # GitHub Actions cron otomatis pelacak harga harian
 │
 ├── backend/                              # Backend Python, Database, & CV Engine
-│   ├── app/
-│   │   ├── analytics_engine.py           # Mesin kalkulasi harga wajar & sinyal rekomendasi
-│   │   ├── cv_detector.py                # Pipeline Model 1 (CLIP) & Model 2 (YOLOv8)
-│   │   └── main.py                       # REST API Server (FastAPI)
+│   ├── app/                              # Modular REST API & Business Logic (FastAPI)
+│   │   ├── schemas.py                    # Validasi tipe data Pydantic (Request, Response, Pricing, Defect)
+│   │   ├── analytics_engine.py           # Mesin valuasi harga wajar w/ Formula Bab II & sinyal BUY/HOLD/SELL
+│   │   ├── cv_service.py                 # Jembatan CV in-memory (Model 1 CLIP 20.617 kartu + Model 2 YOLO)
+│   │   └── main.py                       # Entrypoint FastAPI Server (Endpoints /identify, /analyze, /health)
 │   ├── dataset/                          # Master Dataset & Berkas Citra
 │   │   ├── pokemon_cards_dataset_cleaned.csv  # CSV Bersih (20.617 baris, 22 kolom fitur)
 │   │   ├── pokemon_cards_dataset_cleaned.json # JSON Bersih (20.617 item)
@@ -237,9 +238,14 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r requirements.txt
-python -m app.main
+python -m uvicorn app.main:app --reload --port 8000
 ```
-*(Backend API berjalan di `http://localhost:8000`)*
+* **Status Server:** Berjalan di `http://127.0.0.1:8000`
+* **Dokumentasi Interaktif (Swagger UI):** Kunjungi `http://127.0.0.1:8000/docs` di browser untuk menguji API secara langsung.
+* **Endpoint Tersedia:**
+  * `POST /identify`: Khusus On-Cam (eksekusi cepat Model 1 CLIP sub-50ms).
+  * `POST /analyze`: Khusus Upload Foto Statis (Model 1 + Model 2 YOLO Condition Grader & Valuasi Harga Akhir).
+  * `GET  /health`: Healthcheck untuk Docker & cloud monitoring.
 
 ### 2. Frontend Dashboard (React / Vite)
 ```bash
