@@ -98,7 +98,18 @@ def estimate_tilt_deviation(gray_frame):
     return min(angle_mod, 90 - angle_mod)
 
 
-def capture_best_of_burst(cap, x1, y1, x2, y2, n_frames=BURST_FRAMES):
+def apply_camera_rotation(frame, rotation_deg):
+    """Putar orientasi citra kamera jika HP dipegang secara tegak (portrait)."""
+    if rotation_deg == 90:
+        return cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+    elif rotation_deg == 180:
+        return cv2.rotate(frame, cv2.ROTATE_180)
+    elif rotation_deg == 270:
+        return cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    return frame
+
+
+def capture_best_of_burst(cap, x1, y1, x2, y2, rotation_deg=0, n_frames=BURST_FRAMES):
     # Buang 2 frame buffer lama agar mendapatkan citra real-time saat tombol ditekan
     for _ in range(2):
         cap.grab()
@@ -109,6 +120,8 @@ def capture_best_of_burst(cap, x1, y1, x2, y2, n_frames=BURST_FRAMES):
         ret, frame = cap.read()
         if not ret:
             continue
+        if rotation_deg != 0:
+            frame = apply_camera_rotation(frame, rotation_deg)
         crop = frame[y1:y2, x1:x2]
         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
         score = sharpness_score(gray)
@@ -182,10 +195,11 @@ def main():
     print("• [Q]                                : KELUAR")
     print("=======================================================\n")
 
-    # Hitung proporsi kotak kartu berdasarkan rasio standar kartu resmi (63:88)
+    # Orientasi kamera: baca dari .env CAMERA_ROTATION (default 90 derajat jika stream HP agar portrait)
+    default_rot = 90 if is_phone_stream else 0
+    current_rotation = int(os.getenv("CAMERA_ROTATION", str(default_rot)))
+
     card_aspect = 63.0 / 88.0
-    CARD_HEIGHT = int(actual_h * 0.74)
-    CARD_WIDTH = int(CARD_HEIGHT * card_aspect)
 
     last_result_text = ""
     last_result_color = (255, 255, 255)
@@ -196,7 +210,21 @@ def main():
             print("Gagal mengambil gambar dari kamera.")
             break
 
+        if current_rotation != 0:
+            frame = apply_camera_rotation(frame, current_rotation)
+
         h, w, _ = frame.shape
+
+        # Hitung proporsi kotak kartu adaptif terhadap portrait/landscape
+        if h > w:
+            # Mode Portrait (HP dipegang tegak)
+            CARD_WIDTH = int(w * 0.76)
+            CARD_HEIGHT = int(CARD_WIDTH / card_aspect)
+        else:
+            # Mode Landscape
+            CARD_HEIGHT = int(h * 0.74)
+            CARD_WIDTH = int(CARD_HEIGHT * card_aspect)
+
         x1 = int((w - CARD_WIDTH) / 2)
         y1 = int((h - CARD_HEIGHT) / 2)
         x2 = x1 + CARD_WIDTH
@@ -243,12 +271,12 @@ def main():
                     cv2.FONT_HERSHEY_SIMPLEX, 0.65, guide_color, 2)
 
         # Status Bar Atas
-        controls_text = "[S / Klik] Scan | [Q] Keluar"
+        controls_text = f"[S / Klik] Scan | [R] Rotasi:{current_rotation}° | [Q] Keluar"
         if is_phone_stream:
             torch_status = "ON" if is_torch_on else "OFF"
             controls_text += f" | [F] Focus | [L] Flash:{torch_status}"
         cv2.putText(display_frame, controls_text, (15, 35),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
 
         # Indikator Ketajaman Sensor Redmi
         focus_label = "FOKUS TAJAM" if is_sharp_enough else "KURANG FOKUS"
@@ -270,7 +298,7 @@ def main():
 
         if trigger_scan:
             print("\n[capture] Mengambil burst frame terbaik dari sensor Redmi...")
-            best_crop, best_score = capture_best_of_burst(cap, x1, y1, x2, y2)
+            best_crop, best_score = capture_best_of_burst(cap, x1, y1, x2, y2, rotation_deg=current_rotation)
 
             if best_crop is None or best_score < SHARPNESS_THRESHOLD * 0.4:
                 print("Gambar terlalu blur untuk dipindai. Coba tekan 'F' untuk fokus ulang.")
@@ -278,7 +306,7 @@ def main():
                 last_result_color = (0, 0, 255)
                 continue
 
-            show_scanning_indicator(WINDOW_NAME, frame, x1, y1, x2, y2)
+            show_scanning_indicator(WINDOW_NAME, display_frame, x1, y1, x2, y2)
 
             print(f"Memindai kartu (skor ketajaman: {best_score:.0f})... 🔍")
             save_path = DEBUG_ALIGNED_PATH if DEBUG_MODE else None
@@ -313,6 +341,10 @@ def main():
                 print("Kartu tidak dikenali.")
                 last_result_text = "Kartu tidak dikenali"
                 last_result_color = (0, 0, 255)
+
+        elif key == ord('r'):
+            current_rotation = (current_rotation + 90) % 360
+            print(f"\n[kamera] Rotasi layar diubah ke: {current_rotation}°")
 
         elif key == ord('f'):
             if is_phone_stream:

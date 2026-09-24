@@ -78,6 +78,17 @@ def sharpness_score(gray_frame):
     return cv2.Laplacian(gray_frame, cv2.CV_64F).var()
 
 
+def apply_camera_rotation(frame, rotation_deg):
+    """Putar orientasi citra kamera jika HP dipegang secara tegak (portrait)."""
+    if rotation_deg == 90:
+        return cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+    elif rotation_deg == 180:
+        return cv2.rotate(frame, cv2.ROTATE_180)
+    elif rotation_deg == 270:
+        return cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    return frame
+
+
 class RealtimeInferenceWorker(threading.Thread):
     """
     Worker thread terpisah yang menjalankan inferensi CLIP + FAISS secara asinkron
@@ -129,7 +140,7 @@ class RealtimeInferenceWorker(threading.Thread):
                 pass
 
 
-def draw_hud(frame, x1, y1, x2, y2, scan_ratio, prediction, latency_ms, cam_fps, live_sharpness, is_paused=False):
+def draw_hud(frame, x1, y1, x2, y2, scan_ratio, prediction, latency_ms, cam_fps, live_sharpness, is_paused=False, current_rotation=0):
     """
     Menggambar antarmuka Computer Vision bernuansa futuristik dengan scanner beam,
     corner accents, FPS counter, dan kartu hasil deteksi secara real-time.
@@ -232,8 +243,8 @@ def draw_hud(frame, x1, y1, x2, y2, scan_ratio, prediction, latency_ms, cam_fps,
                     cv2.FONT_HERSHEY_SIMPLEX, 0.52, (150, 160, 175), 1)
 
     # 6. Bar Petunjuk Kontrol
-    controls_text = "[Spasi] Pause | [F] Auto-Focus HP | [L] Flash HP | [Q] Keluar"
-    cv2.putText(out, controls_text, (w - 460, h - 18), cv2.FONT_HERSHEY_SIMPLEX, 0.46, (130, 140, 160), 1)
+    controls_text = f"[Spasi] Pause | [R] Rotasi:{current_rotation}° | [F] Focus | [L] Flash | [Q] Keluar"
+    cv2.putText(out, controls_text, (w - 530, h - 18), cv2.FONT_HERSHEY_SIMPLEX, 0.46, (130, 140, 160), 1)
 
     return out
 
@@ -273,8 +284,10 @@ def main():
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 
     card_aspect = 63.0 / 88.0
-    CARD_HEIGHT = int(actual_h * 0.74)
-    CARD_WIDTH = int(CARD_HEIGHT * card_aspect)
+
+    is_phone_stream = isinstance(CAMERA_SOURCE, str) and CAMERA_SOURCE.startswith("http")
+    default_rot = 90 if is_phone_stream else 0
+    current_rotation = int(os.getenv("CAMERA_ROTATION", str(default_rot)))
 
     is_torch_on = False
     is_paused = False
@@ -289,6 +302,7 @@ def main():
     print("• Arahkan kartu ke dalam kotak panduan.")
     print("• Program akan mengenali kartu secara langsung dan kontinu.")
     print("• [Spasi] : Freeze/Pause tampilan untuk menunjukkan hasil ke dosen.")
+    print("• [R]     : Putar Orientasi Layar (0° / 90° / 180° / 270°).")
     print("• [F]     : Memicu Auto-Focus kamera HP.")
     print("• [L]     : Toggle Flash HP.")
     print("• [Q]     : Keluar.")
@@ -310,11 +324,24 @@ def main():
                 if not ret:
                     print("Gagal membaca frame kamera.")
                     break
+                if current_rotation != 0:
+                    frame = apply_camera_rotation(frame, current_rotation)
                 active_frame = frame
             else:
                 active_frame = paused_frame
 
             h, w, _ = active_frame.shape
+
+            # Hitung proporsi kotak kartu adaptif terhadap portrait/landscape
+            if h > w:
+                # Mode Portrait (HP dipegang tegak)
+                CARD_WIDTH = int(w * 0.76)
+                CARD_HEIGHT = int(CARD_WIDTH / card_aspect)
+            else:
+                # Mode Landscape
+                CARD_HEIGHT = int(h * 0.74)
+                CARD_WIDTH = int(CARD_HEIGHT * card_aspect)
+
             x1 = int((w - CARD_WIDTH) / 2)
             y1 = int((h - CARD_HEIGHT) / 2)
             x2 = x1 + CARD_WIDTH
@@ -336,7 +363,7 @@ def main():
             scan_ratio = (math.sin(scan_phase) + 1.0) / 2.0
 
             hud_frame = draw_hud(active_frame, x1, y1, x2, y2, scan_ratio,
-                                 prediction, latency_ms, current_cam_fps, live_sharp, is_paused)
+                                 prediction, latency_ms, current_cam_fps, live_sharp, is_paused, current_rotation)
 
             cv2.imshow(WINDOW_NAME, hud_frame)
 
@@ -348,6 +375,9 @@ def main():
                 paused_frame = active_frame.copy() if is_paused else None
                 status_str = "PAUSED" if is_paused else "RESUMED"
                 print(f"[info] Video {status_str}")
+            elif key == ord('r'):
+                current_rotation = (current_rotation + 90) % 360
+                print(f"[kamera] Rotasi layar diubah ke: {current_rotation}°")
             elif key == ord('f'):
                 print("[remote] Mengirim Auto-Focus ke HP...")
                 send_ipwebcam_cmd("focus")
