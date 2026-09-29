@@ -49,7 +49,7 @@ CAMERA_SOURCE = int(_camera_source_raw) if _camera_source_raw.strip().isdigit() 
 
 # Konfigurasi Real-Time
 SHARPNESS_MIN = 60.0
-REALTIME_ORB_POOL = 15     # Pool ringkas agar inferensi real-time sangat gesit (~120-180 ms)
+REALTIME_ORB_POOL = 4      # Cukup Top-4 kandidat untuk verifikasi ORB real-time secepat kilat
 CONFIDENCE_TEMP = 0.03
 
 LABEL_COLOR = {
@@ -183,8 +183,9 @@ class RealtimeInferenceWorker(threading.Thread):
 
             t0 = time.time()
             try:
-                # Inferensi cepat (top_k=4 agar mencakup Top-1 dan Top 2-4 runner-up)
-                res = self.identifier.identify_card(crop_bgr, top_k=4, auto_align=False)
+                # Inferensi ultra-gesit real-time (bypass auto-orient & dual-view, gunakan in-memory ORB cache)
+                res = self.identifier.identify_card(crop_bgr, top_k=4, auto_align=False,
+                                                    auto_orient=False, dual_view=False, fast_mode=True)
                 t1 = time.time()
                 latency = round((t1 - t0) * 1000, 1)
 

@@ -313,20 +313,42 @@ class CardIdentifier:
                 return p
         return None
 
-    def _orb_match_score(self, query_bgr, card_id, ratio=0.75):
+    def _get_ref_orb_descriptors(self, card_id):
+        """Ambil keypoints dan deskriptor ORB kartu referensi dengan in-memory cache (menghindari disk I/O kontinu)."""
+        if not hasattr(self, "_ref_orb_cache"):
+            self._ref_orb_cache = {}
+        if card_id in self._ref_orb_cache:
+            return self._ref_orb_cache[card_id]
+
         ref_path = self._find_reference_image_path(card_id)
         if ref_path is None:
-            return None
+            self._ref_orb_cache[card_id] = (None, None)
+            return None, None
+
         ref_img = cv2.imread(ref_path)
         if ref_img is None:
-            return None
+            self._ref_orb_cache[card_id] = (None, None)
+            return None, None
 
         orb = self._get_orb()
-        g1 = cv2.cvtColor(query_bgr, cv2.COLOR_BGR2GRAY)
         g2 = cv2.cvtColor(ref_img, cv2.COLOR_BGR2GRAY)
-        k1, d1 = orb.detectAndCompute(g1, None)
         k2, d2 = orb.detectAndCompute(g2, None)
-        if d1 is None or d2 is None or len(k1) < 2 or len(k2) < 2:
+        self._ref_orb_cache[card_id] = (k2, d2)
+        return k2, d2
+
+    def _orb_match_score(self, query_bgr, card_id, ratio=0.75, query_kp_desc=None):
+        k2, d2 = self._get_ref_orb_descriptors(card_id)
+        if d2 is None or k2 is None or len(k2) < 2:
+            return None
+
+        if query_kp_desc is not None:
+            k1, d1 = query_kp_desc
+        else:
+            orb = self._get_orb()
+            g1 = cv2.cvtColor(query_bgr, cv2.COLOR_BGR2GRAY)
+            k1, d1 = orb.detectAndCompute(g1, None)
+
+        if d1 is None or len(k1) < 2:
             return 0.0
 
         bf = cv2.BFMatcher(cv2.NORM_HAMMING)
@@ -350,7 +372,8 @@ class CardIdentifier:
     # ------------------------------------------------------------------
     # MAIN ENTRY POINT
     # ------------------------------------------------------------------
-    def identify_card(self, image_input, top_k=3, debug=False, debug_save_path=None, auto_align=True):
+    def identify_card(self, image_input, top_k=3, debug=False, debug_save_path=None, auto_align=True,
+                      auto_orient=True, dual_view=True, fast_mode=False):
         t0 = time.time()
 
         if isinstance(image_input, str):
@@ -366,8 +389,9 @@ class CardIdentifier:
         else:
             raise ValueError("Format image_input tidak valid! Gunakan path str, PIL Image, atau np.ndarray.")
 
-        # Lakukan 4-Way Smart Auto-Orientation agar kartu selalu tegak
-        aligned_bgr = self._ensure_best_orientation(aligned_bgr)
+        # Lakukan 4-Way Smart Auto-Orientation agar kartu selalu tegak (dapat dilewati pada mode streaming realtime)
+        if auto_orient:
+            aligned_bgr = self._ensure_best_orientation(aligned_bgr)
 
         if debug_save_path:
             cv2.imwrite(debug_save_path, aligned_bgr)
@@ -378,41 +402,53 @@ class CardIdentifier:
             feat_p = self._extract_embedding_tta(pil_p) if self.use_tta else self._extract_embedding(pil_p)
             faiss.normalize_L2(feat_p)
 
-            # View 2: Full Square (640 x 640) - mencakup 100% kartu tanpa terpotong CenterCrop OpenCLIP
-            sq_bgr = cv2.resize(clip_source_bgr, (640, 640))
-            pil_s = Image.fromarray(cv2.cvtColor(sq_bgr, cv2.COLOR_BGR2RGB))
-            feat_s = self._extract_embedding_tta(pil_s) if self.use_tta else self._extract_embedding(pil_s)
-            faiss.normalize_L2(feat_s)
-
             rerank_pool = max(top_k, self.orb_rerank_pool_size) if self.use_orb_rerank else top_k
             sub_k = min(max(rerank_pool // 2, self.calibration_pool_size), self.index.ntotal)
 
             distances_p, indices_p = self.index.search(feat_p, sub_k)
-            distances_s, indices_s = self.index.search(feat_s, sub_k)
 
-            # Gabungkan kandidat dari kedua sudut pandang (Dual-View Pool)
             cand_dict = {}
             for rank in range(len(indices_p[0])):
                 cid = self.card_id_map.get(str(indices_p[0][rank]))
                 sim = float(distances_p[0][rank])
                 cand_dict[cid] = max(cand_dict.get(cid, 0.0), sim)
 
-            for rank in range(len(indices_s[0])):
-                cid = self.card_id_map.get(str(indices_s[0][rank]))
-                sim = float(distances_s[0][rank])
-                cand_dict[cid] = max(cand_dict.get(cid, 0.0), sim)
+            # View 2: Full Square (640 x 640) - hanya jika dual_view diaktifkan
+            if dual_view:
+                sq_bgr = cv2.resize(clip_source_bgr, (640, 640))
+                pil_s = Image.fromarray(cv2.cvtColor(sq_bgr, cv2.COLOR_BGR2RGB))
+                feat_s = self._extract_embedding_tta(pil_s) if self.use_tta else self._extract_embedding(pil_s)
+                faiss.normalize_L2(feat_s)
+                distances_s, indices_s = self.index.search(feat_s, sub_k)
+                for rank in range(len(indices_s[0])):
+                    cid = self.card_id_map.get(str(indices_s[0][rank]))
+                    sim = float(distances_s[0][rank])
+                    cand_dict[cid] = max(cand_dict.get(cid, 0.0), sim)
+
+            # Hitung deskriptor query ORB cukup 1x untuk keseluruhan kandidat
+            q_orb_data = None
+            if self.use_orb_rerank:
+                orb = self._get_orb()
+                g_q = cv2.cvtColor(orb_query_bgr, cv2.COLOR_BGR2GRAY)
+                q_k, q_d = orb.detectAndCompute(g_q, None)
+                q_orb_data = (q_k, q_d)
+
+            # Urutkan berdasarkan kemiripan CLIP terlebih dahulu
+            sorted_by_sim = sorted(cand_dict.items(), key=lambda x: x[1], reverse=True)
+            max_orb_eval = min(len(sorted_by_sim), top_k if fast_mode else len(sorted_by_sim))
 
             raw_cands = []
-            for card_id, dist in cand_dict.items():
+            for rank, (card_id, dist) in enumerate(sorted_by_sim):
                 entry = {
                     "card_id": card_id,
                     "raw_similarity_score": dist,
                 }
-                if self.use_orb_rerank:
-                    orb_score = self._orb_match_score(orb_query_bgr, card_id)
+                if self.use_orb_rerank and rank < max_orb_eval:
+                    orb_score = self._orb_match_score(orb_query_bgr, card_id, query_kp_desc=q_orb_data)
                     entry["orb_verification_score"] = orb_score
                     entry["blended_score"] = 0.60 * dist + 0.40 * (orb_score or 0.0)
                 else:
+                    entry["orb_verification_score"] = None
                     entry["blended_score"] = dist
 
                 name = "Unknown"
@@ -437,8 +473,8 @@ class CardIdentifier:
         if distinct_margin == 0.0 and len(raw_candidates) > 1:
             distinct_margin = max(top_entry["blended_score"] - raw_candidates[1]["blended_score"], 0.0)
 
-        # Pass 2: Adaptive Fallback jika confidence Pass 1 masih 'Rendah' (mengatasi pantulan silau / sleeve glare)
-        if self._confidence_label(distinct_margin) == "Rendah":
+        # Pass 2: Adaptive Fallback jika confidence Pass 1 masih 'Rendah' (dilewati saat fast_mode)
+        if not fast_mode and self._confidence_label(distinct_margin) == "Rendah":
             enhanced_bgr = self._enhance_contrast_glare(aligned_bgr)
             pass2_candidates = _retrieve_and_rerank(enhanced_bgr, aligned_bgr)
             top_pass2 = pass2_candidates[0]
