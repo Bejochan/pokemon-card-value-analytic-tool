@@ -49,7 +49,7 @@ CAMERA_SOURCE = int(_camera_source_raw) if _camera_source_raw.strip().isdigit() 
 
 # Konfigurasi Real-Time
 SHARPNESS_MIN = 60.0
-REALTIME_ORB_POOL = 15     # Pool ringkas agar inferensi real-time sangat gesit (~120-180 ms)
+REALTIME_ORB_POOL = 4      # Cukup Top-4 kandidat untuk verifikasi ORB real-time secepat kilat
 CONFIDENCE_TEMP = 0.03
 
 LABEL_COLOR = {
@@ -57,6 +57,61 @@ LABEL_COLOR = {
     "Sedang": (0, 215, 255),    # Kuning emas
     "Rendah": (0, 90, 255),     # Merah oranye
 }
+
+
+def extract_card_price(cand):
+    """Ambil harga pasar efektif dari kandidat kartu jika tersedia."""
+    if not isinstance(cand, dict):
+        return None
+    val = cand.get("effective_market_price")
+    if val is None or val == "":
+        return None
+    try:
+        f_val = float(val)
+        if np.isnan(f_val) or f_val <= 0:
+            return None
+        return f_val
+    except (ValueError, TypeError):
+        return None
+
+
+def format_price_info(price_val):
+    """
+    Format harga ke USD dan perkiraan Rupiah (kurs acuan Rp 16.000/USD)
+    beserta kategori valuasi pasar (murah vs langka).
+    """
+    if price_val is None or price_val <= 0:
+        return "Harga: N/A", "UNPRICED", (200, 100, 255), "Koleksi Khusus / Tanpa Harga Retail"
+
+    usd_str = f"${price_val:.2f}"
+    idr_val = price_val * 16000
+    if idr_val >= 1_000_000:
+        idr_str = f"Rp {idr_val / 1_000_000:.1f}jt"
+    elif idr_val >= 10_000:
+        idr_str = f"Rp {int(idr_val / 1000):,}rb".replace(",", ".")
+    else:
+        idr_str = f"Rp {int(idr_val):,}".replace(",", ".")
+
+    price_label = f"{usd_str} (~{idr_str})"
+
+    if price_val >= 100.0:
+        tier_tag = "GRAIL / ULTRA RARE"
+        tier_col = (0, 215, 255)   # Emas / Amber
+        tier_desc = "Kartu Sangat Langka & Bernilai Tinggi"
+    elif price_val >= 25.0:
+        tier_tag = "HIGH VALUE"
+        tier_col = (255, 205, 0)   # Cyan
+        tier_desc = "Kartu Bernilai Tinggi (Koleksi Utama)"
+    elif price_val >= 5.0:
+        tier_tag = "MID VALUE"
+        tier_col = (0, 230, 115)   # Hijau Neon
+        tier_desc = "Kartu Bernilai Menengah (Populer)"
+    else:
+        tier_tag = "BUDGET / COMMON"
+        tier_col = (185, 170, 155) # Silver
+        tier_desc = "Kartu Standar / Murah (Umum)"
+
+    return price_label, tier_tag, tier_col, tier_desc
 
 
 def send_ipwebcam_cmd(cmd_path):
@@ -128,8 +183,9 @@ class RealtimeInferenceWorker(threading.Thread):
 
             t0 = time.time()
             try:
-                # Inferensi cepat (top_k=3)
-                res = self.identifier.identify_card(crop_bgr, top_k=3, auto_align=False)
+                # Inferensi ultra-gesit real-time (bypass auto-orient & dual-view, gunakan in-memory ORB cache)
+                res = self.identifier.identify_card(crop_bgr, top_k=4, auto_align=False,
+                                                    auto_orient=False, dual_view=False, fast_mode=True)
                 t1 = time.time()
                 latency = round((t1 - t0) * 1000, 1)
 
@@ -173,7 +229,7 @@ def build_dashboard(active_cam_frame, scan_ratio, prediction, latency_ms,
     # Title & Subtitle
     cv2.putText(canvas, "REGOKEMON AI", (24, 40),
                 cv2.FONT_HERSHEY_DUPLEX, 0.80, COLOR_WHITE, 1)
-    cv2.putText(canvas, "|   REAL-TIME COMPUTER VISION ANALYTICS", (225, 40),
+    cv2.putText(canvas, "|   REAL-TIME COMPUTER VISION & VALUATION SUITE", (225, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.52, COLOR_SILVER, 1)
 
     # Top Status Badge (Pulsing / Live vs Paused)
@@ -298,7 +354,7 @@ def build_dashboard(active_cam_frame, scan_ratio, prediction, latency_ms,
     cv2.rectangle(canvas, (dash_x, p1_y), (dash_x + dash_w, p1_y + p1_h), COLOR_BORDER, 1)
     cv2.line(canvas, (dash_x, p1_y), (dash_x + dash_w, p1_y), COLOR_CYAN, 3)
 
-    cv2.putText(canvas, "TARGET IDENTIFIKASI UTAMA (TOP-1 PREDICTION)", (dash_x + 24, p1_y + 34),
+    cv2.putText(canvas, "TARGET IDENTIFIKASI UTAMA (TOP-1 PREDICTION & MARKET VALUE)", (dash_x + 24, p1_y + 34),
                 cv2.FONT_HERSHEY_DUPLEX, 0.48, COLOR_CYAN, 1)
 
     if has_valid_pred:
@@ -317,19 +373,37 @@ def build_dashboard(active_cam_frame, scan_ratio, prediction, latency_ms,
 
         label_col = COLOR_NEON_GREEN if label == "Tinggi" else (COLOR_AMBER if label == "Sedang" else COLOR_CORAL)
 
-        # Card Name (Big bold)
-        cv2.putText(canvas, card_name, (dash_x + 24, p1_y + 85),
-                    cv2.FONT_HERSHEY_DUPLEX, 1.35, COLOR_WHITE, 2)
+        # Market Price & Valuation Tier
+        top_price = extract_card_price(top)
+        price_label, tier_tag, tier_col, tier_desc = format_price_info(top_price)
 
-        # Confidence Badge
-        badge_w = 210
-        badge_h = 42
-        badge_bx = dash_x + dash_w - badge_w - 24
-        badge_by = p1_y + 48
-        cv2.rectangle(canvas, (badge_bx, badge_by), (badge_bx + badge_w, badge_by + badge_h), (38, 30, 25), -1)
-        cv2.rectangle(canvas, (badge_bx, badge_by), (badge_bx + badge_w, badge_by + badge_h), label_col, 2)
-        cv2.putText(canvas, f"{conf_pct:.1f}%  [{label.upper()}]", (badge_bx + 18, badge_by + 28),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.58, label_col, 1)
+        # Card Name (Big bold, truncated if very long to prevent badge collision)
+        display_name = card_name if len(card_name) <= 20 else card_name[:18] + ".."
+        cv2.putText(canvas, display_name, (dash_x + 24, p1_y + 85),
+                    cv2.FONT_HERSHEY_DUPLEX, 1.30, COLOR_WHITE, 2)
+
+        # BADGE 1: Confidence Badge (Rightmost)
+        badge_conf_w = 180
+        badge_conf_h = 42
+        badge_conf_x = dash_x + dash_w - badge_conf_w - 24
+        badge_conf_y = p1_y + 48
+        cv2.rectangle(canvas, (badge_conf_x, badge_conf_y), (badge_conf_x + badge_conf_w, badge_conf_y + badge_conf_h), (38, 30, 25), -1)
+        cv2.rectangle(canvas, (badge_conf_x, badge_conf_y), (badge_conf_x + badge_conf_w, badge_conf_y + badge_conf_h), label_col, 2)
+        cv2.putText(canvas, f"{conf_pct:.1f}% [{label.upper()}]", (badge_conf_x + 14, badge_conf_y + 28),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.52, label_col, 1)
+
+        # BADGE 2: Market Price & Valuation Tier Badge (Beside Confidence Badge)
+        badge_price_w = 320
+        badge_price_h = 42
+        badge_price_x = badge_conf_x - badge_price_w - 14
+        badge_price_y = p1_y + 48
+        cv2.rectangle(canvas, (badge_price_x, badge_price_y), (badge_price_x + badge_price_w, badge_price_y + badge_price_h), (36, 28, 22), -1)
+        cv2.rectangle(canvas, (badge_price_x, badge_price_y), (badge_price_x + badge_price_w, badge_price_y + badge_price_h), tier_col, 2)
+        cv2.circle(canvas, (badge_price_x + 16, badge_price_y + 21), 5, tier_col, -1)
+        cv2.putText(canvas, price_label, (badge_price_x + 28, badge_price_y + 27),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.48, COLOR_WHITE, 1)
+        cv2.putText(canvas, f"[{tier_tag}]", (badge_price_x + badge_price_w - 105, badge_price_y + 27),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.42, tier_col, 1)
 
         # Metadata Line
         meta_str = f"Set: {set_name}   |   Card ID: {card_id}   |   No: {card_no}   |   Rarity: {rarity}"
@@ -357,10 +431,10 @@ def build_dashboard(active_cam_frame, scan_ratio, prediction, latency_ms,
         cv2.putText(canvas, sub_metrics, (dash_x + 24, p1_y + 225),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.48, COLOR_MUTED, 1)
 
-        # Verification Status Tag
-        verif_status = "STATUS: TERVERIFIKASI TINGGI OLEH MULTI-MODAL PIPELINE (CLIP + FAISS + ORB)"
+        # Verification Status & Market Valuation Tag
+        verif_status = f"STATUS: TERVERIFIKASI  |  VALUASI PASAR: {tier_desc.upper()}"
         cv2.putText(canvas, verif_status, (dash_x + 24, p1_y + 258),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.42, label_col, 1)
+                    cv2.FONT_HERSHEY_DUPLEX, 0.42, tier_col, 1)
 
     else:
         # Searching / Standby State
@@ -399,16 +473,17 @@ def build_dashboard(active_cam_frame, scan_ratio, prediction, latency_ms,
     cv2.rectangle(canvas, (dash_x, p2_y), (dash_x + dash_w, p2_y + p2_h), COLOR_BORDER, 1)
     cv2.line(canvas, (dash_x, p2_y), (dash_x + dash_w, p2_y), COLOR_AMBER, 3)
 
-    cv2.putText(canvas, "KANDIDAT LAIN & VARIAN REPRINT TERDEKAT (TOP 2 - 4)", (dash_x + 24, p2_y + 34),
+    cv2.putText(canvas, "KANDIDAT LAIN, PERBANDINGAN VARIAN REPRINT & HARGA (TOP 2 - 4)", (dash_x + 24, p2_y + 34),
                 cv2.FONT_HERSHEY_DUPLEX, 0.48, COLOR_AMBER, 1)
 
-    # Table Header
+    # Table Header with HARGA PASAR column
     th_y = p2_y + 60
     cv2.putText(canvas, "RANK", (dash_x + 36, th_y), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_MUTED, 1)
     cv2.putText(canvas, "NAMA KARTU", (dash_x + 115, th_y), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_MUTED, 1)
-    cv2.putText(canvas, "SET & CARD ID", (dash_x + 390, th_y), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_MUTED, 1)
-    cv2.putText(canvas, "COSINE SIM", (dash_x + dash_w - 320, th_y), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_MUTED, 1)
-    cv2.putText(canvas, "ORB MATCH", (dash_x + dash_w - 160, th_y), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_MUTED, 1)
+    cv2.putText(canvas, "SET & CARD ID", (dash_x + 350, th_y), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_MUTED, 1)
+    cv2.putText(canvas, "HARGA PASAR", (dash_x + 630, th_y), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_MUTED, 1)
+    cv2.putText(canvas, "COSINE SIM", (dash_x + dash_w - 240, th_y), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_MUTED, 1)
+    cv2.putText(canvas, "ORB MATCH", (dash_x + dash_w - 110, th_y), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_MUTED, 1)
     cv2.line(canvas, (dash_x + 24, th_y + 10), (dash_x + dash_w - 24, th_y + 10), (55, 45, 38), 1)
 
     cands_list = prediction.get("candidates", [])[1:4] if has_valid_pred else []
@@ -423,21 +498,26 @@ def build_dashboard(active_cam_frame, scan_ratio, prediction, latency_ms,
             cand = cands_list[idx]
             r_str = f"#{cand.get('rank', idx + 2)}"
             c_name = cand.get('name', 'Unknown')
-            if len(c_name) > 20:
-                c_name = c_name[:18] + ".."
+            if len(c_name) > 18:
+                c_name = c_name[:16] + ".."
             s_name = cand.get('set_name', '-')
             c_id = cand.get('card_id', '-')
             s_info = f"{s_name} ({c_id})"
-            if len(s_info) > 34:
-                s_info = s_info[:32] + ".."
+            if len(s_info) > 30:
+                s_info = s_info[:28] + ".."
+
+            c_price = extract_card_price(cand)
+            p_label, _, p_col, _ = format_price_info(c_price)
+
             sim_val = f"{cand.get('raw_similarity_score', 0.0):.4f}"
             orb_val = f"{cand.get('orb_verification_score', 0.0):.3f}" if cand.get('orb_verification_score') is not None else "-"
 
-            cv2.putText(canvas, r_str, (dash_x + 36, row_y + 30), cv2.FONT_HERSHEY_DUPLEX, 0.54, COLOR_CYAN, 1)
-            cv2.putText(canvas, c_name, (dash_x + 115, row_y + 30), cv2.FONT_HERSHEY_DUPLEX, 0.54, COLOR_WHITE, 1)
-            cv2.putText(canvas, s_info, (dash_x + 390, row_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.50, COLOR_SILVER, 1)
-            cv2.putText(canvas, sim_val, (dash_x + dash_w - 300, row_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.50, COLOR_CYAN, 1)
-            cv2.putText(canvas, orb_val, (dash_x + dash_w - 140, row_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.50, COLOR_NEON_GREEN, 1)
+            cv2.putText(canvas, r_str, (dash_x + 36, row_y + 30), cv2.FONT_HERSHEY_DUPLEX, 0.52, COLOR_CYAN, 1)
+            cv2.putText(canvas, c_name, (dash_x + 115, row_y + 30), cv2.FONT_HERSHEY_DUPLEX, 0.52, COLOR_WHITE, 1)
+            cv2.putText(canvas, s_info, (dash_x + 350, row_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.46, COLOR_SILVER, 1)
+            cv2.putText(canvas, p_label, (dash_x + 630, row_y + 30), cv2.FONT_HERSHEY_DUPLEX, 0.46, p_col, 1)
+            cv2.putText(canvas, sim_val, (dash_x + dash_w - 230, row_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.48, COLOR_CYAN, 1)
+            cv2.putText(canvas, orb_val, (dash_x + dash_w - 100, row_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.48, COLOR_NEON_GREEN, 1)
         else:
             cv2.putText(canvas, f"#{idx + 2}", (dash_x + 36, row_y + 30), cv2.FONT_HERSHEY_DUPLEX, 0.50, COLOR_MUTED, 1)
             cv2.putText(canvas, "--- Menunggu deteksi kartu ---", (dash_x + 115, row_y + 30),

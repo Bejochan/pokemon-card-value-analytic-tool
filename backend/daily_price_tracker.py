@@ -92,9 +92,10 @@ def fetch_valid_card_ids():
     return valid_ids
 
 
-def fetch_page_with_retry(page_num, page_size=250, max_retries=5, backoff_factor=2.0):
+def fetch_page_with_retry(page_num, page_size=250, max_retries=6, backoff_factor=1.5):
     """
-    Menarik 1 halaman data kartu (hanya id, tcgplayer, cardmarket) dengan retry otomatis.
+    Menarik 1 halaman data kartu (hanya id, tcgplayer, cardmarket) dengan retry otomatis,
+    pacing jitter acak, dan penanganan Cloudflare 502/429 yang tangguh.
     """
     url = f"{POKEMONTCG_BASE_URL}/cards"
     params = {
@@ -106,20 +107,27 @@ def fetch_page_with_retry(page_num, page_size=250, max_retries=5, backoff_factor
     if POKEMONTCG_API_KEY:
         headers["X-Api-Key"] = POKEMONTCG_API_KEY
 
+    # Pacing acak (50ms - 200ms) agar antrean thread tidak menabrak batas rate-limit API bersamaan
+    time.sleep(0.05 + (page_num % 5) * 0.03)
+
     for attempt in range(1, max_retries + 1):
         try:
-            r = requests.get(url, headers=headers, params=params, timeout=25)
+            r = requests.get(url, headers=headers, params=params, timeout=30)
             if r.status_code == 200:
-                data = r.json()
-                return page_num, data.get("data", []), data.get("totalCount", 0)
+                try:
+                    data = r.json()
+                    cards = data.get("data", [])
+                    if cards:
+                        return page_num, cards, data.get("totalCount", 0)
+                except Exception:
+                    pass
             elif r.status_code in [429, 500, 502, 503, 504]:
-                wait_time = backoff_factor ** attempt
+                wait_time = min(30.0, (backoff_factor ** attempt) + (attempt * 1.5))
                 time.sleep(wait_time)
             else:
-                tqdm.write(f"❌ [HTTP {r.status_code}] Gagal di halaman {page_num}")
-                break
-        except Exception as e:
-            wait_time = backoff_factor ** attempt
+                time.sleep(2.0)
+        except Exception:
+            wait_time = min(30.0, (backoff_factor ** attempt) + (attempt * 1.5))
             time.sleep(wait_time)
 
     return page_num, [], 0
@@ -266,26 +274,64 @@ def run_daily_tracker(max_pages=None, workers=4, dry_run=False):
     print(f"   Total kartu di API: {total_count:,} kartu ({total_pages} halaman @ 250 kartu)")
     print(f"   Menggunakan {workers} concurrent workers...")
 
-    # 3. Tarik seluruh halaman secara paralel
-    all_raw_cards = list(initial_cards)
-    pages_to_fetch = list(range(2, total_pages + 1))
+    # 3. Tarik seluruh halaman dengan sistem Multi-Pass Retry Queue
+    # Mengumpulkan kartu ke dictionary {card_id: card} agar terjamin unik dan bebas duplikasi
+    all_raw_cards_dict = {}
+    if initial_cards:
+        for c in initial_cards:
+            if c.get("id"):
+                all_raw_cards_dict[c["id"]] = c
 
-    if pages_to_fetch:
+    pages_to_fetch = set(range(2, total_pages + 1))
+    max_passes = 4
+
+    for pass_num in range(1, max_passes + 1):
+        if not pages_to_fetch:
+            break
+
+        pass_label = "⚡ Mengambil Data Harga" if pass_num == 1 else f"🔁 Putaran Retry #{pass_num-1} ({len(pages_to_fetch)} hlm)"
+        failed_pages = set()
+
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_to_page = {
                 executor.submit(fetch_page_with_retry, p, page_size): p 
                 for p in pages_to_fetch
             }
-            with tqdm(total=len(pages_to_fetch), desc="⚡ Mengambil Data Harga", unit="hlm") as pbar:
+            with tqdm(total=len(pages_to_fetch), desc=pass_label, unit="hlm") as pbar:
                 for future in as_completed(future_to_page):
                     page_num, cards, _ = future.result()
                     if cards:
-                        all_raw_cards.extend(cards)
+                        for c in cards:
+                            if c.get("id"):
+                                all_raw_cards_dict[c["id"]] = c
+                    else:
+                        failed_pages.add(page_num)
                     pbar.update(1)
 
+        if failed_pages:
+            print(f"   ⚠️ Terdapat {len(failed_pages)} halaman gagal di putaran {pass_num}.")
+            if pass_num < max_passes:
+                cooldown = 4 * pass_num
+                print(f"   ⏳ Melakukan jeda pendinginan (cooldown) {cooldown}s sebelum mencoba ulang halaman yang tertinggal...")
+                time.sleep(cooldown)
+                pages_to_fetch = failed_pages
+            else:
+                print(f"   ❌ Halaman yang tetap gagal setelah {max_passes} putaran: {sorted(list(failed_pages))}")
+        else:
+            pages_to_fetch = set()
+
+    all_raw_cards = list(all_raw_cards_dict.values())
     print(f"\n📦 Berhasil menarik total {len(all_raw_cards):,} data kartu dari pokemontcg.io.")
 
-    # 4. Ekstrak & pisahkan kartu terdaftar vs kartu baru
+    # 4. Validasi Kelengkapan Data (Integrity Guardrail)
+    # Memastikan tidak ada pengunggahan data yang compang-camping / hilang banyak
+    expected_min = int(len(valid_card_ids) * 0.95) if valid_card_ids else int(total_count * 0.95)
+    if len(all_raw_cards) < expected_min and not dry_run:
+        print(f"\n❌ [INTEGRITY ERROR] Data yang ditarik ({len(all_raw_cards):,}) di bawah ambang integritas minimum ({expected_min:,}).")
+        print("   Upload dibatalkan otomatis demi menjaga database Supabase tetap bersih.")
+        sys.exit(1)
+
+    # 5. Ekstrak & pisahkan kartu terdaftar vs kartu baru
     prices_latest = []
     prices_history = []
     unregistered_cards = []
@@ -312,7 +358,7 @@ def run_daily_tracker(max_pages=None, workers=4, dry_run=False):
         rec_hist["created_at"] = now_iso
         prices_history.append(rec_hist)
 
-    print(f"   📊 Kartu valid siap sinkronisasi : {len(prices_latest):,} kartu")
+    print(f"   📊 Kartu valid siap sinkronisasi : {len(prices_latest):,} kartu (Kelengkapan: {len(prices_latest)/len(valid_card_ids)*100:.1f}%)" if valid_card_ids else f"   📊 Kartu valid siap sinkronisasi : {len(prices_latest):,} kartu")
     if unregistered_cards:
         print(f"   ✨ Ditemukan kartu rilis terbaru  : {len(unregistered_cards)} kartu baru (belum ada di tabel master 'cards')")
 
