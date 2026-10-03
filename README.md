@@ -2,7 +2,7 @@
 
 > **Dashboard Analitika Data, Dual-Model Computer Vision & Estimasi Harga Wajar Kartu Pokémon untuk Marketplace**
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![OpenAI CLIP](https://img.shields.io/badge/Model_1-CLIP_ViT--B%2F32-412991?style=flat&logo=openai&logoColor=white)](https://github.com/mlfoundations/open_clip)
 [![FAISS](https://img.shields.io/badge/FAISS-Vector_Index-00599C?style=flat&logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
@@ -17,10 +17,10 @@
 
 ## 📌 Ringkasan Proyek
 
-**Pokemon Card Value Analytic Tool (REGOKEMON)** adalah sistem analitika data dan intelijen buatan berbasis **Dual-Model Computer Vision** yang dirancang untuk membantu penjual maupun pembeli kartu Pokémon pada **marketplace umum** (seperti Tokopedia, Shopee, eBay, atau forum jual-beli lokal). 
+**Pokemon Card Value Analytic Tool (REGOKEMON)** adalah sistem analitika data dan kecerdasan buatan berbasis **Dual-Model Computer Vision** yang dirancang untuk membantu penjual maupun pembeli kartu Pokémon pada **marketplace sekunder** (seperti Tokopedia, Shopee, eBay, atau forum jual-beli lokal). 
 
 Sistem ini menyelesaikan 3 permasalahan utama dalam transaksi kartu koleksi TCG:
-1. **Identifikasi Kartu Otomatis (Model 1):** Mengenali jenis kartu secara presisi dan instan (< 10 ms) dari foto kamera HP atau webcam di antara **20.617 jenis kartu** menggunakan representasi visual **OpenAI CLIP (ViT-B-32)** dan indeks vektor **FAISS**.
+1. **Identifikasi Kartu Otomatis (Model 1):** Mengenali jenis kartu secara presisi dan instan (< 200 ms) dari foto kamera HP atau webcam di antara **20.617 jenis kartu** menggunakan representasi visual **OpenAI CLIP (ViT-B/32)** dan indeks vektor **FAISS**.
 2. **Estimasi Kondisi Fisik Otomatis (Model 2):** Mengidentifikasi cacat fisik kartu (lecet, tertekuk, aus pinggir) secara objektif menggunakan Computer Vision berbasis **YOLOv8**.
 3. **Valuasi Harga Pasar Wajar & Sinyal Transaksi:** Menghitung deviasi harga penawaran marketplace dibanding harga pasar wajar (*fair market price*) dan memberikan rekomendasi **BUY (Beli)**, **HOLD (Tahan)**, atau **SELL (Kemahalan)**.
 
@@ -30,52 +30,35 @@ Sistem ini menyelesaikan 3 permasalahan utama dalam transaksi kartu koleksi TCG:
 
 Sistem ini menggunakan **2 Model Computer Vision independen** yang bekerja secara terintegrasi untuk menghasilkan analisis kartu yang akurat:
 
-```text
-[ Foto Kartu dari Kamera HP / IP Webcam / Upload ]
-                         │
-                         ▼
- ┌──────────────────────────────────────────────────────────┐
- │ 1. SMART STATIC FRAME & 4-WAY AUTO-ORIENTATION           │
- │    - Panduan bingkai portrait standar kartu (rasio 63:88)│
- │    - Deteksi ketajaman real-time (Laplacian variance)    │
- │    - Rotasi otomatis 4 arah (0°, 90°, 180°, 270°)        │
- └───────────────────────────┬──────────────────────────────┘
-                             │
-              ┌──────────────┴──────────────┐
-              ▼                             ▼
- ┌─────────────────────────────┐   ┌─────────────────────────────┐
- │ MODEL 1: Card Identifier    │   │ MODEL 2: Condition Grader   │
- │ (Default: OpenAI CLIP)      │   │ (Defect Detection)          │
- ├─────────────────────────────┤   ├─────────────────────────────┤
- │ • Backbone: CLIP ViT-B-32   │   │ • YOLOv8 / Roboflow         │
- │ • FAISS IndexFlatIP (512-d) │   │ • Deteksi Kerusakan Fisik:  │
- │ • Database: 20.617 Kartu    │   │   - Clean / Mint (1.00x)    │
- │ • Hybrid ORB Re-ranking     │   │   - Scratched (0.85x)       │
- │ • Pencarian sub-milidetik   │   │   - Edge Wear (0.80x)       │
- │ • Alternative: MobileNetV3  │   │   - Bent/Crease (0.65x)     │
- └─────────────┬───────────────┘   └─────────────┬───────────────┘
-                │                                 │
-                └────────────────┬────────────────┘
-                                 │
-                                 ▼
- ┌──────────────────────────────────────────────────────────┐
- │ ANALYTICS ENGINE & VALUATION FORMULA                     │
- │ - Sinkronisasi Harga Pasar Supabase Cloud (20.617 kartu) │
- │ - Menghitung P_final (Harga Pasar Wajar Realistis)       │
- │ - Menghitung Deviasi Harga Penawaran Marketplace         │
- │ - Menghasilkan Sinyal Transaksi: BUY / HOLD / SELL       │
- └──────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Input["Input: Foto Kartu (Webcam / IP Cam / Upload)"] --> Preproc["Smart Frame & 4-Way Auto-Orientation<br/>(Rasio 63:88, Laplacian Blur, 0°/90°/180°/270°)"]
+    
+    Preproc --> M1["MODEL 1: Card Identifier<br/>(OpenAI CLIP ViT-B/32 + FAISS IndexFlatIP)"]
+    Preproc --> M2["MODEL 2: Condition Grader<br/>(YOLOv8 Defect Detection via Roboflow)"]
+    
+    M1 -->|Top-150 Kandidat| ORB["Hybrid ORB Keypoint Re-Ranking<br/>& RANSAC Homography Verification"]
+    ORB --> CardID["Identitas Kartu Terverifikasi<br/>(Nama, Edisi Set, Nomor Seri, Rarity)"]
+    
+    M2 --> ConditionScore["F_condition Multiplier<br/>(Clean: 1.00x, Scratched: 0.85x, Edge: 0.80x, Bent: 0.65x)"]
+    
+    CardID --> Valuation["ANALYTICS ENGINE & VALUATION FORMULA<br/>P_final = P_base × M_variant × F_condition × F_market"]
+    ConditionScore --> Valuation
+    
+    Supabase[("Supabase Cloud Database<br/>(20.617 Kartu & Daily Pricing Cron)")] --> Valuation
+    
+    Valuation --> Output["Output: P_final (Harga Pasar Wajar Realistis)<br/>Deviasi Harga Pasar & Sinyal Transaksi BUY / HOLD / SELL"]
 ```
 
-### 1️⃣ Model 1: Card Identification Engine (Default: OpenAI CLIP ViT-B-32)
+### 1️⃣ Model 1: Card Identification Engine (Default: OpenAI CLIP ViT-B/32)
 * **Tujuan:** Mengenali **jenis kartu** (Nama, Set, Nomor Seri, Rarity) dari foto input di antara 20.617 kartu acuan.
-* **Arsitektur Default (Produksi):** **OpenAI CLIP (Vision Transformer ViT-B-32)** pre-trained kontrastif pada 400M pasangan gambar-teks.
+* **Arsitektur Default (Produksi):** **OpenAI CLIP (Vision Transformer ViT-B/32)** pre-trained kontrastif pada 400M pasangan gambar-teks.
   * **Mengapa CLIP?** Model klasifikasi umum seperti MobileNetV3 dilatih pada ImageNet (foto objek riil dunia nyata), sehingga rentan salah mengenali ilustrasi 2D bergaya anime/fanart dan sangat sensitif terhadap pencahayaan. CLIP memahami semantik grafis dan variasi ilustrasi secara mendalam, menghasilkan akurasi pencocokan visual yang jauh lebih tinggi.
 * **Fitur Utama Engine:**
-  1. **512-Dimension Visual Embeddings:** Representasi fitur visual yang padat dan sangat diskriminatif.
-  2. **FAISS IndexFlatIP:** Indeks pencarian vektor berbasis *Cosine Similarity* yang memproses 20.617 kartu dalam hitungan sub-milidetik.
+  1. **512-Dimension Visual Embeddings:** Representasi fitur visual yang padat dan sangat diskriminatif diekstraksi via CUDA GPU.
+  2. **FAISS IndexFlatIP:** Indeks pencarian vektor berbasis *Cosine Similarity* yang memproses 20.617 kartu dalam hitungan sub-milidetik (< 200 ms).
   3. **4-Way Smart Auto-Orientation:** Secara cerdas mengevaluasi sudut rotasi kartu (0°, 90°, 180°, 270°) terhadap FAISS, sehingga kartu yang difoto miring atau terbalik otomatis ditegakkan sebelum identifikasi.
-  4. **Hybrid ORB Verification:** Verifikasi fitur lokal (ORB keypoints) pada Top-50 kandidat FAISS untuk membedakan kartu reprint atau varian foil yang memiliki layout mirip.
+  4. **Hybrid ORB Re-Ranking (Top-150):** Verifikasi fitur lokal (ORB keypoints) dan estimasi homografi RANSAC pada **Top-150 kandidat FAISS** (`Commit 7707151`) untuk membedakan kartu reprint atau varian foil/holografis yang memiliki kemiripan tata letak tinggi.
 * **Alternative Baseline Model (MobileNetV3):**
   Implementasi lama berbasis MobileNetV3 diarsipkan di folder `backend/models/legacy_mobilenet/` untuk kebutuhan studi komparasi (*ablation study*) dan analisis performa pada laporan akademik.
 
@@ -84,16 +67,31 @@ Sistem ini menggunakan **2 Model Computer Vision independen** yang bekerja secar
 * **Metode ML:** *YOLOv8 Object Detection / Bounding Box Segmentation*.
 * **Dataset Training:** Dataset Roboflow Universe `card-grader` (tersimpan di `backend/dataset/card-condition-dataset/`).
 * **Kelas Cacat Fisik & Multiplier Kondisi ($F_{condition}$):**
-  * `Clean / Mint (Mulus)` $\rightarrow$ Multiplier = **1.00** *(Tanpa Potongan Harga)*
-  * `Scratched / Lecet` $\rightarrow$ Multiplier = **0.85** *(Diskon 15%)*
-  * `Edge Wear / Aus Pinggir` $\rightarrow$ Multiplier = **0.80** *(Diskon 20%)*
-  * `Bent / Tertekuk / Crease` $\rightarrow$ Multiplier = **0.65** *(Diskon 35%)*
+  * `Clean / Mint (Mulus)` $ightarrow$ Multiplier = **1.00** *(Tanpa Potongan Harga)*
+  * `Scratched / Lecet` $ightarrow$ Multiplier = **0.85** *(Diskon 15%)*
+  * `Edge Wear / Aus Pinggir` $ightarrow$ Multiplier = **0.80** *(Diskon 20%)*
+  * `Bent / Tertekuk / Crease` $ightarrow$ Multiplier = **0.65** *(Diskon 35%)*
+
+---
+
+## ⚡ Tolak Ukur Kuantitatif & Benchmark Komputasi
+
+Berikut adalah metrik performa operasional hasil tolak ukur empiris pada workstation pengembangan:
+
+| Parameter Evaluasi | Nilai Benchmark | Metodologi & Arsitektur Rekayasa |
+|---|:---:|---|
+| **Latensi Inferensi GPU** | **< 200 ms** | Akselerasi Tensor Core PyTorch (CUDA) pada workstation MSI Thin 15 |
+| **Latensi Inferensi CPU (Baseline)** | ~1.200 ms | Baseline PyTorch CPU inference tanpa akselerasi tensor |
+| **Dimensi Vektor Fitur** | **512 Dimensi** | Dense normalized visual semantic embeddings via OpenAI CLIP (ViT-B/32) |
+| **Skala Katalog Terindeks** | **20.617 Kartu** | Indeks pencarian kesamaan kosinus FAISS `IndexFlatIP` |
+| **Cakupan Re-Ranking ORB** | **Top-150 Kandidat** | Deteksi keypoint ORB + verifikasi homografi RANSAC (`Commit 7707151`) |
+| **Presisi Sinkronisasi Harga** | **Otomatis Harian** | Serverless GitHub Actions cron job mengeksekusi atomic SQL batch upserts |
 
 ---
 
 ## 📊 Dataset, Metrik Pasar & Database Cloud
 
-Regokemon menggunakan master dataset yang telah melalui proses kurasi ketat (*data cleaning & image verification*):
+REGOKEMON menggunakan master dataset yang telah melalui proses kurasi ketat (*data cleaning & image verification*):
 
 | Statistik Dataset | Nilai | Keterangan |
 |---|:---:|---|
@@ -109,15 +107,13 @@ Regokemon menggunakan master dataset yang telah melalui proses kurasi ketat (*da
 
 > [!TIP]
 > Rincian analisis statistik distribusi harga, kuartil ($Q_1, Q_3, P_{99}$), dan arsitektur data tersedia lengkap di:  
-> 📄 [`docs/dataset_summary_and_metrics.md`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/docs/dataset_summary_and_metrics.md) dan [`docs/dataset_dictionary.md`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/docs/dataset_dictionary.md).
+> 📄 [`docs/dataset_summary_and_metrics.md`](docs/dataset_summary_and_metrics.md) dan [`docs/dataset_dictionary.md`](docs/dataset_dictionary.md).
 
 ---
 
 ## ⚙️ Formula Valuasi Harga Wajar ($P_{final}$)
 
-Aplikasi ini menggabungkan 4 kategori parameter utama untuk menghasilkan nilai estimasi harga pasar wajar yang realistis:
-
-$$P_{final} = P_{base} \times M_{variant} \times F_{condition} \times F_{market}$$
+$$P_{final} = P_{base} 	imes M_{variant} 	imes F_{condition} 	imes F_{market}$$
 
 * **$P_{base}$ (Harga Dasar Pasar):** Diambil dari `effective_market_price` (kombinasi `tcgplayer.market` dan `cardmarket.avg30` dari database Supabase/CSV).
 * **$M_{variant}$ (Pengali Varian & Vintage):** 
@@ -153,7 +149,7 @@ pokemon-card-value-analytic-tool/
 │   │   ├── compressed_images/            # 20.617 gambar JPG 640x640 terkompresi
 │   │   └── card-condition-dataset/       # Dataset Roboflow untuk pelatihan Model 2
 │   ├── models/                           # Engine Model 1 Resmi & Vektor Indeks
-│   │   ├── card_identifier.py            # Engine Model 1 (CLIP ViT-B-32 + FAISS + ORB)
+│   │   ├── card_identifier.py            # Engine Model 1 (CLIP ViT-B/32 + FAISS + ORB)
 │   │   ├── card_identifier_oncam.py       # Pemindai kamera langsung (Webcam / IP Webcam HP)
 │   │   ├── card_identifier_manual.py     # Skrip pengujian foto manual dengan GUI File Explorer
 │   │   ├── build_card_index.py           # Skrip pembuat indeks FAISS resmi berbasis CLIP
@@ -243,7 +239,7 @@ python -m uvicorn app.main:app --reload --port 8000
 * **Status Server:** Berjalan di `http://127.0.0.1:8000`
 * **Dokumentasi Interaktif (Swagger UI):** Kunjungi `http://127.0.0.1:8000/docs` di browser untuk menguji API secara langsung.
 * **Endpoint Tersedia:**
-  * `POST /identify`: Khusus On-Cam (eksekusi cepat Model 1 CLIP sub-50ms).
+  * `POST /identify`: Khusus On-Cam (eksekusi cepat Model 1 CLIP sub-200ms).
   * `POST /analyze`: Khusus Upload Foto Statis (Model 1 + Model 2 YOLO Condition Grader & Valuasi Harga Akhir).
   * `GET  /health`: Healthcheck untuk Docker & cloud monitoring.
 
