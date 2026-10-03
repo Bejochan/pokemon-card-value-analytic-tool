@@ -60,17 +60,17 @@ graph TD
   3. **4-Way Smart Auto-Orientation:** Secara cerdas mengevaluasi sudut rotasi kartu (0°, 90°, 180°, 270°) terhadap FAISS, sehingga kartu yang difoto miring atau terbalik otomatis ditegakkan sebelum identifikasi.
   4. **Hybrid ORB Re-Ranking (Top-150):** Verifikasi fitur lokal (ORB keypoints) dan estimasi homografi RANSAC pada **Top-150 kandidat FAISS** (`Commit 7707151`) untuk membedakan kartu reprint atau varian foil/holografis yang memiliki kemiripan tata letak tinggi.
 * **Alternative Baseline Model (MobileNetV3):**
-  Implementasi lama berbasis MobileNetV3 diarsipkan di folder `backend/models/legacy_mobilenet/` untuk kebutuhan studi komparasi (*ablation study*) dan analisis performa pada laporan akademik.
+  Implementasi lama berbasis MobileNetV3 diarsipkan di folder `backend/models/legacy_mobilenet/` untuk kebutuhan studi komparasi (*ablation study*) dan analisis performa sistem.
 
 ### 2️⃣ Model 2: Card Condition Grader Engine (Defect Detection)
 * **Tujuan:** Mendeteksi **cacat dan kondisi fisik** kartu secara objektif.
 * **Metode ML:** *YOLOv8 Object Detection / Bounding Box Segmentation*.
 * **Dataset Training:** Dataset Roboflow Universe `card-grader` (tersimpan di `backend/dataset/card-condition-dataset/`).
 * **Kelas Cacat Fisik & Multiplier Kondisi ($F_{condition}$):**
-  * `Clean / Mint (Mulus)` $ightarrow$ Multiplier = **1.00** *(Tanpa Potongan Harga)*
-  * `Scratched / Lecet` $ightarrow$ Multiplier = **0.85** *(Diskon 15%)*
-  * `Edge Wear / Aus Pinggir` $ightarrow$ Multiplier = **0.80** *(Diskon 20%)*
-  * `Bent / Tertekuk / Crease` $ightarrow$ Multiplier = **0.65** *(Diskon 35%)*
+  * `Clean / Mint (Mulus)` → Multiplier = **1.00** *(Tanpa Potongan Harga)*
+  * `Scratched / Lecet` → Multiplier = **0.85** *(Diskon 15%)*
+  * `Edge Wear / Aus Pinggir` → Multiplier = **0.80** *(Diskon 20%)*
+  * `Bent / Tertekuk / Crease` → Multiplier = **0.65** *(Diskon 35%)*
 
 ---
 
@@ -111,9 +111,9 @@ REGOKEMON menggunakan master dataset yang telah melalui proses kurasi ketat (*da
 
 ---
 
-## ⚙️ Formula Valuasi Harga Wajar ($P_{final}$)
+$$P_{\text{final}} = P_{\text{base}} \times M_{\text{variant}} \times F_{\text{condition}} \times F_{\text{market}}$$
 
-$$P_{final} = P_{base} 	imes M_{variant} 	imes F_{condition} 	imes F_{market}$$
+$$P_{\text{final}} = P_{\text{base}} \times M_{\text{variant}} \times F_{\text{condition}} \times F_{\text{market}}$$
 
 * **$P_{base}$ (Harga Dasar Pasar):** Diambil dari `effective_market_price` (kombinasi `tcgplayer.market` dan `cardmarket.avg30` dari database Supabase/CSV).
 * **$M_{variant}$ (Pengali Varian & Vintage):** 
@@ -138,7 +138,7 @@ pokemon-card-value-analytic-tool/
 ├── backend/                              # Backend Python, Database, & CV Engine
 │   ├── app/                              # Modular REST API & Business Logic (FastAPI)
 │   │   ├── schemas.py                    # Validasi tipe data Pydantic (Request, Response, Pricing, Defect)
-│   │   ├── analytics_engine.py           # Mesin valuasi harga wajar w/ Formula Bab II & sinyal BUY/HOLD/SELL
+│   │   ├── analytics_engine.py           # Mesin valuasi harga wajar w/ Formula Valuasi Dinamis & sinyal BUY/HOLD/SELL
 │   │   ├── cv_service.py                 # Jembatan CV in-memory (Model 1 CLIP 20.617 kartu + Model 2 YOLO)
 │   │   └── main.py                       # Entrypoint FastAPI Server (Endpoints /identify, /analyze, /health)
 │   ├── dataset/                          # Master Dataset & Berkas Citra
