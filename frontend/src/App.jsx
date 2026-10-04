@@ -8,6 +8,7 @@ import DashboardPage from './components/DashboardPage';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
+  const [scanResult, setScanResult] = useState(null);
 
   return (
     <div>
@@ -23,11 +24,16 @@ function App() {
         )}
 
         {currentPage === 'upload' && (
-          <UploadPage onUploadComplete={() => setCurrentPage('result')} />
+          <UploadPage 
+            onUploadComplete={(resultData) => {
+              setScanResult(resultData);
+              setCurrentPage('result');
+            }} 
+          />
         )}
 
         {currentPage === 'result' && (
-          <ScannerDashboard />
+          <ScannerDashboard scanResult={scanResult} />
         )}
 
         {/* --- PERBAIKAN 2 --- */}

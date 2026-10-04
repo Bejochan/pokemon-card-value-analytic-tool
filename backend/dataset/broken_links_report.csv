@@ -1,54 +1,54 @@
 card_id,name,number,rarity,set.name,set.series,set.release_date,images.large,status
-xyp-XY39,Kingdra,XY39,Promo,XY Black Star Promos,XY,2013/10/12,https://images.pokemontcg.io/xyp/XY39_hires.png,broken
-xyp-XY46,Altaria,XY46,Promo,XY Black Star Promos,XY,2013/10/12,https://images.pokemontcg.io/xyp/XY46_hires.png,broken
-xyp-XY68,Chesnaught,XY68,Promo,XY Black Star Promos,XY,2013/10/12,https://images.pokemontcg.io/xyp/XY68_hires.png,broken
-mcd14-9,Swirlix,9,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/9_hires.png,broken
-mcd14-2,Chespin,2,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/2_hires.png,broken
-mcd15-1,Treecko,1,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/1_hires.png,broken
-mcd15-6,Pikachu,6,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/6_hires.png,broken
-mcd14-3,Fennekin,3,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/3_hires.png,broken
-mcd14-5,Pikachu,5,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/5_hires.png,broken
-mcd14-10,Bunnelby,10,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/10_hires.png,broken
-mcd14-4,Froakie,4,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/4_hires.png,broken
-mcd14-1,Weedle,1,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/1_hires.png,broken
-mcd14-12,Furfrou,12,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/12_hires.png,broken
-mcd14-7,Honedge,7,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/7_hires.png,broken
-mcd14-11,Fletchling,11,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/11_hires.png,broken
-mcd15-2,Lotad,2,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/2_hires.png,broken
-mcd14-8,Snubbull,8,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/8_hires.png,broken
-mcd14-6,Inkay,6,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/6_hires.png,broken
-svp-102,Oddish,102,Promo,Scarlet & Violet Black Star Promos,Scarlet & Violet,2023/01/01,https://images.pokemontcg.io/svp/102_hires.png,broken
 hsp-HGSS18,Tropical Tidal Wave,HGSS18,Promo,HGSS Black Star Promos,HeartGold & SoulSilver,2010/02/10,https://images.pokemontcg.io/hsp/HGSS18_hires.png,broken
+xyp-XY39,Kingdra,XY39,Promo,XY Black Star Promos,XY,2013/10/12,https://images.pokemontcg.io/xyp/XY39_hires.png,broken
+xyp-XY68,Chesnaught,XY68,Promo,XY Black Star Promos,XY,2013/10/12,https://images.pokemontcg.io/xyp/XY68_hires.png,broken
+mcd14-2,Chespin,2,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/2_hires.png,broken
+mcd14-5,Pikachu,5,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/5_hires.png,broken
+mcd14-6,Inkay,6,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/6_hires.png,broken
+mcd14-12,Furfrou,12,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/12_hires.png,broken
+mcd14-1,Weedle,1,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/1_hires.png,broken
+mcd14-4,Froakie,4,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/4_hires.png,broken
+mcd14-7,Honedge,7,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/7_hires.png,broken
+mcd14-8,Snubbull,8,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/8_hires.png,broken
+mcd14-10,Bunnelby,10,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/10_hires.png,broken
+mcd14-11,Fletchling,11,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/11_hires.png,broken
+mcd14-9,Swirlix,9,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/9_hires.png,broken
+mcd14-3,Fennekin,3,,McDonald's Collection 2014,Other,2014/05/23,https://images.pokemontcg.io/mcd14/3_hires.png,broken
+mcd15-1,Treecko,1,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/1_hires.png,broken
+mcd15-2,Lotad,2,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/2_hires.png,broken
+mcd15-6,Pikachu,6,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/6_hires.png,broken
+mcd15-11,Zigzagoon,11,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/11_hires.png,broken
 mcd15-3,Torchic,3,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/3_hires.png,broken
+mcd15-9,Meditite,9,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/9_hires.png,broken
+mcd15-10,Marill,10,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/10_hires.png,broken
 mcd15-5,Mudkip,5,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/5_hires.png,broken
 mcd15-8,Rhyhorn,8,Common,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/8_hires.png,broken
 mcd15-4,Staryu,4,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/4_hires.png,broken
-mcd17-7,Crabrawler,7,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/7_hires.png,broken
-mcd15-11,Zigzagoon,11,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/11_hires.png,broken
-mcd15-10,Marill,10,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/10_hires.png,broken
-mcd17-2,Grubbin,2,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/2_hires.png,broken
 mcd15-7,Electrike,7,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/7_hires.png,broken
+mcd15-12,Skitty,12,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/12_hires.png,broken
+mcd17-7,Crabrawler,7,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/7_hires.png,broken
+mcd17-2,Grubbin,2,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/2_hires.png,broken
+mcd17-4,Popplio,4,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/4_hires.png,broken
 mcd17-8,Alolan Meowth,8,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/8_hires.png,broken
 mcd17-1,Rowlet,1,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/1_hires.png,broken
-mcd17-4,Popplio,4,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/4_hires.png,broken
-mcd15-9,Meditite,9,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/9_hires.png,broken
-mcd17-12,Yungoos,12,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/12_hires.png,broken
 mcd17-3,Litten,3,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/3_hires.png,broken
-mcd18-5,Slowpoke,5,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/5_hires.png,broken
-mcd15-12,Skitty,12,,McDonald's Collection 2015,Other,2015/11/27,https://images.pokemontcg.io/mcd15/12_hires.png,broken
-mcd17-11,Pikipek,11,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/11_hires.png,broken
 mcd17-5,Pikachu,5,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/5_hires.png,broken
-mcd18-10,Chansey,10,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/10_hires.png,broken
-mcd18-7,Cubone,7,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/7_hires.png,broken
 mcd17-6,Cosmog,6,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/6_hires.png,broken
-mcd18-4,Pikachu,4,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/4_hires.png,broken
-mcd18-1,Growlithe,1,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/1_hires.png,broken
-mcd18-2,Psyduck,2,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/2_hires.png,broken
 mcd17-10,Cutiefly,10,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/10_hires.png,broken
-mcd18-8,Magnemite,8,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/8_hires.png,broken
-mcd18-6,Machop,6,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/6_hires.png,broken
-mcd18-12,Porygon,12,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/12_hires.png,broken
-mcd18-11,Eevee,11,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/11_hires.png,broken
 mcd17-9,Alolan Diglett,9,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/9_hires.png,broken
-mcd18-9,Dratini,9,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/9_hires.png,broken
+mcd17-11,Pikipek,11,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/11_hires.png,broken
+mcd17-12,Yungoos,12,,McDonald's Collection 2017,Other,2017/11/07,https://images.pokemontcg.io/mcd17/12_hires.png,broken
 mcd18-3,Horsea,3,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/3_hires.png,broken
+mcd18-2,Psyduck,2,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/2_hires.png,broken
+mcd18-1,Growlithe,1,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/1_hires.png,broken
+mcd18-4,Pikachu,4,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/4_hires.png,broken
+mcd18-5,Slowpoke,5,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/5_hires.png,broken
+mcd18-6,Machop,6,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/6_hires.png,broken
+mcd18-7,Cubone,7,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/7_hires.png,broken
+mcd18-10,Chansey,10,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/10_hires.png,broken
+mcd18-8,Magnemite,8,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/8_hires.png,broken
+mcd18-9,Dratini,9,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/9_hires.png,broken
+mcd18-11,Eevee,11,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/11_hires.png,broken
+mcd18-12,Porygon,12,,McDonald's Collection 2018,Other,2018/10/16,https://images.pokemontcg.io/mcd18/12_hires.png,broken
+svp-102,Oddish,102,Promo,Scarlet & Violet Black Star Promos,Scarlet & Violet,2023/01/01,https://images.pokemontcg.io/svp/102_hires.png,broken
+xyp-XY46,Altaria,XY46,Promo,XY Black Star Promos,XY,2013/10/12,https://images.pokemontcg.io/xyp/XY46_hires.png,broken

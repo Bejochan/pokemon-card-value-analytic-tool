@@ -28,6 +28,18 @@ adapter = HTTPAdapter(max_retries=retries, pool_connections=50, pool_maxsize=50)
 session.mount("https://", adapter)
 session.mount("http://", adapter)
 
+def get_safe_filename(card_id: str) -> str:
+    """
+    Mengamankan nama file dari batasan OS Windows dan memetakan kartu khusus.
+    Misal: 'ex10-?' dipetakan ke 'question_hires' sesuai file acuan model FAISS.
+    """
+    card_id_str = str(card_id)
+    if card_id_str == "ex10-?":
+        return "question_hires"
+    for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
+        card_id_str = card_id_str.replace(char, '_')
+    return card_id_str
+
 # 4. Fungsi untuk mendownload satu gambar secara efisien
 def download_single_image(row):
     card_id = row.get('card_id')
@@ -37,7 +49,8 @@ def download_single_image(row):
     if pd.isna(card_id) or pd.isna(img_url):
         return "skipped"
     
-    file_path = os.path.join(output_dir, f"{card_id}.png")
+    safe_name = get_safe_filename(card_id)
+    file_path = os.path.join(output_dir, f"{safe_name}.png")
     
     # Jika file sudah pernah terdownload sebelumnya, lewati (mencegah duplikasi & hemat waktu)
     if os.path.exists(file_path):

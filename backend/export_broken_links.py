@@ -74,7 +74,7 @@ print(f"Tautan Rusak (Broken): {broken_count}")
 print(f"Tautan Kosong/NaN    : {empty_count}")
 
 # ---------- Export broken rows ----------
-broken_indices = [idx for idx, status in results.items() if status in ("broken", "empty")]
+broken_indices = sorted([idx for idx, status in results.items() if status in ("broken", "empty")])
 
 EXPORT_COLS = ["card_id", "name", "number", "rarity",
                "set.name", "set.series", "set.release_date", "images.large"]
