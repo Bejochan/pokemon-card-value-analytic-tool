@@ -1,0 +1,284 @@
+/* BACKGROUND UTAMA HALAMAN */
+.market-dashboard-container {
+  width: 100%;
+  height: calc(100vh - 70px);
+  background-image: url('/bg-basic.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Montserrat', sans-serif;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 1. HERO TITLE */
+.dashboard-hero-title {
+  padding: 8px 20px 20px 20px;
+  text-align: center;
+  width: 100%;
+}
+
+.dashboard-title {
+  font-family: 'Anton', sans-serif;
+  font-size: 48px;
+  color: #324175;
+  margin: 0 0 0px 0;
+  letter-spacing: 2px;
+  text-shadow: 5px 5px 0px #ffffff;
+}
+
+.dashboard-subtitle {
+  font-weight: 600;
+  color: #e83e8c;
+  margin: 0;
+  font-size: 16px;
+}
+
+/* 2. STATS BANNER (PINK) */
+.dashboard-stats-banner {
+  width: 100%;
+  background-color: #e83e8c;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  padding: 15px 0;
+  margin-bottom: 30px;
+}
+
+.stat-banner-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 330px;
+  gap: 5px;
+}
+
+.stat-banner-label {
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.stat-banner-value {
+  color: #1e1b4b;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 30px;
+}
+
+.stat-banner-divider {
+  width: 1px;
+  height: 50px;
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Gaya saat teks berhenti di kata Bullish */
+.text-bullish {
+  color: #1e1b4b; /* Warna gelap stabil, atau bisa ubah ke #00d26a (hijau) jika ingin menyala */
+  font-weight: 800;
+  transition: color 0.3s ease;
+}
+
+/* Gaya saat teks masih mengacak (sedikit redup atau abu-abu) */
+.text-scramble {
+  color: #24214c;
+  font-weight: 800;
+  /* font-style: italic;  Memberi kesan sedang memproses */
+}
+
+/* 3. TRENDING BANNER (PUTIH & BORDER BIRU) */
+.dashboard-trending-banner {
+  width: 100%;
+  background-color: white;
+  border-top: 5px solid #4a5a94;
+  border-bottom: 5px solid #4a5a94;
+  display: flex;
+  justify-content: center;
+  padding: 18px 40px;
+  box-sizing: border-box;
+}
+
+.trending-banner-content {
+  width: 100%;
+  /* max-width: 1200px; */
+  display: flex;
+  align-items: center;
+  gap: 60px;
+}
+
+.trending-banner-title {
+  font-weight: 800;
+  font-size: 22px;
+  color: #1e1b4b;
+  line-height: 1.4;
+  flex-shrink: 0;
+  margin-left: -10px;
+  margin-right: -30px;
+}
+
+.trending-banner-cards {
+  display: flex;
+  gap: 20px;
+  flex-grow: 1;
+  justify-content: space-between;
+}
+
+.trending-card-row-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.t-row-img {
+  width: 150px;
+  height: auto;
+  border-radius: 6px;
+  box-shadow: 0 0px 0px rgba(0,0,0,0.15);
+}
+
+.t-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* Jarak antar grup elemen (Nama -> Rarity -> Set -> Bendera/Harga) */
+  padding-top: 5px;
+}
+
+.t-row-name { 
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500; /* Sedikit lebih tipis dari font-weight: 700 */
+  font-size: 18px; 
+  color: #1e1b4b; /* Warna gelap */
+  letter-spacing: -0.5px;
+}
+
+.t-row-rarity-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 15px 0px 0px 0px;
+}
+
+.t-row-rarity { 
+  font-size: 12px; 
+  color: #a0426b; /* Warna ungu/pink kemerahan */
+  font-weight: 500;
+}
+
+.t-row-holo { 
+  font-size: 12px; 
+  color: #d4af37; /* Warna emas/kuning */
+  font-weight: 500;
+}
+
+/* LOGO SET */
+.t-row-set-icon {
+  height: 20px; /* Tinggi logo set */
+  width: auto;
+  align-self: flex-start; /* Memastikan logo tetap di kiri */
+  padding: 15px 0px 0px 0px;
+}
+
+/* BENDERA (Jika menggunakan gambar nanti, ubah tag span menjadi img) */
+.t-row-flag {
+  font-size: 15px; /* Ukuran emoji bendera */
+  line-height: 1;
+}
+
+/* HARGA */
+.t-row-price { 
+  font-weight: 800; 
+  color: #00d26a; 
+  font-size: 18px; /* Harga dibuat sangat besar dan menonjol */
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* 4. KOTAK BAWAH (SPLIT GRID) */
+.dashboard-bottom-area {
+  width: 100%;
+  /* max-width: 1200px; */
+  padding: 30px 0px 80px 0px;
+  box-sizing: border-box;
+}
+
+.dashboard-split-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+
+.section-title {
+  font-weight: 800;
+  font-size: 18px;
+  color: #1e1b4b;
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.widget-box {
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 15px 30px rgba(0,0,0,0.08);
+}
+
+.left-box {
+  /* Urutan border-radius: Kiri-Atas, Kanan-Atas, Kanan-Bawah, Kiri-Bawah */
+  /* Sisi kiri (menempel layar) bersudut 0 (lancip). 
+     Sisi kanan (tengah layar) bersudut 30px (tumpul). */
+  border-radius: 0 15px 15px 0; 
+}
+
+/* PERBAIKAN: Sudut Kotak KANAN */
+.right-box {
+  /* Sisi kiri (tengah layar) bersudut 30px (tumpul). 
+     Sisi kanan (menempel layar) bersudut 0 (lancip). */
+  border-radius: 15px 0 0 15px; 
+}
+
+.list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid #eee;
+  border-radius: 0px;
+  background: #fafafa;
+}
+
+.rank-number {
+  font-family: 'Anton', sans-serif;
+  font-size: 24px;
+  color: #ccc;
+  width: 30px;
+  text-align: center;
+  margin-right: 15px;
+}
+
+.list-info-main {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.item-name { font-weight: 700; color: #333; font-size: 15px; margin-bottom: 4px;}
+.item-prices, .item-sub { font-size: 12px; color: #666; }
+.item-prices strong { color: #1e1b4b; }
+
+.up-badge {
+  background-color: #e6f9f0;
+  color: #00d26a;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 800;
+  font-size: 13px;
+}

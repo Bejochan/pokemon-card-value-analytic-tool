@@ -1,0 +1,369 @@
+.catalog-container {
+  width: 100%;
+  
+  /* PENTING: Kunci tinggi kontainer ini agar pas menempel di bawah Navbar (70px) */
+  height: calc(100vh - 70px); 
+  
+  background-color: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Montserrat', sans-serif;
+  
+  /* AKTIFKAN SCROLL DI SINI, BUKAN DI BODY */
+  overflow-y: auto; 
+  overflow-x: hidden;
+}
+
+/* HEADER PENCARIAN (Ubah dari solid kuning menjadi background home) */
+.catalog-header {
+  width: 100%;
+  padding: 20px 40px 35px 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  box-sizing: border-box;
+  
+  /* --- PERBAIKAN: Menggunakan Background Home --- */
+  /* Ganti background-color solid kuning dengan image background.
+     Asumsikan user punya file background home, misal public/bg-hero.jpg */
+  background-image: url('/bg-basic.png'); /* Silakan ganti dengan path file background home kamu */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  
+  /* Hapus background-color lama */
+  /* background-color: #e5b94f; */
+}
+
+/* --- SET SELECTOR (KIRI HEADER) --- */
+.set-selector-container {
+  position: absolute;
+  left: 20px;
+  z-index: 50; /* Memastikan dropdown jatuh menutupi elemen di bawahnya */
+}
+
+.set-selector-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.7); /* Putih transparan */
+  border: 2px solid #ffffff;
+  padding: 8px 20px 8px 12px; /* Padding kiri lebih kecil karena ada gambar */
+  border-radius: 30px;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.set-selector-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-2px); /* Efek terangkat saat disorot mouse */
+}
+
+.celebration-icon {
+  height: 30px;
+}
+
+.celebration-text {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  color: #1e1b4b;
+  font-size: 14px;
+}
+
+.set-arrow {
+  margin-left: 5px;
+  transition: transform 0.2s ease;
+}
+
+.set-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* MENU DROPDOWN PILIHAN SET */
+.set-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 12px); /* Jarak dari tombol utama */
+  left: 0;
+  width: 260px;
+  background-color: #ffffff;
+  border-radius: 16px; /* Melengkung rapi */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  overflow: hidden; /* Memastikan item di dalamnya ikut melengkung */
+  display: flex;
+  flex-direction: column;
+}
+
+.set-dropdown-item {
+  padding: 16px 20px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #555;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.set-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.set-dropdown-item:hover,
+.set-dropdown-item.active {
+  background-color: #e83e8c; /* Warna pink tema */
+  color: #ffffff;
+}
+
+.celebration-icon {
+  height: 30px;
+}
+
+.search-bar-wrapper {
+  background-color: white;
+  border-radius: 30px;
+  border: 3px solid #e83e8c; /* Border pink */
+  display: flex;
+  align-items: center;
+  width: 600px;
+  padding: 5px 20px;
+}
+
+.search-input {
+  flex-grow: 1;
+  border: none;
+  outline: none;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  color: #333;
+  padding: 8px 0;
+}
+
+.search-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* AREA KONTEN PUTIH BAWAH */
+.catalog-content-area {
+  width: 100%;
+  background-color: white;
+  border-radius: 30px 30px 0 0;
+  padding: 20px 40px;
+  box-sizing: border-box;
+  flex-grow: 1; /* PENTING: Mendorong konten ke bawah agar penuh */
+  margin-top: -15px; /* Overlap sedikit dengan header agar rapi */
+  z-index: 2; /* Di atas bayangan header */
+  box-shadow: 0 -10px 20px rgba(0,0,0,0.05); /* Bayangan atas */
+}
+
+/* BARIS FILTER */
+.filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 5px;
+  border-bottom: 0px solid #eaeaea;
+  margin-bottom: 20px;
+  margin-top: -5px;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.filter-label {
+  font-weight: 600;
+  color: #e83e8c;
+  font-size: 14px;
+}
+
+.checkbox-label {
+  font-size: 12px;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.flag-icon {
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.more-dots {
+  color: #e83e8c;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.sort-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sort-dropdown {
+  background-color: #d84b8f;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+/* GRID GALERI KARTU (Akan berderet ke bawah otomatis) */
+.card-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr); 
+  row-gap: 20px;
+  column-gap: 40px;
+  width: 100%;
+  /* Tambahkan jarak bawah agar kartu terakhir bisa di-scroll dengan nyaman */
+  margin-bottom: 50px; 
+}
+
+.gallery-card-item {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.card-gallery-grid::before,
+.card-gallery-grid::after {
+  display: none;
+}
+
+/* =========================================
+   4. GARIS VERTIKAL (Membelah Kolom)
+   ========================================= */
+.gallery-card-item:not(:nth-child(5n))::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -20px; 
+  
+  /* PERBAIKAN: Ubah width menjadi 0 dan gunakan border-right */
+  width: 0; 
+  height: calc(100% + 20px); 
+  border-right: 1px solid #890289; 
+  
+  z-index: 0;
+}
+
+/* KHUSUS baris paling bawah: Potong garis agar tidak menjulur ke bawah layar */
+.gallery-card-item:nth-last-child(-n+5):not(:nth-child(5n))::after {
+  height: 100%;
+}
+
+
+/* =========================================
+   5. GARIS HORIZONTAL (Membelah Baris)
+   ========================================= */
+.gallery-card-item:nth-last-child(n+6)::before {
+  content: '';
+  position: absolute;
+  bottom: -10px; 
+  left: 0;
+  
+  /* PERBAIKAN: Ubah height menjadi 0 dan gunakan border-bottom */
+  width: calc(100% + 40px); 
+  height: 0; 
+  border-bottom: 1px solid #890289; 
+  
+  z-index: 0;
+}
+
+/* KHUSUS kolom ke-5: Potong garis horizontal agar tidak menjulur keluar batas kanan layar */
+.gallery-card-item:nth-child(5n):nth-last-child(n+6)::before {
+  width: 100%;
+}
+
+.card-image-wrapper {
+  width: 100%;
+  margin-bottom: 15px;
+  filter: drop-shadow(0 10px 15px rgba(0,0,0,0.15)); /* Bayangan di bawah kartu */
+}
+
+.card-image {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  display: block;
+}
+
+.card-details-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-name-mini {
+  font-weight: 700;
+  font-size: 13px;
+  color: #333;
+}
+
+.card-price-mini {
+  font-weight: 800;
+  color: #00d26a; /* Hijau untuk harga */
+  font-size: 13px;
+}
+
+.card-rarity-text {
+  font-size: 11px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80%; /* Mencegah teks panjang menabrak bendera */
+}
+
+.flag-icon-mini {
+  font-size: 12px;
+}
+
+.footer-row {
+  border-top: 1px dotted #ccc;
+  padding-top: 5px;
+  margin-top: -2px;
+}
+
+.rarity-icon-badge {
+  background-color: #1e1b4b;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.set-badge {
+  background-color: #333;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}

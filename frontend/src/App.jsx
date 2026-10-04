@@ -3,13 +3,17 @@ import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import UploadPage from './components/UploadPage';
 import ScannerDashboard from './components/ScannerDashboard';
+import CatalogPage from './components/CatalogPage';
+import DashboardPage from './components/DashboardPage';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
 
   return (
     <div>
-      <Navbar />
+      {/* --- PERBAIKAN 1 --- */}
+      {/* Tambahkan prop onNavigate ke Navbar utama agar tombolnya berfungsi */}
+      <Navbar onNavigate={setCurrentPage} />
       
       {/* Trik React: Atribut 'key' memaksa animasi CSS diputar ulang tiap state berubah */}
       <div key={currentPage} className="page-transition">
@@ -25,7 +29,17 @@ function App() {
         {currentPage === 'result' && (
           <ScannerDashboard />
         )}
+
+        {/* --- PERBAIKAN 2 --- */}
+        {/* Render CatalogPage saat state currentPage adalah 'catalog' */}
+        {currentPage === 'catalog' && (
+          <CatalogPage />
+        )}
         
+        {currentPage === 'dashboard' && (
+          <DashboardPage />
+        )}
+
       </div>
     </div>
   );
