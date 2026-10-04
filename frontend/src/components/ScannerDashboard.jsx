@@ -5,45 +5,90 @@ function ScannerDashboard({ scanResult }) {
   // State untuk mengontrol halaman mana yang sedang aktif di dalam Dasbor
   const [dashboardView, setDashboardView] = useState('price');
 
-  // Gunakan data dari backend jika tersedia, atau fallback ke dummy
-  const cardName = scanResult ? scanResult.message.replace('Berhasil mendeteksi: ', '') : 'Unknown Card';
-  const originalPrice = scanResult ? scanResult.estimated_price : 920.00;
-  const officialImage = scanResult && scanResult.official_image_url ? scanResult.official_image_url : '/card-result.png';
+  // =====================================================================
+  // DATA DARI BACKEND (Model 1 CLIP + Model 2 YOLO + Analytics Engine)
+  // Semua field diambil langsung dari response JSON backend FastAPI.
+  // =====================================================================
 
-  // Data simulasi hasil deteksi (Nanti akan didapat dari backend YOLO)
-  const detectedDefects = []; // Sementara kosong karena "Menunggu Deteksi Kondisi"
-  // Jika ada cacat, diskon 2.28%. Jika tidak ada, diskon 0%
-  const conditionDiscount = detectedDefects.length > 0 ? 0.0228 : 0; 
-  const finalPrice = originalPrice - (originalPrice * conditionDiscount);
-  const conditionTier = detectedDefects.length > 0 ? "Lightly used" : "Mint / Near Mint";
+  // --- Identitas Kartu (dari card_identifier.py + dataset CSV) ---
+  const cardName   = scanResult?.name         ?? 'Unknown Card';
+  const setName    = scanResult?.set_name      ?? '-';
+  const setId      = scanResult?.set_id        ?? '-';
+  const setSeries  = scanResult?.set_series    ?? '-';
+  const releaseYear = scanResult?.release_year  ?? '-';
+  const rarity     = scanResult?.rarity        ?? '-';
+  const supertype  = scanResult?.supertype     ?? '-';
+  const subtypes   = scanResult?.subtypes      ?? '-';
+  const types      = scanResult?.types         ?? '-';
+  const hp         = scanResult?.hp            ?? '-';
+  const officialImage = (scanResult?.official_image_url) || '/card-result.png';
 
-  // Format harga (IDR)
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(price);
-  };
+  // --- Confidence AI ---
+  const confidencePct   = scanResult?.confidence_percentage ?? 0;
+  const confidenceLabel = scanResult?.confidence_label      ?? 'Uncertain';
+
+  // --- Harga (dari analytics_engine.py) ---
+  const pricing              = scanResult?.pricing             ?? {};
+  const basePriceUsd         = pricing?.base_price_usd        ?? 0;
+  const basePriceIdr         = pricing?.base_price_idr        ?? 0;
+  const conditionMultiplier  = pricing?.condition_multiplier  ?? 1.0;
+  const conditionDiscountPct = pricing?.condition_discount_pct ?? 0;
+  const finalPriceIdr        = pricing?.final_price_idr       ?? (scanResult?.estimated_price ?? 0);
+  const finalPriceUsd        = pricing?.final_price_usd       ?? 0;
+  const currencyRate         = pricing?.currency_rate         ?? 15500;
+
+  // --- Kondisi & Cacat Fisik (dari card_condition_grader.py via YOLO) ---
+  const conditionReport = scanResult?.condition_report ?? null;
+  const conditionTier   = conditionReport?.condition_tier  ?? (scanResult?.card_condition ?? 'Near Mint / Mint');
+  const hasDefects      = conditionReport?.has_defects     ?? false;
+  const defectCount     = conditionReport?.defect_count    ?? 0;
+  const defects         = conditionReport?.defects         ?? [];
+  const evalStatus      = conditionReport?.evaluation_status ?? 'evaluated';
+
+  // --- Sinyal Transaksi (dari analytics_engine.py) ---
+  const recommendationSignal = scanResult?.recommendation_signal ?? 'HOLD';
+
+  // --- Kandidat Alternatif (dari FAISS top-k) ---
+  const candidates = scanResult?.candidates ?? [];
+
+  // --- Format harga IDR ---
+  const formatIDR = (amount) =>
+    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
+
+  // --- Warna sinyal transaksi ---
+  const signalColor = {
+    'BUY':  'text-green',
+    'SELL': 'text-pink',
+    'HOLD': 'text-yellow',
+  }[recommendationSignal] ?? '';
 
   return (
     <div className="dashboard-container">
-      
-      {/* TAMPILAN 1: HALAMAN HARGA (Sesuai Mockup) */}
+
+      {/* TAMPILAN 1: HALAMAN HARGA */}
       {dashboardView === 'price' && (
         <div className="price-view fade-in">
-          
+
           {/* Efek Cahaya / Glow di belakang kartu */}
           <div className="glow-effect"></div>
-          
+
+          {/* Badge Confidence AI */}
+          <div className={`confidence-badge ${confidenceLabel === 'Tinggi' ? 'badge-high' : confidenceLabel === 'Sedang' ? 'badge-mid' : 'badge-low'}`}>
+            🤖 AI Confidence: <strong>{confidencePct.toFixed(1)}%</strong> ({confidenceLabel})
+          </div>
+
           {/* Gambar Kartu Hasil Scan */}
           <img src={officialImage} alt="Scanned Card" className="scanned-card" />
-          
-          {/* Label Harga Hijau (Dipisah antara background dan teks) */}
+
+          {/* Label Harga */}
           <div className="price-tag-container">
             <img src="/price-shape.png" alt="Background Harga" className="price-shape" />
-            <div className="price-text">{formatPrice(originalPrice)}</div>
+            <div className="price-text">{formatIDR(finalPriceIdr)}</div>
           </div>
 
           {/* Tombol Panah Bawah */}
-          <button 
-            className="down-arrow-btn" 
+          <button
+            className="down-arrow-btn"
             onClick={() => setDashboardView('details')}
           >
             <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -57,7 +102,7 @@ function ScannerDashboard({ scanResult }) {
       {/* TAMPILAN 2: HALAMAN DETAIL */}
       {dashboardView === 'details' && (
         <div className="details-view slide-up">
-          
+
           {/* Tombol kembali ke atas */}
           <button className="up-arrow-btn" onClick={() => setDashboardView('price')}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -66,74 +111,99 @@ function ScannerDashboard({ scanResult }) {
           </button>
 
           <div className="details-grid">
-            
-            {/* KOTAK KIRI: Detail Kartu & Tabel */}
+
+            {/* ============================================ */}
+            {/* KOTAK KIRI: Detail Kartu & Kondisi Fisik     */}
+            {/* ============================================ */}
             <div className="info-box card-info-box">
               <div className="card-visuals">
                 <img src={officialImage} alt="Card Detail" className="detail-card-img" />
-                <div className="celebration-logo">30th Celebration</div>
+                <div className="celebration-logo">{setSeries || setName}</div>
               </div>
-              
+
               <div className="card-specs">
-                {/* Jadual Spesifikasi Kad (Dipadatkan) */}
+                {/* Tabel Spesifikasi Kartu — dari dataset pokemon_cards_dataset_cleaned.csv */}
                 <table className="specs-table">
                   <tbody>
                     <tr><td>Name</td><td>{cardName}</td></tr>
-                    <tr><td>Condition</td><td>{scanResult ? scanResult.card_condition : "Menunggu Deteksi"}</td></tr>
-                    <tr><td>Holofoil type</td><td>Reverse holofoil</td></tr>
-                    <tr><td>Language</td><td>English 🇬🇧</td></tr>
-                    <tr><td>Set number</td><td>036 / 084</td></tr>
-                    <tr><td>Year</td><td>2017</td></tr>
-                    <tr><td>Set code</td><td>M2a</td></tr>
-                    <tr><td>Regulation mark</td><td>H</td></tr>
-                    <tr><td>Stage</td><td>Basic</td></tr>
+                    <tr><td>Set</td><td>{setName}</td></tr>
+                    <tr><td>Set ID</td><td>{setId}</td></tr>
+                    <tr><td>Series</td><td>{setSeries}</td></tr>
+                    <tr><td>Year</td><td>{releaseYear}</td></tr>
+                    <tr><td>Rarity</td><td>{rarity}</td></tr>
+                    <tr><td>Supertype</td><td>{supertype}</td></tr>
+                    <tr><td>Subtypes</td><td>{subtypes}</td></tr>
+                    <tr><td>Types</td><td>{types}</td></tr>
+                    <tr><td>HP</td><td>{hp !== '-' ? `${hp} HP` : '-'}</td></tr>
+                    <tr><td>Condition</td><td>{conditionTier}</td></tr>
                   </tbody>
                 </table>
 
-                {/* Bahagian Penilaian Keadaan Fizikal (Baharu) */}
+                {/* ============================================ */}
+                {/* SEKSI KONDISI FISIK — dari YOLO Condition Grader */}
+                {/* ============================================ */}
                 <div className="defect-section">
-                  
-                  {/* Pengecekan Kondisi dengan Ternary Operator */}
-                  {detectedDefects.length > 0 ? (
+
+                  {evalStatus === 'bypassed_oncam' ? (
                     <>
-                      <h4 className="defect-title warning">⚠️ Defect detected ⚠️</h4>
+                      <h4 className="defect-title">🔍 Condition Not Evaluated</h4>
+                      <p className="defect-clear-msg">Scan via camera (fast mode). Upload a photo for full condition grading.</p>
+                    </>
+                  ) : hasDefects ? (
+                    <>
+                      <h4 className="defect-title warning">⚠️ {defectCount} Defect{defectCount > 1 ? 's' : ''} Detected ⚠️</h4>
                       <ul className="defect-list">
-                        {detectedDefects.map((defect, index) => (
-                          <li key={index}>{defect}</li>
+                        {defects.map((defect, index) => (
+                          <li key={index}>
+                            <span className="defect-label">{defect.label}</span>
+                            <span className="defect-conf">{(defect.confidence * 100).toFixed(0)}% conf.</span>
+                          </li>
                         ))}
                       </ul>
                     </>
                   ) : (
                     <>
-                      <h4 className="defect-title success">✅ No defect detected ✅</h4>
+                      <h4 className="defect-title success">✅ No Defect Detected ✅</h4>
                       <p className="defect-clear-msg">Card is in pristine physical condition.</p>
                     </>
                   )}
 
-                  {/* Jadual Pecahan Harga Berdasarkan Keadaan */}
+                  {/* Tabel Pecahan Harga — dari analytics_engine.py */}
                   <table className="specs-table">
                     <tbody>
                       <tr>
-                        <td><strong>Original value</strong></td>
-                        <td><strong>{formatPrice(originalPrice)}</strong></td>
+                        <td><strong>Base Price (USD)</strong></td>
+                        <td><strong>${basePriceUsd.toFixed(2)}</strong></td>
                       </tr>
                       <tr>
-                        <td><strong>Physical condition</strong></td>
-                        <td className={detectedDefects.length > 0 ? "text-danger" : "text-success"}>
-                          {detectedDefects.length > 0 ? "- 2.28%" : "0.00%"}
+                        <td><strong>Base Price (IDR)</strong></td>
+                        <td><strong>{formatIDR(basePriceIdr)}</strong></td>
+                      </tr>
+                      <tr>
+                        <td>Condition Discount</td>
+                        <td className={conditionDiscountPct > 0 ? 'text-danger' : 'text-success'}>
+                          {conditionDiscountPct > 0 ? `- ${conditionDiscountPct.toFixed(2)}%` : '0.00%'}
                         </td>
                       </tr>
                       <tr>
-                        <td><strong>Final value</strong></td>
-                        <td className="text-success"><strong>{formatPrice(finalPrice)}</strong></td>
+                        <td>Condition Multiplier</td>
+                        <td>×{conditionMultiplier.toFixed(2)}</td>
                       </tr>
                       <tr>
-                        <td>Condition tier</td>
+                        <td>Exchange Rate</td>
+                        <td>Rp{currencyRate.toLocaleString('id-ID')}/USD</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Final Value (USD)</strong></td>
+                        <td><strong>${finalPriceUsd.toFixed(2)}</strong></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Final Value (IDR)</strong></td>
+                        <td className="text-success"><strong>{formatIDR(finalPriceIdr)}</strong></td>
+                      </tr>
+                      <tr>
+                        <td>Condition Tier</td>
                         <td>{conditionTier}</td>
-                      </tr>
-                      <tr>
-                        <td>Est. value</td>
-                        <td>{detectedDefects.length > 0 ? "97.72%" : "100.00%"}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -141,85 +211,99 @@ function ScannerDashboard({ scanResult }) {
               </div>
             </div>
 
-            {/* KOTAK KANAN: Analitik Pasar */}
+            {/* ============================================ */}
+            {/* KOTAK KANAN: Analitik Pasar & Signal         */}
+            {/* ============================================ */}
             <div className="info-box analytics-box">
-              <h2 className="analytics-title">Market Trend</h2>
-              
+              <h2 className="analytics-title">Market Analytics</h2>
+
               <div className="stats-container">
-                {/* Baris 1: Data Finansial Dasar */}
+                {/* Baris 1: Sinyal Transaksi dari Analytics Engine */}
                 <div className="stats-row">
-                  <div className="stat-card">
-                    <span className="stat-label">All-Time High</span>
-                    <span className="stat-value text-green">$1,250.00</span>
+                  <div className={`stat-card signal-${recommendationSignal.toLowerCase()}`}>
+                    <span className="stat-label">Trading Signal</span>
+                    <span className={`stat-value ${signalColor}`}>{recommendationSignal}</span>
                   </div>
                   <div className="stat-card">
-                    <span className="stat-label">Market Avg</span>
-                    <span className="stat-value">$850.50</span>
+                    <span className="stat-label">AI Confidence</span>
+                    <span className={`stat-value ${confidencePct >= 70 ? 'text-green' : confidencePct >= 40 ? 'text-yellow' : 'text-pink'}`}>
+                      {confidencePct.toFixed(1)}%
+                    </span>
                   </div>
                   <div className="stat-card">
-                    <span className="stat-label">30-Day Trend</span>
-                    <span className="stat-value text-pink">↑ +15.2%</span>
+                    <span className="stat-label">Condition Score</span>
+                    <span className={`stat-value ${conditionMultiplier >= 0.95 ? 'text-green' : conditionMultiplier >= 0.80 ? 'text-yellow' : 'text-pink'}`}>
+                      {(conditionMultiplier * 100).toFixed(0)}%
+                    </span>
                   </div>
                 </div>
 
-                {/* Baris 2: Analitik Lanjutan */}
+                {/* Baris 2: Data Detail Valuasi */}
                 <div className="stats-row">
                   <div className="stat-card">
-                    <span className="stat-label">Popularity Index</span>
-                    <span className="stat-value">94<span className="stat-sub">/100</span></span>
+                    <span className="stat-label">Rarity</span>
+                    <span className="stat-value" style={{fontSize: '0.75rem'}}>{rarity !== '-' ? rarity : 'N/A'}</span>
                   </div>
                   <div className="stat-card">
-                    <span className="stat-label">Age vs Market</span>
-                    <span className="stat-value">9 Yrs <span className="stat-sub text-green">(+12%)</span></span>
+                    <span className="stat-label">Release Year</span>
+                    <span className="stat-value">{releaseYear !== '-' ? releaseYear : 'N/A'}
+                      {releaseYear !== '-' && releaseYear < 2005 && <span className="stat-sub text-green"> (Vintage +20%)</span>}
+                    </span>
                   </div>
                   <div className="stat-card">
-                    <span className="stat-label">Price Valuation</span>
-                    <span className="stat-value text-green">Underpriced</span>
-                  </div>
-                  <div className="stat-card signal-buy">
-                    <span className="stat-label">Trading Signal</span>
-                    <span className="stat-value">STRONG BUY</span>
+                    <span className="stat-label">Market Price</span>
+                    <span className="stat-value text-green">${basePriceUsd.toFixed(2)}</span>
                   </div>
                 </div>
+
+                {/* Kandidat Alternatif AI */}
+                {candidates.length > 0 && (
+                  <div className="candidates-section">
+                    <h4 className="candidates-title">🃏 Alternative Matches</h4>
+                    <ul className="candidates-list">
+                      {candidates.map((c) => (
+                        <li key={c.card_id} className="candidate-item">
+                          <span className="candidate-rank">#{c.rank}</span>
+                          <span className="candidate-name">{c.name}</span>
+                          <span className="candidate-conf">{c.confidence_percentage?.toFixed(1)}%</span>
+                          {c.rarity && <span className="candidate-rarity">{c.rarity}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
-              {/* Grafik Garis (Line Chart) */}
+              {/* Grafik Tren Harga (statis – representasi visual) */}
               <div className="chart-container">
                 <p className="chart-subtitle">Price History & Forecasting</p>
                 <div className="svg-wrapper">
-                  {/* Hapus preserveAspectRatio="none" agar lingkaran tetap bulat sempurna */}
                   <svg viewBox="0 0 500 200" className="market-chart" preserveAspectRatio="none">
-                    <line x1="0" y1="50" x2="500" y2="50" stroke="#f0f0f0" strokeWidth="2" />
+                    <line x1="0" y1="50"  x2="500" y2="50"  stroke="#f0f0f0" strokeWidth="2" />
                     <line x1="0" y1="100" x2="500" y2="100" stroke="#f0f0f0" strokeWidth="2" />
                     <line x1="0" y1="150" x2="500" y2="150" stroke="#f0f0f0" strokeWidth="2" />
-                    
-                    {/* Garis Tren Harga (Warna Crimson Gelap) */}
-                    <polyline 
-                      fill="none" 
-                      stroke="#c2185b" 
-                      strokeWidth="5" 
-                      points="0,150 100,120 200,110 300,100 400,70 500,60" 
+                    <polyline
+                      fill="none"
+                      stroke="#c2185b"
+                      strokeWidth="5"
+                      points="0,150 100,120 200,110 300,100 400,70 500,60"
                     />
-                    
-                    {/* Titik Data (Solid, tanpa border putih) */}
-                    <circle cx="0" cy="150" r="7" fill="#c2185b" />
+                    <circle cx="0"   cy="150" r="7" fill="#c2185b" />
                     <circle cx="100" cy="120" r="7" fill="#c2185b" />
                     <circle cx="200" cy="110" r="7" fill="#c2185b" />
                     <circle cx="300" cy="100" r="7" fill="#c2185b" />
-                    <circle cx="400" cy="70" r="7" fill="#c2185b" />
-                    <circle cx="500" cy="60" r="7" fill="#c2185b" />
+                    <circle cx="400" cy="70"  r="7" fill="#c2185b" />
+                    <circle cx="500" cy="60"  r="7" fill="#c2185b" />
                   </svg>
                 </div>
-                
                 <div className="chart-labels">
                   <span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Okt</span><span>Nov</span>
                 </div>
               </div>
-              
-              {/* Teks tombol diperbarui */}
+
               <button className="marketplace-btn">SCAN OTHER CARDS</button>
             </div>
-            
+
           </div>
         </div>
       )}
