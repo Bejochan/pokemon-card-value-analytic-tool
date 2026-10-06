@@ -84,50 +84,22 @@ const AnimatedTextScramble = ({ targetText, duration }) => {
 };
 
 function DashboardPage() {
-  // Dummy Data untuk Simulasi Backend
-  const trendingCards = [
-    { 
-      id: 1, 
-      name: "Pikachu EX", 
-      rarity: "Shiny rare", 
-      holo: "Reverse Holofoil",
-      price: "$ 30.00", 
-      image: "/card-result.png", // Ganti dengan path gambarmu
-      setIcon: "/30th-celebration-logo.png", // Ganti dengan path logo set 30th celebration
-      flagIcon: "🇬🇧" // Menggunakan emoji bendera untuk contoh (bisa diganti gambar bendera nanti)
-    },
-    { 
-      id: 2, 
-      name: "Mewtwo EX", 
-      rarity: "Illustration rare", 
-      holo: "Radiant Holofoil",
-      price: "$ 45.00", 
-      image: "/card-result.png", // Ganti dengan path gambarmu
-      setIcon: "/ascended-heroes-logo.png", // Ganti dengan path logo set ascended
-      flagIcon: "🇯🇵"
-    },
-    // ... Tambahkan 3 kartu lainnya dengan struktur yang sama ...
-    { 
-      id: 3, 
-      name: "Umbreon EX", 
-      rarity: "Shiny rare", 
-      holo: "Normal Print",
-      price: "$ 21.00", 
-      image: "/card-result.png", // Ganti dengan path gambarmu
-      setIcon: "/ascended-heroes-logo.png", // Ganti dengan path logo set ascended
-      flagIcon: "🇬🇧"
-    },
-    { 
-      id: 4, 
-      name: "Sylveon EX", 
-      rarity: "Promo", 
-      holo: "Rare Holofoil",
-      price: "$ 49.00", 
-      image: "/card-result.png", // Ganti dengan path gambarmu
-      setIcon: "/30th-celebration-logo.png", // Ganti dengan path logo set ascended
-      flagIcon: "🇯🇵"
-    },
-  ];
+  const [trendingCards, setTrendingCards] = useState([]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/dashboard');
+        if (response.ok) {
+          const data = await response.json();
+          setTrendingCards(data.trending || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard data:", err);
+      }
+    };
+    fetchDashboardData();
+  }, []);
 
   const topGainers = [
     { id: 1, name: "Umbreon VMAX (Alt Art)", oldPrice: "$400", newPrice: "$450", up: "+12.5%" },

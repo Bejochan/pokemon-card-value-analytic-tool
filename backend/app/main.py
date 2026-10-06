@@ -237,6 +237,71 @@ def get_cards(limit: int = 50):
         print(f"[API] Error fetching cards from Supabase: {e}")
         raise HTTPException(status_code=500, detail="Gagal mengambil data dari database.")
 
+@app.get("/cards/{card_id}/history")
+def get_card_history(card_id: str):
+    """Ambil histori harga untuk grafik"""
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+    if not supabase_url or not supabase_key:
+        return []
+    
+    url = f"{supabase_url}/rest/v1/card_price_history?select=recorded_date,effective_market_price&card_id=eq.{card_id}&order=recorded_date.asc"
+    headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        print(f"[API] Error fetching history: {e}")
+        return []
+
+@app.get("/dashboard")
+def get_dashboard_data():
+    """Ambil data trending/top cards untuk dashboard"""
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+    if not supabase_url or not supabase_key:
+        return {"trending": []}
+    
+    # Ambil 4 kartu dengan limit
+    url = f"{supabase_url}/rest/v1/cards?select=card_id,name,rarity,image_small,sets(set_id),card_prices(effective_market_price)&limit=4"
+    headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        data = res.json()
+        
+        trendingCards = []
+        for i, item in enumerate(data):
+            price_val = 0.0
+            if isinstance(item.get("card_prices"), dict):
+                price_val = item["card_prices"].get("effective_market_price") or 0.0
+            elif isinstance(item.get("card_prices"), list) and len(item["card_prices"]) > 0:
+                price_val = item["card_prices"][0].get("effective_market_price") or 0.0
+                
+            set_id = "unknown"
+            if isinstance(item.get("sets"), dict):
+                set_id = item["sets"].get("set_id") or "unknown"
+            elif isinstance(item.get("sets"), list) and len(item["sets"]) > 0:
+                set_id = item["sets"][0].get("set_id") or "unknown"
+                
+            trendingCards.append({
+                "id": i + 1,
+                "card_id": item.get("card_id"),
+                "name": item.get("name"),
+                "rarity": item.get("rarity") or "Common",
+                "holo": "Normal Print",
+                "price": f"$ {price_val:.2f}",
+                "image": item.get("image_small") or "/card-result.png",
+                "setIcon": f"/{set_id}-logo.png",
+                "flagIcon": "🇺🇸"
+            })
+            
+        return {"trending": trendingCards}
+    except Exception as e:
+        print(f"[API] Error fetching dashboard: {e}")
+        return {"trending": []}
+
 # ---------------------------------------------------------------------
 # 6. RUNNER LOKAL
 # ---------------------------------------------------------------------

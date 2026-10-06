@@ -1,9 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './ScannerDashboard.css';
 
 function ScannerDashboard({ scanResult }) {
   // State untuk mengontrol halaman mana yang sedang aktif di dalam Dasbor
   const [dashboardView, setDashboardView] = useState('price');
+  const [priceHistory, setPriceHistory] = useState([]);
+  
+  useEffect(() => {
+    if (!scanResult?.card_id) return;
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/cards/${scanResult.card_id}/history`);
+        if (res.ok) {
+          const data = await res.json();
+          setPriceHistory(data.filter(d => d.effective_market_price !== null));
+        }
+      } catch (err) {
+        console.error("Failed to fetch history:", err);
+      }
+    };
+    fetchHistory();
+  }, [scanResult?.card_id]);
 
   // =====================================================================
   // DATA DARI BACKEND (Model 1 CLIP + Model 2 YOLO + Analytics Engine)
@@ -277,28 +294,31 @@ function ScannerDashboard({ scanResult }) {
               {/* Grafik Tren Harga (statis – representasi visual) */}
               <div className="chart-container">
                 <p className="chart-subtitle">Price History & Forecasting</p>
-                <div className="svg-wrapper">
-                  <svg viewBox="0 0 500 200" className="market-chart" preserveAspectRatio="none">
-                    <line x1="0" y1="50"  x2="500" y2="50"  stroke="#f0f0f0" strokeWidth="2" />
-                    <line x1="0" y1="100" x2="500" y2="100" stroke="#f0f0f0" strokeWidth="2" />
-                    <line x1="0" y1="150" x2="500" y2="150" stroke="#f0f0f0" strokeWidth="2" />
-                    <polyline
-                      fill="none"
-                      stroke="#c2185b"
-                      strokeWidth="5"
-                      points="0,150 100,120 200,110 300,100 400,70 500,60"
-                    />
-                    <circle cx="0"   cy="150" r="7" fill="#c2185b" />
-                    <circle cx="100" cy="120" r="7" fill="#c2185b" />
-                    <circle cx="200" cy="110" r="7" fill="#c2185b" />
-                    <circle cx="300" cy="100" r="7" fill="#c2185b" />
-                    <circle cx="400" cy="70"  r="7" fill="#c2185b" />
-                    <circle cx="500" cy="60"  r="7" fill="#c2185b" />
-                  </svg>
-                </div>
-                <div className="chart-labels">
-                  <span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Okt</span><span>Nov</span>
-                </div>
+                {priceHistory.length === 0 ? (
+                  <div style={{padding: '50px 0', textAlign: 'center', color: '#888'}}>Belum ada data harga</div>
+                ) : (
+                  <>
+                    <div className="svg-wrapper">
+                      <svg viewBox="0 0 500 200" className="market-chart" preserveAspectRatio="none">
+                        <line x1="0" y1="50"  x2="500" y2="50"  stroke="#f0f0f0" strokeWidth="2" />
+                        <line x1="0" y1="100" x2="500" y2="100" stroke="#f0f0f0" strokeWidth="2" />
+                        <line x1="0" y1="150" x2="500" y2="150" stroke="#f0f0f0" strokeWidth="2" />
+                        <polyline
+                          fill="none"
+                          stroke="#c2185b"
+                          strokeWidth="5"
+                          points={priceHistory.slice(-6).map((d, i, arr) => `${i * (arr.length > 1 ? 500 / (arr.length - 1) : 250)},${Math.min(...arr.map(x=>x.effective_market_price))===Math.max(...arr.map(x=>x.effective_market_price)) ? 100 : 150 - ((d.effective_market_price - Math.min(...arr.map(x=>x.effective_market_price))*0.9) / (Math.max(...arr.map(x=>x.effective_market_price))*1.1 - Math.min(...arr.map(x=>x.effective_market_price))*0.9)) * 100}`).join(" ")}
+                        />
+                        {priceHistory.slice(-6).map((d, i, arr) => (
+                          <circle key={i} cx={i * (arr.length > 1 ? 500 / (arr.length - 1) : 250)} cy={Math.min(...arr.map(x=>x.effective_market_price))===Math.max(...arr.map(x=>x.effective_market_price)) ? 100 : 150 - ((d.effective_market_price - Math.min(...arr.map(x=>x.effective_market_price))*0.9) / (Math.max(...arr.map(x=>x.effective_market_price))*1.1 - Math.min(...arr.map(x=>x.effective_market_price))*0.9)) * 100} r="7" fill="#c2185b" />
+                        ))}
+                      </svg>
+                    </div>
+                    <div className="chart-labels">
+                      {priceHistory.slice(-6).map((d, i) => <span key={i}>{new Date(d.recorded_date).toLocaleDateString('id-ID', { month: 'short' })}</span>)}
+                    </div>
+                  </>
+                )}
               </div>
 
               <button className="marketplace-btn">SCAN OTHER CARDS</button>

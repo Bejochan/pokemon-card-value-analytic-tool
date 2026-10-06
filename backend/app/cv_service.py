@@ -38,6 +38,23 @@ print("[OK] [CV Service] Model 1 siap digunakan!")
 
 ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY", "")
 ROBOFLOW_CONFIDENCE = int(os.getenv("ROBOFLOW_CONFIDENCE", "80"))
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
+def get_live_price(card_id: str, default_price: float) -> float:
+    if not SUPABASE_URL or not SUPABASE_KEY or not card_id:
+        return default_price
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/card_prices?select=effective_market_price&card_id=eq.{card_id}"
+        headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if data and len(data) > 0 and data[0].get("effective_market_price") is not None:
+                return float(data[0]["effective_market_price"])
+    except Exception as e:
+        print(f"[CV Service] Gagal fetch harga live dari Supabase: {e}")
+    return default_price
 
 
 # =====================================================================
@@ -183,6 +200,7 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
 
     # Hitung harga dasar (tanpa diskon cacat fisik)
     price_usd = float(top_match.get("effective_market_price") or 0.0)
+    price_usd = get_live_price(top_match.get("card_id"), price_usd)
     price_idr = int(price_usd * DEFAULT_USD_TO_IDR)
 
     candidates = build_candidates_list(ai_result.get("candidates", []))
@@ -241,6 +259,7 @@ def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dic
 
     # 3. Hitung Valuasi Harga Wajar Akhir & Diskon Kerusakan
     base_price_usd = float(top_match.get("effective_market_price") or 0.0)
+    base_price_usd = get_live_price(top_match.get("card_id"), base_price_usd)
     release_year = top_match.get("release_year")
     rarity = top_match.get("rarity", "")
 
