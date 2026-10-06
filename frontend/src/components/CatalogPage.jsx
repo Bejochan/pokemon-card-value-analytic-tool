@@ -1,27 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './CatalogPage.css';
 
 function CatalogPage() {
-  // --- PERBAIKAN: Membuat Data Kartu Dinamis & Menggunakan card-result.png ---
-  // Objek dasar data kartu yang akan diulang-ulang.
-  // Ganti source gambar dengan card-result.png
-  const baseCardData = {
-    name: "Fuecoco",
-    price: "$ 5.00",
-    rarityText: "Common",
-    rarityIcon: "C",
-    set: "m2a",
-    image: "/card-result.png" // Menggunakan card-result.png untuk semua kartu
-  };
+  const [cardsData, setCardsData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Membuat array data simulasi yang terdiri dari 25 kartu (5 baris x 5 kolom)
-  // key 'id' dibuat unik untuk React.
-  const [cardsData] = useState(
-    Array.from({ length: 25 }, (_, i) => ({
-      ...baseCardData,
-      id: i + 1, // ID unik untuk setiap item
-    }))
-  );
+  // --- MENGAMBIL DATA DARI BACKEND FASTAPI ---
+  useEffect(() => {
+    const fetchCards = async () => {
+      try {
+        // Fetch 50 data pertama dari backend
+        const response = await fetch('http://127.0.0.1:8000/cards?limit=50');
+        if (!response.ok) {
+          throw new Error('Gagal mengambil data dari server');
+        }
+        const data = await response.json();
+        setCardsData(data);
+      } catch (error) {
+        console.error("Error fetching cards:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCards();
+  }, []);
 
   const [isSetMenuOpen, setIsSetMenuOpen] = useState(false);
   
@@ -121,9 +124,14 @@ function CatalogPage() {
         </div>
 
         {/* GRID GALERI KARTU (Akan berderet ke bawah secara otomatis) */}
-        <div className="card-gallery-grid">
-          {cardsData.map((card) => (
-            <div key={card.id} className="gallery-card-item">
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '50px', width: '100%', color: '#e83e8c' }}>
+            <h3>Memuat Data Kartu...</h3>
+          </div>
+        ) : (
+          <div className="card-gallery-grid">
+            {cardsData.map((card) => (
+              <div key={card.id} className="gallery-card-item">
               <div className="card-image-wrapper">
                 <img src={card.image} alt={card.name} className="card-image" />
               </div>
@@ -147,6 +155,7 @@ function CatalogPage() {
             </div>
           ))}
         </div>
+        )}
 
       </div>
     </div>
