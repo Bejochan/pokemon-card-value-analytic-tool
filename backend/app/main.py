@@ -16,6 +16,7 @@ import sys
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import requests
 
 # Pastikan terminal Windows tidak crash saat print karakter/emoji
 if sys.platform == "win32":
@@ -168,7 +169,76 @@ async def analyze_card_file(file: UploadFile = File(...)):
 
 
 # ---------------------------------------------------------------------
-# 5. RUNNER LOKAL
+# 5. ROUTE CATALOG: MENAMPILKAN DATASET KARTU
+# ---------------------------------------------------------------------
+
+@app.get("/cards")
+def get_cards(limit: int = 50):
+    """
+    Endpoint untuk mengambil dataset kartu dari Supabase (maks 50 data pertama).
+    Digunakan oleh halaman Katalog Frontend.
+    """
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+    
+    if not supabase_url or not supabase_key:
+        raise HTTPException(status_code=500, detail="Konfigurasi Supabase tidak ditemukan di .env")
+
+    # Ambil data dari tabel cards, join dengan sets dan card_prices
+    url = f"{supabase_url}/rest/v1/cards?select=card_id,name,rarity,image_small,sets(set_id),card_prices(effective_market_price)&limit={limit}"
+    
+    headers = {
+        "apikey": supabase_key,
+        "Authorization": f"Bearer {supabase_key}"
+    }
+
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        data = res.json()
+        
+        # Mapping response ke struktur yang diharapkan frontend
+        formatted_data = []
+        for item in data:
+            # Ambil harga, tangani null
+            price_val = 0.0
+            if isinstance(item.get("card_prices"), dict):
+                price_val = item["card_prices"].get("effective_market_price") or 0.0
+            elif isinstance(item.get("card_prices"), list) and len(item["card_prices"]) > 0:
+                price_val = item["card_prices"][0].get("effective_market_price") or 0.0
+                
+            # Ambil set_id
+            set_id = "unknown"
+            if isinstance(item.get("sets"), dict):
+                set_id = item["sets"].get("set_id") or "unknown"
+            elif isinstance(item.get("sets"), list) and len(item["sets"]) > 0:
+                set_id = item["sets"][0].get("set_id") or "unknown"
+                
+            rarity_str = item.get("rarity") or "Common"
+            
+            # Buat inisial untuk icon rarity (misal: "Illustration Rare" -> "IR")
+            words = rarity_str.split()
+            rarity_icon = "".join([w[0].upper() for w in words]) if words else "C"
+            if len(rarity_icon) > 2:
+                rarity_icon = rarity_icon[:2]
+                
+            formatted_data.append({
+                "id": item.get("card_id"),
+                "name": item.get("name"),
+                "price": f"$ {price_val:.2f}",
+                "rarityText": rarity_str,
+                "rarityIcon": rarity_icon,
+                "set": set_id,
+                "image": item.get("image_small") or "/card-result.png"
+            })
+            
+        return formatted_data
+    except Exception as e:
+        print(f"[API] Error fetching cards from Supabase: {e}")
+        raise HTTPException(status_code=500, detail="Gagal mengambil data dari database.")
+
+# ---------------------------------------------------------------------
+# 6. RUNNER LOKAL
 # ---------------------------------------------------------------------
 
 if __name__ == "__main__":
