@@ -327,8 +327,11 @@
 .stats-container {
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  margin-bottom: 20px; 
+  gap: 8px; /* Spasi antar baris diperkecil */
+  /* Jarak bawah diminimalkan (sebelumnya 15px) agar teks grafik naik */
+  margin-bottom: 2px; 
+  /* FIX: statistik tidak boleh ikut menyusut, biar grafik yang mengalah */
+  flex-shrink: 0;
 }
 
 .stats-row {
@@ -528,10 +531,13 @@
   background-color: #ffffff;
   border-radius: 15px;
   /* Ubah flex: 1 menjadi flex-grow yang lebih kecil agar tidak terlalu tinggi */
-  flex-grow: 0; 
+  /* FIX: grafik mengisi SISA ruang saja. Sebelumnya flex-end membuat isi
+     grafik meluap ke ATAS dan menimpa kotak Trading Signal & Alternative Matches */
+  flex: 1 1 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   /* Kurangi margin bottom agar tombol naik */
   margin-bottom: 0px; 
   width: 100%;
@@ -543,6 +549,8 @@
   /* Sisakan sedikit ruang margin agar titik ujung tidak terpotong tepi putih */
   padding: 0 15px; 
   box-sizing: border-box;
+  flex: 1;
+  min-height: 0;
 }
 
 .chart-subtitle {
@@ -555,7 +563,7 @@
 
 .market-chart {
   width: 100%;
-  height: auto;
+  height: 100%;
   
   /* 1. HAPUS atau komentari max-height yang mencekik grafik ini */
   /* max-height: 120px; */ 
@@ -563,7 +571,7 @@
   /* 2. AKTIFKAN KEMBALI aspect-ratio ini. 
         Rasio 5/2 persis sama dengan viewBox 500/200, 
         sehingga lingkaran dijamin bulat sempurna meskipun ditarik selebar apa pun */
-  aspect-ratio: 5 / 2; 
+  /* aspect-ratio: 5 / 2; -- dimatikan: memaksa tinggi tetap & bikin overflow */
   
   display: block; 
   overflow: visible;
