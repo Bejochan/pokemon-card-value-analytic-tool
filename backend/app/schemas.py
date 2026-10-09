@@ -56,6 +56,13 @@ class ConditionReport(BaseModel):
     evaluation_status: str = Field("evaluated", description="Status evaluasi: evaluated, bypassed_oncam, atau error.")
 
 
+class MarketAnalytics(BaseModel):
+    """Analisis peramalan harga menggunakan model Machine Learning."""
+    predicted_fair_value_usd: float = Field(0.0, description="Harga wajar yang diprediksi oleh Machine Learning dalam USD.")
+    predicted_fair_value_idr: int = Field(0, description="Harga wajar prediksi dalam Rupiah.")
+    mispricing_gap_pct: float = Field(0.0, description="Persentase selisih harga pasar aktual dengan harga wajar prediksi.")
+
+
 class CardCandidate(BaseModel):
     """Informasi kartu alternatif yang mendekati tebakan visual."""
     rank: int
@@ -119,6 +126,7 @@ class AnalyzeResponse(BaseModel):
     estimated_price: Optional[int] = Field(None, description="Backward-compatibility untuk frontend.")
     card_condition: Optional[str] = Field(None, description="Backward-compatibility untuk frontend.")
     condition_report: Optional[ConditionReport] = None
+    market_analytics: Optional[MarketAnalytics] = None
     candidates: List[CardCandidate] = Field(default_factory=list)
     recommendation_signal: str = Field("HOLD", description="Sinyal transaksi: BUY, HOLD, atau SELL.")
     execution_time_ms: float = 0.0
