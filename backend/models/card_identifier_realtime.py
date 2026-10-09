@@ -157,6 +157,10 @@ class RealtimeInferenceWorker(threading.Thread):
         self.latest_result = None
         self.latest_latency_ms = 0.0
         self.lock = threading.Lock()
+        
+        # Buffer untuk Temporal Smoothing (Anti-Epilepsi / Kedip)
+        import collections
+        self.pred_history = collections.deque(maxlen=7)
 
     def update_frame(self, crop_bgr):
         # Jika queue penuh, buang frame lama dan masukkan frame paling baru
@@ -175,6 +179,7 @@ class RealtimeInferenceWorker(threading.Thread):
             return self.latest_result, self.latest_latency_ms
 
     def run(self):
+        import collections
         while self.running:
             try:
                 crop_bgr = self.frame_queue.get(timeout=0.2)
@@ -186,11 +191,27 @@ class RealtimeInferenceWorker(threading.Thread):
                 # Inferensi ultra-gesit real-time (bypass auto-orient & dual-view, gunakan in-memory ORB cache)
                 res = self.identifier.identify_card(crop_bgr, top_k=4, auto_align=False,
                                                     auto_orient=False, dual_view=False, fast_mode=True)
+                
+                # Temporal Smoothing (Voting Stabilizer)
+                if res and res.get("candidates"):
+                    self.pred_history.append(res)
+                
+                smoothed_res = res
+                if len(self.pred_history) > 0:
+                    top_names = [r["candidates"][0]["name"] for r in self.pred_history if r.get("candidates")]
+                    if top_names:
+                        counts = collections.Counter(top_names)
+                        best_name = counts.most_common(1)[0][0]
+                        for r in reversed(self.pred_history):
+                            if r["candidates"][0]["name"] == best_name:
+                                smoothed_res = r
+                                break
+
                 t1 = time.time()
                 latency = round((t1 - t0) * 1000, 1)
 
                 with self.lock:
-                    self.latest_result = res
+                    self.latest_result = smoothed_res
                     self.latest_latency_ms = latency
             except Exception as e:
                 pass
@@ -260,7 +281,20 @@ def build_dashboard(active_cam_frame, scan_ratio, prediction, latency_ms,
     view_h = cam_h - 48 - view_pad
 
     if active_cam_frame is not None and active_cam_frame.size > 0:
-        resized_cam = cv2.resize(active_cam_frame, (view_w, view_h), interpolation=cv2.INTER_AREA)
+        # Crop bagian tengah gambar sebelum di-resize agar proporsi (aspect ratio) tidak gepeng
+        cur_h, cur_w = active_cam_frame.shape[:2]
+        target_aspect = view_w / float(view_h)
+        cur_aspect = cur_w / float(cur_h)
+        if cur_aspect > target_aspect:
+            new_w = int(cur_h * target_aspect)
+            offset = (cur_w - new_w) // 2
+            cropped_frame = active_cam_frame[:, offset:offset + new_w]
+        else:
+            new_h = int(cur_w / target_aspect)
+            offset = (cur_h - new_h) // 2
+            cropped_frame = active_cam_frame[offset:offset + new_h, :]
+
+        resized_cam = cv2.resize(cropped_frame, (view_w, view_h), interpolation=cv2.INTER_AREA)
         canvas[view_y:view_y + view_h, view_x:view_x + view_w] = resized_cam
     else:
         cv2.rectangle(canvas, (view_x, view_y), (view_x + view_w, view_y + view_h), (35, 28, 24), -1)
@@ -573,6 +607,56 @@ def build_dashboard(active_cam_frame, scan_ratio, prediction, latency_ms,
     return canvas
 
 
+class FastCameraStream:
+    """
+    Membaca frame kamera di latar belakang menggunakan antrean frame.
+    Sangat dioptimalkan untuk Webcam USB atau Virtual Webcam (seperti DroidCam/Iriun).
+    """
+    def __init__(self, src):
+        self.cap = cv2.VideoCapture(src)
+        # Mencoba mematikan buffer internal dan meminta resolusi HD
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+        self.ret = False
+        self.frame = None
+        self.running = True
+        self.lock = threading.Lock()
+        
+        if self.cap.isOpened():
+            self.ret, self.frame = self.cap.read()
+            self.thread = threading.Thread(target=self._update, daemon=True)
+            self.thread.start()
+
+    def _update(self):
+        while self.running:
+            ret, frame = self.cap.read()
+            with self.lock:
+                self.ret = ret
+                self.frame = frame
+
+    def read(self):
+        with self.lock:
+            if self.frame is not None:
+                return self.ret, self.frame.copy()
+            return self.ret, None
+
+    def isOpened(self):
+        return self.cap.isOpened()
+
+    def release(self):
+        self.running = False
+        if self.cap is not None:
+            self.cap.release()
+
+    def get(self, prop):
+        if self.cap is not None:
+            return self.cap.get(prop)
+        return 0
+
+
+
 def main():
     print("=================================================================")
     print("Regokemon AI - Live Computer Vision Dashboard (1920x1080 Scale)")
@@ -593,8 +677,9 @@ def main():
     print("[OK] Background Inference Worker aktif.")
 
     print(f"\n[INFO] Menghubungkan ke kamera: {CAMERA_SOURCE}")
-    cap = cv2.VideoCapture(CAMERA_SOURCE)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    # Menggunakan FastCameraStream alih-alih cv2.VideoCapture biasa
+    # untuk mengatasi akumulasi buffer (delay 12+ detik) pada IP Webcam.
+    cap = FastCameraStream(CAMERA_SOURCE)
 
     if not cap.isOpened():
         print(f"[ERROR] Tidak dapat membuka sumber kamera: {CAMERA_SOURCE}")
@@ -609,8 +694,9 @@ def main():
     # Default ukuran jendela 16:9 proporsional dan nyaman di laptop 1920x1080 (100% / 125% / 150% scaling)
     cv2.resizeWindow(WINDOW_NAME, 1440, 810)
 
-    is_phone_stream = isinstance(CAMERA_SOURCE, str) and CAMERA_SOURCE.startswith("http")
-    default_rot = 90 if is_phone_stream else 0
+    # Default rotasi selalu 90 derajat agar orientasi HP berdiri (portrait)
+    # langsung pas dengan tampilan UI tanpa harus menekan tombol R.
+    default_rot = 90
     current_rotation = int(os.getenv("CAMERA_ROTATION", str(default_rot)))
 
     is_torch_on = False
