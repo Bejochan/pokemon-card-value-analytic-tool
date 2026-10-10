@@ -16,26 +16,28 @@ from pathlib import Path
 from collections import defaultdict
 
 import cv2
-import requests
 import numpy as np
 from dotenv import load_dotenv
 from pathlib import Path
+from ultralytics import YOLO
 
 # Mendapatkan rute folder 'models' tempat script ini berada
 _script_dir = Path(__file__).resolve().parent
 
-# Mundur satu tingkat ke folder parent, yaitu 'backend'
-_backend_dir = _script_dir.parent
+# === KONFIGURASI MODEL LOKAL ===
+# Sementara langsung pakai path absolut
+local_model_path = r"best-model-v5-card-condition.pt"
 
-# Memuat file .env yang ada di dalam folder 'backend'
-load_dotenv(_backend_dir / ".env")
-
-ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY")
-if not ROBOFLOW_API_KEY:
-    print("ERROR: ROBOFLOW_API_KEY tidak ditemukan di file .env!")
+print(f"[*] Memuat model YOLO dari: {local_model_path}")
+try:
+    if not os.path.exists(local_model_path):
+        print(f"[!] File model tidak ditemukan di path: {local_model_path}")
+        sys.exit(1)
+        
+    defect_model = YOLO(local_model_path)
+except Exception as e:
+    print(f"[!] Gagal memuat model YOLO. Error: {e}")
     sys.exit(1)
-
-API_URL = f"https://detect.roboflow.com/card-grader/4?api_key={ROBOFLOW_API_KEY}&confidence=0"
 
 CLASS_COLORS = {
     "Card":        (0, 255, 0),
@@ -256,22 +258,31 @@ def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray
     return cv2.warpPerspective(image_np, M, (out_w, out_h), flags=cv2.INTER_CUBIC)
 
 
-def send_frame_to_roboflow(image: np.ndarray) -> dict | None:
+def get_yolo_predictions(image: np.ndarray) -> dict | None:
+    """Menggunakan model YOLO lokal (didownload dari HF) untuk menggantikan Roboflow API."""
     try:
-        success, buffer = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
-        if not success:
-            print("[!] ERROR: Gagal melakukan encode gambar ke JPEG.")
-            return None
-        image_data = base64.b64encode(buffer.tobytes()).decode("utf-8")
-        response = requests.post(
-            API_URL, data=image_data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=30,
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"[!] Request gagal: {e}")
+        # Gunakan conf=0.01 agar filter manual (LOW_THRESH/HIGH_THRESH) di script ini tetap berfungsi sama
+        results = defect_model.predict(image, conf=0.01, verbose=False)
+        result = results[0]
+        
+        predictions = []
+        for box in result.boxes:
+            cx, cy, w, h = box.xywh[0].tolist()
+            conf = float(box.conf[0])
+            cls_id = int(box.cls[0])
+            cls_name = result.names[cls_id]
+            
+            predictions.append({
+                "class": cls_name,
+                "confidence": conf,
+                "x": cx,
+                "y": cy,
+                "width": w,
+                "height": h
+            })
+        return {"predictions": predictions}
+    except Exception as e:
+        print(f"[!] YOLO prediction error: {e}")
         return None
 
 
@@ -306,8 +317,17 @@ def draw_detections(frame: np.ndarray, detections: list[dict]) -> np.ndarray:
     line_thick = max(2, int(2 * scale_factor))
     font_scale = max(0.6, 0.6 * scale_factor)
 
+    # Logika ala Kaggle: Cari 1 Card dengan confidence tertinggi
+    cards = [d for d in detections if d["class"] == "Card"]
+    best_card = max(cards, key=lambda c: c["confidence"]) if cards else None
+
     for det in detections:
         label, confidence, certainty = det["class"], det["confidence"], det["certainty"]
+        
+        # Sembunyikan duplikat kotak Card agar UI bersih (hanya gambar 1 yang terbaik)
+        if label == "Card" and det != best_card:
+            continue
+
         cx, cy = int(det["x"]), int(det["y"])
         w, h = int(det["width"]), int(det["height"])
         x1, y1, x2, y2 = cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2
@@ -319,8 +339,14 @@ def draw_detections(frame: np.ndarray, detections: list[dict]) -> np.ndarray:
         tag = "[V]" if certainty == "Terdeteksi" else "[?]"
         text = f"{label} {confidence:.1%} {tag}"
         (tw, th), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, line_thick)
-        cv2.rectangle(overlay, (x1, y1 - th - baseline - 10), (x1 + tw + 10, y1), color, -1)
-        cv2.putText(overlay, text, (x1 + 5, y1 - baseline - 5),
+        
+        # Smart label placement: Jika label menabrak margin atas, gambar di sebelah dalam/bawah garis
+        text_y = y1 - 10
+        if text_y - th < 0:
+            text_y = y1 + th + 10
+            
+        cv2.rectangle(overlay, (x1, text_y - th - baseline), (x1 + tw + 10, text_y + baseline), color, -1)
+        cv2.putText(overlay, text, (x1 + 5, text_y),
                     cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), line_thick)
     return overlay
 
@@ -374,8 +400,8 @@ def process_side(image_path: str, side_label: str,
     enhanced = cv2.merge((clahe.apply(l), a, b))
     send_image = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
 
-    print(f"[*] Mengirim {side_label} ke API...")
-    result = send_frame_to_roboflow(send_image)
+    print(f"[*] Menganalisis {side_label} dengan Model YOLO lokal...")
+    result = get_yolo_predictions(send_image)
     if result is None:
         return None
 
@@ -413,15 +439,19 @@ def print_combined_conclusion(front_detections: list[dict] | None, back_detectio
         print("[!] PERINGATAN: Sisi BELAKANG gagal dianalisis, kesimpulan hanya dari sisi depan.")
 
     all_detections = (front_detections or []) + (back_detections or [])
-    solid = [d for d in all_detections if d["certainty"] == "Terdeteksi"]
-    indicated = [d for d in all_detections if d["certainty"] != "Terdeteksi"]
+    
+    # Abaikan kelas 'Card', kita hanya ingin merekap defect yang sebenarnya
+    defects_only = [d for d in all_detections if d["class"] != "Card"]
+
+    solid = [d for d in defects_only if d["certainty"] == "Terdeteksi"]
+    indicated = [d for d in defects_only if d["certainty"] != "Terdeteksi"]
 
     if solid:
         print(f"[!] {len(solid)} defect terkonfirmasi solid:")
         for d in solid:
             print(f"    - {d['class']} ({d['confidence']:.1%})")
     if indicated:
-        print(f"[?] {len(indicated)} defect di zona abu-abu:")
+        print(f"[?] {len(indicated)} defect di zona abu-abu (perlu cek visual):")
         for d in indicated:
             print(f"    - {d['class']} ({d['confidence']:.1%})")
     if not solid and not indicated:
@@ -453,6 +483,54 @@ def main():
     back_detections = process_side(back_path, "TAMPAK BELAKANG", args.low_thresh, args.high_thresh)
 
     print_combined_conclusion(front_detections, back_detections)
+
+    # === MENAMPILKAN UI WINDOW SECARA OTOMATIS ===
+    front_save_path = str(_script_dir / f"{Path(front_path).stem}_result.jpg")
+    back_save_path = str(_script_dir / f"{Path(back_path).stem}_result.jpg")
+
+    img_front = cv2.imread(front_save_path)
+    img_back = cv2.imread(back_save_path)
+
+    if img_front is not None and img_back is not None:
+        # Samakan tingginya sebelum digabung
+        h1, w1 = img_front.shape[:2]
+        h2, w2 = img_back.shape[:2]
+        target_h = max(h1, h2)
+        
+        img_f = cv2.resize(img_front, (int(w1 * target_h / h1), target_h))
+        img_b = cv2.resize(img_back, (int(w2 * target_h / h2), target_h))
+        
+        # Buat pemisah vertikal hitam selebar 20 piksel
+        divider = np.zeros((target_h, 20, 3), dtype=np.uint8)
+        combined = np.hstack((img_f, divider, img_b))
+        
+        # Buat area header hitam di bagian atas setinggi 80 piksel
+        header_h = 80
+        header = np.zeros((header_h, combined.shape[1], 3), dtype=np.uint8)
+        
+        # Susun UI akhir
+        final_ui = np.vstack((header, combined))
+        
+        def put_centered_text(img, text, center_x, center_y):
+            (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 3)
+            cv2.putText(img, text, (center_x - tw // 2, center_y + th // 2), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
+            
+        # Tulis label di tengah-tengah bagian gambar masing-masing
+        put_centered_text(final_ui, "TAMPAK DEPAN", img_f.shape[1] // 2, header_h // 2)
+        put_centered_text(final_ui, "TAMPAK BELAKANG", img_f.shape[1] + 20 + img_b.shape[1] // 2, header_h // 2)
+
+        print("\n[*] Menampilkan UI Window... (Tekan sembarang tombol keyboard atau klik 'X' untuk menutup)")
+        cv2.namedWindow("Hasil Deteksi Kartu", cv2.WINDOW_NORMAL)
+        cv2.imshow("Hasil Deteksi Kartu", final_ui)
+        
+        # Loop canggih agar window tidak freeze saat diklik silang (X) atau lewat keyboard
+        while cv2.getWindowProperty("Hasil Deteksi Kartu", cv2.WND_PROP_VISIBLE) >= 1:
+            key = cv2.waitKey(100) & 0xFF
+            if key != 255:  # Artinya ada tombol keyboard yang ditekan
+                break
+                
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

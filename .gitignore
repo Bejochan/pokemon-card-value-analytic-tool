@@ -35,6 +35,7 @@ scratch/
 **/scratch/
 debug_*.jpg
 debug_*.png
+*_result.jpg
 backend/models/*.pt
 *.index
 **/*.index
