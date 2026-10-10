@@ -264,9 +264,12 @@ def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dic
     rarity = top_match.get("rarity", "")
 
     valuation = evaluate_card_valuation(
+        card_id=top_match.get("card_id"),
         base_price_usd=base_price_usd,
         release_year=release_year,
         rarity=rarity,
+        supertype=top_match.get("supertype"),
+        hp=top_match.get("hp"),
         defects=defects,
         usd_rate=DEFAULT_USD_TO_IDR
     )
@@ -294,6 +297,7 @@ def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dic
         "estimated_price": valuation["pricing"]["final_price_idr"],
         "card_condition": valuation["condition_report"]["condition_tier"],
         "condition_report": valuation["condition_report"],
+        "market_analytics": valuation.get("market_analytics", {}),
         "candidates": candidates,
         "recommendation_signal": valuation["recommendation_signal"],
         "execution_time_ms": ai_result.get("execution_time_ms", 0.0)

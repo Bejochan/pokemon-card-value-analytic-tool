@@ -62,6 +62,11 @@ function ScannerDashboard({ scanResult }) {
   const defects         = conditionReport?.defects         ?? [];
   const evalStatus      = conditionReport?.evaluation_status ?? 'evaluated';
 
+  // --- Analitik Pasar (ML Forecasting) ---
+  const marketAnalytics   = scanResult?.market_analytics ?? {};
+  const predictedPriceIdr = marketAnalytics?.predicted_fair_value_idr ?? 0;
+  const mispricingGap     = marketAnalytics?.mispricing_gap_pct ?? 0;
+
   // --- Sinyal Transaksi (dari analytics_engine.py) ---
   const recommendationSignal = scanResult?.recommendation_signal ?? 'HOLD';
 
@@ -73,11 +78,9 @@ function ScannerDashboard({ scanResult }) {
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
 
   // --- Warna sinyal transaksi ---
-  const signalColor = {
-    'BUY':  'text-green',
-    'SELL': 'text-pink',
-    'HOLD': 'text-yellow',
-  }[recommendationSignal] ?? '';
+  let signalColor = 'text-yellow';
+  if (recommendationSignal === 'BUY' || recommendationSignal === 'STRONG BUY') signalColor = 'text-green';
+  if (recommendationSignal === 'SELL') signalColor = 'text-pink';
 
   return (
     <div className="dashboard-container">
@@ -269,7 +272,21 @@ function ScannerDashboard({ scanResult }) {
                   </div>
                   <div className="stat-card">
                     <span className="stat-label">Market Price</span>
-                    <span className="stat-value text-green">${basePriceUsd.toFixed(2)}</span>
+                    <span className="stat-value text-green">{formatIDR(basePriceIdr)}</span>
+                  </div>
+                </div>
+
+                {/* Baris 3: Machine Learning Valuation */}
+                <div className="stats-row">
+                  <div className="stat-card" style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255,255,255,0.3)' }}>
+                    <span className="stat-label text-yellow">Predicted Fair Value (ML)</span>
+                    <span className="stat-value">{formatIDR(predictedPriceIdr)}</span>
+                  </div>
+                  <div className="stat-card" style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255,255,255,0.3)' }}>
+                    <span className="stat-label text-yellow">Mispricing Gap</span>
+                    <span className={`stat-value ${mispricingGap < 0 ? 'text-green' : mispricingGap > 0 ? 'text-pink' : 'text-yellow'}`}>
+                      {mispricingGap > 0 ? '+' : ''}{mispricingGap.toFixed(2)}%
+                    </span>
                   </div>
                 </div>
 
