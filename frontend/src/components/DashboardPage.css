@@ -282,3 +282,458 @@
   font-weight: 800;
   font-size: 13px;
 }
+
+/* =========================================
+   STACKED BAR CHART (KOTAK KIRI)
+   ========================================= */
+
+/* Legend (Keterangan Warna di Atas) */
+.chart-legend-header {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  margin-bottom: 35px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legend-text {
+  font-size: 13px;
+  color: #333;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+}
+
+/* Palet Warna Batang */
+.color-low { background-color: #4b5e94; } /* Biru Tua */
+.color-mid { background-color: #f2cf66; } /* Kuning Keemasan */
+.color-high { background-color: #e54c8c; } /* Merah Muda / Pink */
+
+/* Kontainer Utama Grafik */
+.bar-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* Jarak vertikal antar batang */
+}
+
+/* Baris Tunggal (Teks + Batang) */
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* Label Teks di Kiri */
+.bar-label {
+  width: 130px; /* Memastikan teks memiliki ruang yang sejajar vertikal */
+  text-align: right;
+  font-size: 13px;
+  color: #333;
+  flex-shrink: 0;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Track Batang Keseluruhan */
+.bar-track {
+  flex-grow: 1; /* Mengisi sisa ruang ke kanan */
+  height: 10px; /* Ketebalan batang */
+  display: flex;
+  
+  /* Sisi kiri lurus (0), sisi kanan melengkung (12px) */
+  border-radius: 0 2px 2px 0; 
+  overflow: hidden; /* Memotong segmen di dalamnya agar ikut melengkung di ujung */
+  background-color: #f9f9f9; 
+}
+
+/* Segmen Warna di Dalam Batang */
+.bar-segment {
+  height: 100%;
+  /* Efek animasi saat lebar batang diisi dari state awal */
+  transition: width 1.2s cubic-bezier(0.1, 0.7, 0.1, 1); 
+}
+
+/* =========================================
+   FEATURE IMPACT CHART (KOTAK KANAN)
+   ========================================= */
+
+.feature-chart-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  font-family: 'Montserrat', sans-serif;
+  margin-top: 10px;
+}
+
+/* Area Batang dan Garis Panduan */
+.feature-bars-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Jarak yang cukup rapat antar batang */
+  position: relative;
+  
+  /* Membuat 4 garis panduan vertikal (di 25%, 50%, dan 75%) */
+  background-image: linear-gradient(to right, 
+    transparent 24.8%, #f0f0f0 25%, transparent 25.2%,
+    transparent 49.8%, #f0f0f0 50%, transparent 50.2%,
+    transparent 74.8%, #f0f0f0 75%, transparent 75.2%
+  );
+  
+  /* Mulai garis panduan sejajar dengan baris track (mengabaikan lebar label) */
+  background-position: left 100px top 0; /* 100px = lebar label (90px) + gap (10px) */
+  background-size: calc(100% - 100px) 100%;
+  background-repeat: no-repeat;
+  padding-bottom: 12px; /* Ruang antara batang terakhir dan sumbu X */
+}
+
+/* Baris Tunggal */
+.f-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1; /* Pastikan batang berada di atas garis panduan */
+}
+
+/* Label Fitur (Kiri) */
+.f-bar-label {
+  width: 90px;
+  text-align: right;
+  font-size: 12px;
+  color: #333;
+  flex-shrink: 0;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Track Batang Keseluruhan */
+.f-bar-track {
+  flex-grow: 1;
+  height: 16px; /* Ketebalan batang */
+  display: flex;
+  background-color: transparent;
+}
+
+/* Isi Batang Pink */
+.f-bar-fill {
+  height: 100%;
+  background-color: #e54c8c; /* Warna pink seragam */
+  border-radius: 0 4px 4px 0; /* Ujung kanan sedikit melengkung */
+  transition: width 1.2s cubic-bezier(0.1, 0.7, 0.1, 1);
+}
+
+/* Area Sumbu X di Bawah */
+.f-x-axis {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.f-x-spacer {
+  width: 90px; /* Harus sama dengan lebar .f-bar-label */
+  flex-shrink: 0;
+}
+
+.f-x-labels {
+  flex-grow: 1;
+  display: flex;
+  justify-content: space-between; /* Menyebarkan angka 0, 20, 40, 60, 80 secara merata */
+  font-size: 12px;
+  color: #888;
+  font-weight: 500;
+}
+
+/* =========================================
+   BARIS KEDUA (GRID ASIMETRIS)
+   ========================================= */
+
+.dashboard-asymmetric-grid {
+  display: grid;
+  /* Kiri 35%, Kanan 65% (Kanan lebih menjorok ke kiri) */
+  grid-template-columns: 0.9fr 1.5fr; 
+  gap: 40px;
+  margin-top: 30px;
+}
+
+/* --- DONUT CHART (KIRI) --- */
+.donut-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.donut-wrapper {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  margin: 40px 0;
+}
+
+.donut-chart {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  
+  /* Gradasi melingkar (Conic) sesuai persentase */
+  background: conic-gradient(
+    #4b5e94 0% 55%,
+    #a0426b 55% 80%,
+    #e54c8c 80% 95%,
+    #f2cf66 95% 100%
+  );
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-hole {
+  width: 110px;
+  height: 110px;
+  background-color: white; /* Memberi ilusi lubang donut */
+  border-radius: 50%;
+}
+
+/* Label Posisi Absolut di Luar Donut */
+.donut-label {
+  position: absolute;
+  font-size: 11px;
+  color: #333;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.dl-common { top: 50%; right: -65px; transform: translateY(-50%); }
+.dl-uncommon { bottom: -10px; left: -10px; }
+.dl-rare { top: 20px; left: -20px; }
+.dl-ultra { top: -25px; left: 50%; transform: translateX(-50%); }
+
+/* --- LINE CHART (KANAN) --- */
+.line-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.line-chart-container {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.line-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* =========================================
+   BARIS KETIGA (GRID ASIMETRIS TERBALIK)
+   ========================================= */
+
+.dashboard-asymmetric-grid-reverse {
+  display: grid;
+  /* Kiri 65%, Kanan 35% (Kotak Kiri lebih menjorok ke kanan) */
+  grid-template-columns: 1.5fr 0.8fr; 
+  gap: 40px;
+  margin-top: 40px;
+}
+
+/* Sesuaikan padding agar konsisten dengan baris kedua */
+.dashboard-asymmetric-grid-reverse .widget-box {
+  padding: 15px 30px 20px 30px;
+}
+
+/* --- TREEMAP CHART (KIRI) --- */
+.treemap-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.treemap-container {
+  display: grid;
+  /* Membagi area menjadi 4 kolom dengan lebar proporsional */
+  grid-template-columns: 2fr 1.5fr 1fr 1fr;
+  gap: 5px;
+  height: 250px;
+  margin-top: 10px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Base Group Styling */
+.tm-group, .tm-subgroup {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.tm-group-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #1e1b4b;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tm-cell {
+  background-color: rgba(255,255,255, 0.4); /* Transparan putih */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  text-align: center;
+  color: #1e1b4b;
+  border-radius: 2px;
+  padding: 5px;
+}
+
+/* Warna Background Kolom */
+.tm-yellow { background-color: #f2cf66; }
+.tm-blue { background-color: #5c8cf2; }
+.tm-purple { background-color: #b193f2; }
+.tm-pink { background-color: #e54c8c; }
+.tm-navy { background-color: #4b5e94; }
+
+/* Grid Spesifik Kolom */
+.tm-grid-2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 3px;
+  flex-grow: 1;
+}
+
+.tm-grid-custom-blue {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 2fr 1fr; /* Baris bawah lebih pendek */
+  gap: 3px;
+  flex-grow: 1;
+}
+
+.tm-grid-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-grow: 1;
+}
+.tm-grid-stack .tm-cell { flex-grow: 1; } /* Tinggi merata */
+
+/* Kolom Terakhir (Split Pink & Navy) */
+.tm-group-split {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tm-group-split .tm-pink { flex-grow: 2; }
+.tm-group-split .tm-navy { flex-grow: 1; }
+.tm-group-split .tm-navy .tm-group-title { color: white; margin-bottom: 4px;}
+.tm-group-split .tm-navy .tm-cell { color: white; background-color: rgba(255,255,255,0.2); flex-grow: 1;}
+
+.tm-grid-custom-pink {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1.5fr 1fr;
+  gap: 3px;
+  flex-grow: 1;
+}
+
+.tm-span-full { grid-column: 1 / -1; } /* Membentang penuh 2 kolom */
+
+
+/* --- GAUGE CHART (KANAN) --- */
+.gauge-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gauge-container {
+  position: relative;
+  width: 250px;
+  height: 125px; /* Setengah lingkaran */
+  overflow: hidden; /* Potong bagian bawah agar bentuknya separuh */
+  margin-top: 10px;
+}
+
+/* Lingkaran Penuh Background (Biru Navy) */
+.gauge-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 40px solid #4b5e94;
+  border-bottom-color: transparent; /* Hilangkan batas bawah */
+  border-left-color: transparent; /* Hilangkan batas kiri */
+  transform: rotate(-45deg); /* Putar agar bagian yang ada di atas */
+}
+
+/* Lingkaran Penuh Fill (Pink) - Akan berotasi sesuai persentase */
+.gauge-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 40px solid #a0426b; /* Warna Pink/Ungu Tua */
+  border-bottom-color: transparent;
+  border-right-color: transparent; /* Sisi yang berbeda agar menutupi */
+  /* Putaran dikendalikan lewat properti style di JSX (rotate 94deg = 52%) */
+  transform-origin: center;
+  border-radius: 50%;
+}
+
+/* Lingkaran Penutup di Tengah (Ujung melengkung buatan) */
+.gauge-background::before, .gauge-fill::before {
+  content: "";
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: inherit; /* Mewarisi warna garis */
+}
+/* Posisi ujung lengkung navy */
+.gauge-background::before { bottom: 15px; left: 15px; background-color: #4b5e94; }
+/* Posisi ujung lengkung pink */
+.gauge-fill::before { top: 15px; left: 15px; background-color: #a0426b; }
+
+
+/* Teks Nilai di Tengah */
+.gauge-center {
+  position: absolute;
+  bottom: 0; /* Berada tepat di dasar batas potong setengah lingkaran */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 5px;
+}
+
+.gauge-value {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 54px;
+  font-weight: 800;
+  color: #a0426b;
+  line-height: 1;
+}
