@@ -277,15 +277,26 @@ def get_cards(
             if len(rarity_icon) > 2:
                 rarity_icon = rarity_icon[:2]
                 
-            price_idr_val = int(price_val * 15500)
+            # Penanganan kartu tanpa data harga pasar (misal set promo/baru seperti me55)
+            if price_val and price_val > 0:
+                price_usd_str = f"$ {price_val:.2f}"
+                price_idr_val = int(price_val * 15500)
+                price_idr_str = f"Rp {price_idr_val:,}".replace(",", ".")
+                is_unlisted = False
+            else:
+                price_usd_str = "Unlisted"
+                price_idr_str = "Belum Ada Data"
+                is_unlisted = True
+
             formatted_data.append({
                 "id": item.get("card_id"),
                 "name": item.get("name"),
                 "supertype": item.get("supertype") or "Pokémon",
-                "price": f"$ {price_val:.2f}",
-                "price_usd": f"$ {price_val:.2f}",
-                "price_idr": f"Rp {price_idr_val:,}".replace(",", "."),
-                "price_num": price_val,
+                "price": price_usd_str,
+                "price_usd": price_usd_str,
+                "price_idr": price_idr_str,
+                "price_num": price_val if price_val else 0.0,
+                "is_unlisted": is_unlisted,
                 "rarityText": rarity_str,
                 "rarityIcon": rarity_icon,
                 "set": set_info,

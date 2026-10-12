@@ -266,12 +266,16 @@ function CatalogPage() {
                   <div className="card-details-mini">
                     <div className="detail-row">
                       <span className="card-name-mini" title={card.name}>{card.name}</span>
-                      <span className="card-price-mini">{card.price_usd || card.price}</span>
+                      <span className={`card-price-mini ${card.is_unlisted ? 'price-unlisted' : ''}`}>
+                        {card.price_usd || card.price}
+                      </span>
                     </div>
                     
                     <div className="detail-row">
                       <span className="card-rarity-text">{card.rarityText}</span>
-                      <span className="card-price-idr" title="Estimasi IDR">{card.price_idr}</span>
+                      <span className={`card-price-idr ${card.is_unlisted ? 'idr-unlisted' : ''}`} title="Estimasi IDR">
+                        {card.price_idr}
+                      </span>
                     </div>
                     
                     <div className="detail-row footer-row">
