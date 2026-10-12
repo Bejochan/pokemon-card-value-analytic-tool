@@ -89,28 +89,51 @@
   position: absolute;
   top: calc(100% + 12px); /* Jarak dari tombol utama */
   left: 0;
-  width: 260px;
+  width: 270px;
+  max-height: 320px; /* Batas tinggi setara ~6-7 item agar tidak menjulur */
   background-color: #ffffff;
   border-radius: 16px; /* Melengkung rapi */
-  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-  overflow: hidden; /* Memastikan item di dalamnya ikut melengkung */
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
+  overflow-y: auto; /* Aktifkan scroll di dalam menu ini */
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  z-index: 100;
+}
+
+/* Custom Scrollbar yang Halus untuk Menu Set */
+.set-dropdown-menu::-webkit-scrollbar {
+  width: 6px;
+}
+.set-dropdown-menu::-webkit-scrollbar-track {
+  background: #fdf2f8;
+  border-radius: 8px;
+}
+.set-dropdown-menu::-webkit-scrollbar-thumb {
+  background: #f472b6;
+  border-radius: 8px;
+}
+.set-dropdown-menu::-webkit-scrollbar-thumb:hover {
+  background: #e83e8c;
 }
 
 .set-dropdown-item {
-  padding: 16px 20px;
+  padding: 12px 18px; /* Lebih proporsional dan nyaman diklik */
   font-family: 'Montserrat', sans-serif;
   font-weight: 600;
-  font-size: 14px;
-  color: #555;
+  font-size: 13.5px;
+  color: #4b5563;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
-  transition: background-color 0.2s, color 0.2s;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.15s, color 0.15s, padding-left 0.15s;
 }
 
 .set-dropdown-item:last-child {
   border-bottom: none;
+}
+
+.set-dropdown-item:hover {
+  padding-left: 22px; /* Micro-animation saat kursor diarahkan */
 }
 
 .set-dropdown-item:hover,
@@ -367,3 +390,126 @@
   border-radius: 4px;
   text-transform: uppercase;
 }
+
+/* === TAMBAHAN STYLE FULLSTACK KATALOG (PAGINATION, IDR & EMPTY STATE) === */
+.card-price-idr {
+  font-size: 10.5px;
+  color: #888;
+  font-weight: 600;
+}
+
+.catalog-count-info {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.reset-filter-btn {
+  background: none;
+  border: 1px solid #e83e8c;
+  color: #e83e8c;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reset-filter-btn:hover {
+  background-color: #e83e8c;
+  color: white;
+}
+
+.catalog-loader {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #e83e8c;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.catalog-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #4b5563;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.catalog-empty-state h3 {
+  font-size: 18px;
+  color: #1e1b4b;
+  margin-bottom: 8px;
+}
+
+.catalog-empty-state p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+.reset-all-btn {
+  background: #e83e8c;
+  color: white;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(232, 62, 140, 0.3);
+  transition: all 0.2s ease;
+}
+
+.reset-all-btn:hover {
+  background: #d84b8f;
+  transform: translateY(-2px);
+}
+
+.catalog-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 30px 0 20px 0;
+  margin-top: 10px;
+}
+
+.pagination-btn {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  color: #1e1b4b;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: #e83e8c;
+  color: #e83e8c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(232, 62, 140, 0.15);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
+.pagination-info {
+  font-size: 13.5px;
+  color: #374151;
+}
