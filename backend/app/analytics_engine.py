@@ -101,7 +101,10 @@ def calculate_mispricing_signal(actual_price: float, predicted_price: float) -> 
         return "HOLD", gap_pct
 
 
-DEFAULT_USD_TO_IDR = 15500
+from app.currency_service import get_usd_to_idr_rate
+
+# Fallback konstanta jika dibutuhkan secara statis
+DEFAULT_USD_TO_IDR = 16500
 
 
 def calculate_condition_factor(defects: List[Dict[str, Any]]) -> Tuple[float, str, float]:
@@ -182,8 +185,9 @@ def evaluate_card_valuation(
     Mengembalikan dictionary rincian harga dasar, pengali, harga akhir, dan sinyal.
     """
     defects = defects or []
+    current_rate = float(usd_rate) if (usd_rate and usd_rate > 0) else get_usd_to_idr_rate()
     base_price = max(0.0, float(base_price_usd or 0.0))
-    base_price_idr = int(base_price * usd_rate)
+    base_price_idr = int(round(base_price * current_rate))
 
     # 1. Hitung Pengali Kondisi Fisik
     f_condition, condition_tier, discount_pct = calculate_condition_factor(defects)
@@ -193,7 +197,7 @@ def evaluate_card_valuation(
 
     # 3. Hitung Harga Wajar Akhir (P_final)
     final_price_usd = round(base_price * m_variant * f_condition, 2)
-    final_price_idr = int(final_price_usd * usd_rate)
+    final_price_idr = int(round(final_price_usd * current_rate))
 
     # ML Prediction
     predicted_fair_value_usd = predict_fair_value_ml(card_id, release_year, rarity, supertype, hp)
@@ -218,7 +222,7 @@ def evaluate_card_valuation(
             "condition_discount_pct": discount_pct,
             "final_price_usd": final_price_usd,
             "final_price_idr": final_price_idr,
-            "currency_rate": usd_rate
+            "currency_rate": current_rate
         },
         "condition_report": {
             "condition_tier": condition_tier,

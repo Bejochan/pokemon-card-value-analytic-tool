@@ -24,6 +24,7 @@ if sys.platform == "win32":
         pass
 
 from app.analytics_engine import evaluate_card_valuation, DEFAULT_USD_TO_IDR
+from app.currency_service import get_usd_to_idr_rate, convert_usd_to_idr
 
 
 # =====================================================================
@@ -227,7 +228,8 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
     # Hitung harga dasar (tanpa diskon cacat fisik)
     price_usd = float(top_match.get("effective_market_price") or 0.0)
     price_usd = get_live_price(top_match.get("card_id"), price_usd)
-    price_idr = int(price_usd * DEFAULT_USD_TO_IDR)
+    current_rate = get_usd_to_idr_rate()
+    price_idr = convert_usd_to_idr(price_usd)
 
     candidates = build_candidates_list(ai_result.get("candidates", []))
 
@@ -255,7 +257,7 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
             "condition_discount_pct": 0.0,
             "final_price_usd": price_usd,
             "final_price_idr": price_idr,
-            "currency_rate": DEFAULT_USD_TO_IDR
+            "currency_rate": current_rate
         },
         "estimated_price": price_idr,
         "card_condition": "Tidak Dievaluasi (Mode On-Cam)",
@@ -297,7 +299,7 @@ def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dic
         supertype=top_match.get("supertype"),
         hp=top_match.get("hp"),
         defects=defects,
-        usd_rate=DEFAULT_USD_TO_IDR
+        usd_rate=get_usd_to_idr_rate()
     )
 
     candidates = build_candidates_list(ai_result.get("candidates", []))

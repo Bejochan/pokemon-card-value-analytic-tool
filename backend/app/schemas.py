@@ -32,12 +32,12 @@ class ImageDataRequest(BaseModel):
 class PricingDetails(BaseModel):
     """Rincian valuasi harga pasar kartu dalam USD dan Rupiah (IDR)."""
     base_price_usd: float = Field(0.0, description="Harga dasar pasar (effective_market_price) dalam USD.")
-    base_price_idr: int = Field(0, description="Estimasi harga dasar dalam Rupiah (kurs Rp15.500).")
+    base_price_idr: int = Field(0, description="Estimasi harga dasar dalam Rupiah (kurs acuan live).")
     condition_multiplier: float = Field(1.0, description="Faktor pengali kondisi fisik (F_condition, misal: 1.0, 0.85, 0.65).")
     condition_discount_pct: float = Field(0.0, description="Persentase potongan harga akibat cacat fisik (misal: 15.0%).")
     final_price_usd: float = Field(0.0, description="Harga pasar wajar akhir (P_final) dalam USD.")
     final_price_idr: int = Field(0, description="Harga pasar wajar akhir (P_final) dalam Rupiah.")
-    currency_rate: int = Field(15500, description="Kurs acuan USD ke IDR.")
+    currency_rate: float = Field(16500.0, description="Kurs acuan USD ke IDR real-time.")
 
 
 class DefectItem(BaseModel):
