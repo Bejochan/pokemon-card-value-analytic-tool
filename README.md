@@ -277,6 +277,6 @@ Buka browser di: **`http://localhost:5173`**
 * **Metadata Kartu & Harga Pasar:** [pokemontcg.io REST API](https://pokemontcg.io/)
 * **Vision Transformer Backbone (Model 1):** [OpenAI CLIP (OpenCLIP)](https://github.com/mlfoundations/open_clip)
 * **Dataset Cacat Fisik (Model 2):** [Roboflow Universe — Card Grader](https://universe.roboflow.com/group-6-major-project/card-grader)
-* **Dataset Centering Tambahan:** [GemSnipe Pokemon Centering Measurements](https://gemsnipe.com/) (Open-Source CC BY 4.0 via Contributor Issue #1)
+* **Dataset Referensi Tambahan (Model 2):** [GemSnipe Pokemon Centering Measurements](https://gemsnipe.com/) (Open-Source CC BY 4.0 via Contributor Issue #1)
 * **Vector Retrieval Engine:** [Meta AI FAISS](https://github.com/facebookresearch/faiss)
 * **Cloud Database:** [Supabase PostgreSQL](https://supabase.com/)
