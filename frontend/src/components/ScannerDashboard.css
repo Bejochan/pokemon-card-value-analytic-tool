@@ -303,6 +303,17 @@
   color: #00d26a !important;
 }
 
+.highlight-price-row td {
+  /* Background tetap bersih/transparan, hanya teks harga yang hijau */
+}
+
+.final-idr-value {
+  color: #00d26a !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.3px;
+}
+
 /* --- KOTAK KANAN (ANALITIK) --- */
 .analytics-box {
   border-radius: 25px 0 0 25px;

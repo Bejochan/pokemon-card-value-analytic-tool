@@ -211,15 +211,15 @@ function ScannerDashboard({ scanResult }) {
                       </tr>
                       <tr>
                         <td>Exchange Rate</td>
-                        <td>Rp{currencyRate.toLocaleString('id-ID')}/USD</td>
+                        <td>Rp {Math.round(currencyRate).toLocaleString('id-ID')} / USD</td>
                       </tr>
-                      <tr>
+                      <tr className="highlight-price-row">
                         <td><strong>Final Value (USD)</strong></td>
-                        <td><strong>${finalPriceUsd.toFixed(2)}</strong></td>
+                        <td className="text-green"><strong>${finalPriceUsd.toFixed(2)}</strong></td>
                       </tr>
-                      <tr>
+                      <tr className="highlight-price-row">
                         <td><strong>Final Value (IDR)</strong></td>
-                        <td className="text-success"><strong>{formatIDR(finalPriceIdr)}</strong></td>
+                        <td className="text-green final-idr-value"><strong>{formatIDR(finalPriceIdr)}</strong></td>
                       </tr>
                       <tr>
                         <td>Condition Tier</td>
@@ -280,7 +280,7 @@ function ScannerDashboard({ scanResult }) {
                 <div className="stats-row">
                   <div className="stat-card" style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255,255,255,0.3)' }}>
                     <span className="stat-label text-yellow">Predicted Fair Value (ML)</span>
-                    <span className="stat-value">{formatIDR(predictedPriceIdr)}</span>
+                    <span className="stat-value text-green">{formatIDR(predictedPriceIdr)}</span>
                   </div>
                   <div className="stat-card" style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255,255,255,0.3)' }}>
                     <span className="stat-label text-yellow">Mispricing Gap</span>

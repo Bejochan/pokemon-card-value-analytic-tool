@@ -40,6 +40,11 @@ from app.cv_service import (
     run_identify_flow,
     run_analyze_flow
 )
+from app.currency_service import (
+    get_usd_to_idr_rate,
+    convert_usd_to_idr,
+    get_currency_status
+)
 
 # ---------------------------------------------------------------------
 # 1. INISIALISASI FASTAPI APP & CORS
@@ -280,7 +285,7 @@ def get_cards(
             # Penanganan kartu tanpa data harga pasar (misal set promo/baru seperti me55)
             if price_val and price_val > 0:
                 price_usd_str = f"$ {price_val:.2f}"
-                price_idr_val = int(price_val * 15500)
+                price_idr_val = convert_usd_to_idr(price_val)
                 price_idr_str = f"Rp {price_idr_val:,}".replace(",", ".")
                 is_unlisted = False
             else:
@@ -316,6 +321,7 @@ def get_cards(
             "page": safe_page,
             "limit": safe_limit,
             "total_pages": total_pages,
+            "currency_rate": get_usd_to_idr_rate(),
             "cards": formatted_data
         }
     except Exception as e:
@@ -410,6 +416,13 @@ def get_dashboard_data():
     except Exception as e:
         print(f"[API] Error fetching dashboard: {e}")
         return {"trending": []}
+
+
+@app.get("/currency")
+def get_current_currency():
+    """Mengembalikan informasi kurs live USD ke IDR yang digunakan oleh sistem."""
+    return get_currency_status()
+
 
 # ---------------------------------------------------------------------
 # 6. RUNNER LOKAL

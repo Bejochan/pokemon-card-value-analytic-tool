@@ -7,6 +7,7 @@ function CatalogPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCards, setTotalCards] = useState(0);
+  const [currencyRate, setCurrencyRate] = useState(null);
 
   // Filter & Search states
   const [searchInput, setSearchInput] = useState('');
@@ -81,6 +82,7 @@ function CatalogPage() {
         setTotalCards(data.total || 0);
         setTotalPages(data.total_pages || 1);
         setPage(data.page || 1);
+        if (data.currency_rate) setCurrencyRate(data.currency_rate);
       } else if (Array.isArray(data)) {
         setCardsData(data);
         setTotalCards(data.length);
