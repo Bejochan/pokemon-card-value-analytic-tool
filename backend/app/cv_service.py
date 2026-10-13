@@ -23,18 +23,32 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-from models.card_identifier import CardIdentifier
 from app.analytics_engine import evaluate_card_valuation, DEFAULT_USD_TO_IDR
 
 
 # =====================================================================
-# INISIALISASI MODEL VISION SINGLETON
+# INISIALISASI MODEL VISION SINGLETON (LAZY LOADING)
 # =====================================================================
 
-print("[INFO] [CV Service] Menginisialisasi Model 1 (Card Identifier CLIP + FAISS)...")
-# Menggunakan default CardIdentifier (use_orb_rerank=True, orb_rerank_pool_size=150) untuk akurasi maksimal
-_card_identifier = CardIdentifier()
-print("[OK] [CV Service] Model 1 siap digunakan!")
+# Inisialisasi awal hanya bernilai None (RAM & GPU belum terpakai saat startup)
+_card_identifier = None
+
+def get_card_identifier():
+    """
+    Mengambil instance CardIdentifier secara Lazy (hanya dimuat saat pertama kali dibutuhkan).
+    Jika terjadi kendala pada PyTorch/GPU, server tetap berjalan tanpa crash.
+    """
+    global _card_identifier
+    if _card_identifier is None:
+        try:
+            print("[INFO] [CV Service] Permintaan scan diterima. Memuat Model 1 (CLIP + FAISS)...")
+            from models.card_identifier import CardIdentifier
+            _card_identifier = CardIdentifier()
+            print("[OK] [CV Service] Model 1 berhasil dimuat dan siap digunakan!")
+        except Exception as e:
+            print(f"[ERROR] [CV Service] Gagal memuat Model 1 AI Engine: {e}")
+            return None
+    return _card_identifier
 
 ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY", "")
 ROBOFLOW_CONFIDENCE = int(os.getenv("ROBOFLOW_CONFIDENCE", "80"))
@@ -157,7 +171,19 @@ def process_card_identification(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str
     Menjalankan Model 1 CLIP ViT-B-32 pada gambar OpenCV di memori RAM.
     Mengembalikan data kartu utama dan daftar kandidat alternatif.
     """
-    ai_result = _card_identifier.identify_card(
+    identifier = get_card_identifier()
+    
+    # Penanganan jika model gagal dimuat
+    if identifier is None:
+        return {
+            "status": "error",
+            "message": "Layanan AI Scanner sedang offline atau mengalami kendala modul di server.",
+            "top_match": None,
+            "candidates": [],
+            "execution_time_ms": 0.0
+        }
+
+    ai_result = identifier.identify_card(
         image_input=img_bgr,
         top_k=top_k,
         debug=False
@@ -194,7 +220,7 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
     if not top_match:
         return {
             "status": "error",
-            "message": "AI tidak dapat mengenali kartu dari foto yang diberikan.",
+            "message": ai_result.get("message") or "AI tidak dapat mengenali kartu dari foto yang diberikan.",
             "execution_time_ms": ai_result.get("execution_time_ms", 0.0)
         }
 
@@ -250,7 +276,7 @@ def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dic
     if not top_match:
         return {
             "status": "error",
-            "message": "AI tidak dapat mengenali kartu dari foto yang diberikan.",
+            "message": ai_result.get("message") or "AI tidak dapat mengenali kartu dari foto yang diberikan.",
             "execution_time_ms": ai_result.get("execution_time_ms", 0.0)
         }
 

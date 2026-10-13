@@ -17,113 +17,119 @@
 
 ## 📌 Ringkasan Proyek
 
-**Pokemon Card Value Analytic Tool (REGOKEMON)** adalah sistem analitika data dan kecerdasan buatan berbasis **Dual-Model Computer Vision** yang dirancang untuk membantu penjual maupun pembeli kartu Pokémon pada **marketplace sekunder** (seperti Tokopedia, Shopee, eBay, atau forum jual-beli lokal). 
+**Pokemon Card Value Analytic Tool (REGOKEMON)** adalah sistem analitika data dan kecerdasan buatan berbasis **Dual-Model Computer Vision** yang dirancang untuk membantu penjual maupun pembeli kartu Pokémon pada **marketplace sekunder** (seperti Tokopedia, Shopee, eBay, atau komunitas kolektor lokal).
 
-Sistem ini menyelesaikan 3 permasalahan utama dalam transaksi kartu koleksi TCG:
-1. **Identifikasi Kartu Otomatis (Model 1):** Mengenali jenis kartu secara presisi dan instan (< 200 ms) dari foto kamera HP atau webcam di antara **20.617 jenis kartu** menggunakan representasi visual **OpenAI CLIP (ViT-B/32)** dan indeks vektor **FAISS**.
-2. **Estimasi Kondisi Fisik Otomatis (Model 2):** Mengidentifikasi cacat fisik kartu (lecet, tertekuk, aus pinggir) secara objektif menggunakan Computer Vision berbasis **YOLOv8**.
-3. **Valuasi Harga Pasar Wajar & Sinyal Transaksi:** Menghitung deviasi harga penawaran marketplace dibanding harga pasar wajar (*fair market price*) dan memberikan rekomendasi **BUY (Beli)**, **HOLD (Tahan)**, atau **SELL (Kemahalan)**.
+Sistem ini memecahkan 3 masalah fundamental dalam ekosistem perdagangan kartu TCG:
+1. **Identifikasi Kartu Otomatis Skala Masif (Model 1):** Mengidentifikasi jenis kartu secara instan di antara **20.617 jenis kartu** resmi menggunakan representasi semantik visual **OpenAI CLIP (ViT-B/32)**, pencarian vektor **FAISS**, dan verifikasi mikro **ORB**.
+2. **Penilaian Cacat Fisik Otomatis (Model 2):** Mendeteksi kerusakan fisik permukaan kartu (*scratch*, *edge wear*, *corner wear*, *bent/crease*) menggunakan **YOLOv8 Object Detection**.
+3. **Valuasi Harga Pasar Wajar & Sinyal Transaksi:** Mengintegrasikan data harga historis dari Supabase Cloud dengan formula depresiasi kondisi untuk menghasilkan rekomendasi **BUY (Murah)**, **HOLD (Wajar)**, atau **SELL (Kemahalan)**.
 
 ---
 
 ## 🤖 Arsitektur Dual-Model Computer Vision
 
-Sistem ini menggunakan **2 Model Computer Vision independen** yang bekerja secara terintegrasi untuk menghasilkan analisis kartu yang akurat:
-
 ```mermaid
 graph TD
-    Input["Input: Foto Kartu (Webcam / IP Cam / Upload)"] --> Preproc["Smart Frame & 4-Way Auto-Orientation<br/>(Rasio 63:88, Laplacian Blur, 0°/90°/180°/270°)"]
+    Input["Input Citra Kartu (Webcam / HP DroidCam / Upload Web)"] --> Preproc["Preprocessing & Geometry<br/>• Warp Rasio 63:88<br/>• 4-Way Auto-Orientation (0°/90°/180°/270°)<br/>• CLAHE Glare & Shadow Reduction"]
     
     Preproc --> M1["MODEL 1: Card Identifier<br/>(OpenAI CLIP ViT-B/32 + FAISS IndexFlatIP)"]
-    Preproc --> M2["MODEL 2: Condition Grader<br/>(YOLOv8 Defect Detection via Roboflow)"]
+    Preproc --> M2["MODEL 2: Condition Grader<br/>(YOLOv8 Defect Detection via Roboflow API)"]
     
-    M1 -->|Top-150 Kandidat| ORB["Hybrid ORB Keypoint Re-Ranking<br/>& RANSAC Homography Verification"]
-    ORB --> CardID["Identitas Kartu Terverifikasi<br/>(Nama, Edisi Set, Nomor Seri, Rarity)"]
+    M1 -->|Top-K Kandidat| ORB["Hybrid Fast ORB Re-Ranking<br/>(Verifikasi Teks, Nomor Seri & Cap Set)"]
+    ORB --> Sigmoid["Kalibrasi Keyakinan Sigmoid<br/>(Margin Scaling Temperature tau=0.03)"]
+    Sigmoid --> CardID["Identitas Kartu Terverifikasi<br/>(ID, Nama, Set, Seri, Rarity, Harga Dasar)"]
     
     M2 --> ConditionScore["F_condition Multiplier<br/>(Clean: 1.00x, Scratched: 0.85x, Edge: 0.80x, Bent: 0.65x)"]
     
-    CardID --> Valuation["ANALYTICS ENGINE & VALUATION FORMULA<br/>P_final = P_base × M_variant × F_condition × F_market"]
+    CardID --> Valuation["ANALYTICS ENGINE & FORMULA VALUASI<br/>P_final = P_base × M_variant × F_condition × F_market"]
     ConditionScore --> Valuation
     
-    Supabase[("Supabase Cloud Database<br/>(20.617 Kartu & Daily Pricing Cron)")] --> Valuation
+    Supabase[("Supabase Cloud Database<br/>(20.617 Kartu, Set, & Price History)")] --> Valuation
     
-    Valuation --> Output["Output: P_final (Harga Pasar Wajar Realistis)<br/>Deviasi Harga Pasar & Sinyal Transaksi BUY / HOLD / SELL"]
+    Valuation --> Output["Output Komprehensif:<br/>• Nilai Wajar Realistis (IDR & USD)<br/>• Deviasi Pasar & Sinyal Transaksi (BUY/HOLD/SELL)<br/>• Visual HUD & Grafik Tren Harga"]
 ```
 
-### 1️⃣ Model 1: Card Identification Engine (Default: OpenAI CLIP ViT-B/32)
-* **Tujuan:** Mengenali **jenis kartu** (Nama, Set, Nomor Seri, Rarity) dari foto input di antara 20.617 kartu acuan.
-* **Arsitektur Default (Produksi):** **OpenAI CLIP (Vision Transformer ViT-B/32)** pre-trained kontrastif pada 400M pasangan gambar-teks.
-  * **Mengapa CLIP?** Model klasifikasi umum seperti MobileNetV3 dilatih pada ImageNet (foto objek riil dunia nyata), sehingga rentan salah mengenali ilustrasi 2D bergaya anime/fanart dan sangat sensitif terhadap pencahayaan. CLIP memahami semantik grafis dan variasi ilustrasi secara mendalam, menghasilkan akurasi pencocokan visual yang jauh lebih tinggi.
-* **Fitur Utama Engine:**
-  1. **512-Dimension Visual Embeddings:** Representasi fitur visual yang padat dan sangat diskriminatif diekstraksi via CUDA GPU.
-  2. **FAISS IndexFlatIP:** Indeks pencarian vektor berbasis *Cosine Similarity* yang memproses 20.617 kartu dalam hitungan sub-milidetik (< 200 ms).
-  3. **4-Way Smart Auto-Orientation:** Secara cerdas mengevaluasi sudut rotasi kartu (0°, 90°, 180°, 270°) terhadap FAISS, sehingga kartu yang difoto miring atau terbalik otomatis ditegakkan sebelum identifikasi.
-  4. **Hybrid ORB Re-Ranking (Top-150):** Verifikasi fitur lokal (ORB keypoints) dan estimasi homografi RANSAC pada **Top-150 kandidat FAISS** (`Commit 7707151`) untuk membedakan kartu reprint atau varian foil/holografis yang memiliki kemiripan tata letak tinggi.
-* **Alternative Baseline Model (MobileNetV3):**
-  Implementasi lama berbasis MobileNetV3 diarsipkan di folder `backend/models/legacy_mobilenet/` untuk kebutuhan studi komparasi (*ablation study*) dan analisis performa sistem.
+---
 
-### 2️⃣ Model 2: Card Condition Grader Engine (Defect Detection)
-* **Tujuan:** Mendeteksi **cacat dan kondisi fisik** kartu secara objektif.
-* **Metode ML:** *YOLOv8 Object Detection / Bounding Box Segmentation*.
-* **Dataset Training:** Dataset Roboflow Universe `card-grader` (tersimpan di `backend/dataset/card-condition-dataset/`).
-* **Kelas Cacat Fisik & Multiplier Kondisi ($F_{condition}$):**
-  * `Clean / Mint (Mulus)` → Multiplier = **1.00** *(Tanpa Potongan Harga)*
-  * `Scratched / Lecet` → Multiplier = **0.85** *(Diskon 15%)*
-  * `Edge Wear / Aus Pinggir` → Multiplier = **0.80** *(Diskon 20%)*
-  * `Bent / Tertekuk / Crease` → Multiplier = **0.65** *(Diskon 35%)*
+### 1️⃣ Model 1: Card Identification Engine (CLIP ViT-B/32 + FAISS + ORB)
+
+* **Backbone:** Vision Transformer **`openai/clip-vit-base-patch32` (`ViT-B/32`)** pra-latih pada 400 juta pasangan citra-teks.
+* **Mengapa Vision Transformer (ViT), Bukan CNN Konvensional?**
+  * **Global Self-Attention:** ViT membagi citra menjadi 49 patch ($7 \times 7$ grid berukuran $32 \times 32$ px) dan memproses korelasi visual secara serentak. Model menghubungkan posisi teks nama, simbol energi, dan ilustrasi karakter secara menyeluruh.
+  * **Open-Set Metric Learning:** Tidak menggunakan layer klasifikasi *Softmax* yang kaku (20.000 kelas). Kartu baru cukup diekstrak vektor 512-D-nya dan dimasukkan ke indeks FAISS dalam hitungan detik tanpa perlu *retraining* model.
+  * **Ketahanan Optik (Robustness):** Sangat tahan terhadap pantulan cahaya (*glare*) dari pelindung plastik (*sleeve*), sudut miring, dan variasi pencahayaan ruangan.
+* **Vector Indexing (FAISS IndexFlatIP):**
+  * Seluruh 20.617 kartu disimpan dalam format vektor 512 float32 ternormalisasi $L_2$ (`card_embeddings.index`, ukuran RAM hanya ~42 MB).
+  * Menghitung *Cosine Similarity* secara paralel dalam waktu sub-milidetik (< 1 ms).
+* **Two-Stage Re-Ranking (Fast ORB Keypoints):**
+  * Kartu Pokémon memiliki kasus unik berupa **kartu reprint** (artwork karakter sama persis, tetapi beda nomor seri dan simbol set di bagian bawah).
+  * Sistem menyaring kandidat teratas melalui FAISS, lalu mengekstrak fitur lokal mikro menggunakan **ORB (500 keypoints)** dengan bobot gabungan:
+    $$\text{Score}_{\text{blended}} = 0.60 \times \text{Score}_{\text{CLIP}} + 0.40 \times \text{Score}_{\text{ORB}}$$
+* **Kalibrasi Margin Sigmoid:**
+  * Menghitung selisih margin skor ke *runner-up* kartu dengan nama berbeda ($\Delta$), lalu diskalakan dengan temperatur $\tau = 0.03$:
+    $$P = \frac{100}{1 + e^{-\Delta / \tau}}$$
+  * Menghindari *overconfidence* pada varian kartu yang mirip.
+* **3 Varian Interface Model 1:**
+  1. **`card_identifier_realtime.py` (Live Scanner HUD 30+ FPS):** Menggunakan arsitektur *Multithreaded Asynchronous Worker* (thread rendering kamera dipisah dari thread inferensi AI), *In-Memory ORB Cache*, dan *Temporal Smoothing* (buffer 7-frame konsensus). Latensi: **~83 ms di CPU** dan **~18 ms di GPU RTX 2050**.
+  2. **`card_identifier_oncam.py` (Snapshot Camera):** Membuka webcam/IP Cam dengan tombol capture manual dan visualisasi target box.
+  3. **`card_identifier_manual.py` (File Evaluasi Presisi):** Evaluasi foto statis melalui File Explorer atau CLI dengan Full 4-Way Auto-Orientation & Dual-View (Portrait + Square).
+
+---
+
+### 2️⃣ Model 2: Card Condition Grader (Defect Detection via YOLOv8)
+
+* **Tujuan:** Mendeteksi dan melokalisasi jenis cacat fisik kartu secara objektif.
+* **Metode:** YOLOv8 Object Detection terlatih pada dataset Roboflow `card-grader`.
+* **Kelas Cacat Fisik & Pengali Depresiasi ($F_{condition}$):**
+  * `Clean / Mint (Mulus)` → Multiplier = **1.00** *(Nilai penuh)*
+  * `Scratched (Lecet Permukaan)` → Multiplier = **0.85** *(Penurunan 15%)*
+  * `Edge Wear (Kikis Tepi)` → Multiplier = **0.80** *(Penurunan 20%)*
+  * `Bent / Crease (Tertekuk)` → Multiplier = **0.65** *(Penurunan 35%)*
+
+---
+
+### 3️⃣ Formula Valuasi Harga Wajar Dinamis
+
+$$P_{\text{final}} = P_{\text{base}} \times M_{\text{variant}} \times F_{\text{condition}} \times F_{\text{market}}$$
+
+* **$P_{base}$:** Harga pasar efektif konsolidasi TCGPlayer & Cardmarket dari Supabase Cloud.
+* **$M_{variant}$:** Pengali kelangkaan edisi khusus (Vintage sebelum tahun 2005: $+20\%$ s/d $+50\%$, Secret Rare/Promo: $+15\%$ s/d $+35\%$).
+* **$F_{condition}$:** Pengali kondisi fisik objektif dari Model 2 YOLOv8.
+* **$F_{market}$:** Atribut kondisi penjualan (Bahasa Inggris/Jepang vs Indonesia, kelengkapan Toploader/Sleeve).
 
 ---
 
 ## ⚡ Tolak Ukur Kuantitatif & Benchmark Komputasi
 
-Berikut adalah metrik performa operasional hasil tolak ukur empiris pada workstation pengembangan:
-
-| Parameter Evaluasi | Nilai Benchmark | Metodologi & Arsitektur Rekayasa |
+| Parameter Evaluasi | Nilai Benchmark | Catatan Implementasi |
 |---|:---:|---|
-| **Latensi Inferensi GPU** | **< 200 ms** | Akselerasi Tensor Core PyTorch (CUDA) pada workstation MSI Thin 15 |
-| **Latensi Inferensi CPU (Baseline)** | ~1.200 ms | Baseline PyTorch CPU inference tanpa akselerasi tensor |
-| **Dimensi Vektor Fitur** | **512 Dimensi** | Dense normalized visual semantic embeddings via OpenAI CLIP (ViT-B/32) |
-| **Skala Katalog Terindeks** | **20.617 Kartu** | Indeks pencarian kesamaan kosinus FAISS `IndexFlatIP` |
-| **Cakupan Re-Ranking ORB** | **Top-150 Kandidat** | Deteksi keypoint ORB + verifikasi homografi RANSAC (`Commit 7707151`) |
-| **Presisi Sinkronisasi Harga** | **Otomatis Harian** | Serverless GitHub Actions cron job mengeksekusi atomic SQL batch upserts |
+| **Latensi Inferensi GPU (RTX 2050)** | **~18 ms** | CUDA PyTorch Tensor Stream (`card_identifier_realtime.py`) |
+| **Latensi Inferensi CPU (Optimized)** | **~83 ms** | Single-View + In-Memory ORB Descriptor Caching |
+| **Pencarian Indeks Vektor FAISS** | **< 1 ms** | `IndexFlatIP` untuk 20.617 kartu (~42 MB RAM) |
+| **Frame Rate Kamera Live** | **30+ FPS** | Stabil berkat pemisahan *Asynchronous Worker Thread* |
+| **Dimensi Representasi Vektor** | **512 Dimensi** | $L_2$-Normalized Hypersphere Embeddings |
+| **Ukuran Dataset Katalog** | **20.617 Kartu** | Database resmi pokemontcg.io (1999–2024) |
+| **Sinkronisasi Harga Harian** | **Otomatis Harian** | GitHub Actions Cron Job mengupdate harga pasar ke Supabase |
 
 ---
 
-## 📊 Dataset, Metrik Pasar & Database Cloud
+## 📊 Dataset & Database Cloud Supabase
 
-REGOKEMON menggunakan master dataset yang telah melalui proses kurasi ketat (*data cleaning & image verification*):
-
-| Statistik Dataset | Nilai | Keterangan |
+| Entitas Data | Volume | Keterangan |
 |---|:---:|---|
-| **Total Kartu Bersih Siap Pakai** | **20.617 kartu** | Konsisten 1-to-1 antara Supabase, CSV, JSON, & File Gambar Fisik |
-| **Total Edisi Set (Expansions)** | **172 Set** | Base Set (1999) hingga ekspansi terbaru *30th Celebration* (2026) |
-| **Aset Master Gambar Mentah** | **20.617 file PNG** | Tersimpan di `backend/dataset/raw_images/` |
-| **Aset Gambar Terkompresi** | **20.617 file JPG** | Resolusi 640×640 Lanczos di `backend/dataset/compressed_images/` |
-| **Kartu Broken Links (Dieliminasi)** | **53 kartu (0,26%)** | Tautan mati CDN pokemontcg.io (tercatat di `broken_links_report.csv`) |
-| **Database Cloud Produksi** | **Supabase (PostgreSQL)** | 4 tabel: `sets`, `cards`, `card_prices`, `card_price_history` |
-| **Cakupan Harga Efektif Pasar** | **95,48% (19.686 kartu)** | Memiliki harga pasar gabungan TCGPlayer & Cardmarket |
-| **Median Harga Pasar Riil** | **$0,96 (~Rp14.880)** | 50% kartu Pokémon di pasar bernilai $\le$ $1 USD (*Right-Skewed*) |
-| **Kartu Termahal di Dataset** | **$4.500,00 (~Rp70 Juta)** | *Lugia - Aquapolis (Rare Secret)* |
+| **Katalog Kartu Bersih** | **20.617 baris** | Sinkron 1-to-1 di Supabase, CSV, dan JSON |
+| **Ekspansi Rilis (Sets)** | **172 Set** | Base Set (1999) hingga ekspansi modern |
+| **Gambar Terkompresi** | **20.617 JPG** | Resolusi 640×640 Lanczos di `backend/dataset/compressed_images/` |
+| **Tabel Supabase Cloud** | **4 Tabel Relasional** | `sets`, `cards`, `card_prices`, `card_price_history` |
+| **Cakupan Harga Efektif** | **95,48%** | 19.686 kartu memiliki data harga pasar aktif |
+| **Median Harga Pasar** | **$0,96 (~Rp14.880)** | 50% kartu Pokémon bernilai $\le$ $1 USD (*Right-Skewed*) |
 
 > [!TIP]
-> Rincian analisis statistik distribusi harga, kuartil ($Q_1, Q_3, P_{99}$), dan arsitektur data tersedia lengkap di:  
-> 📄 [`docs/dataset_summary_and_metrics.md`](docs/dataset_summary_and_metrics.md) dan [`docs/dataset_dictionary.md`](docs/dataset_dictionary.md).
-
----
-
-$$P_{\text{final}} = P_{\text{base}} \times M_{\text{variant}} \times F_{\text{condition}} \times F_{\text{market}}$$
-
-$$P_{\text{final}} = P_{\text{base}} \times M_{\text{variant}} \times F_{\text{condition}} \times F_{\text{market}}$$
-
-* **$P_{base}$ (Harga Dasar Pasar):** Diambil dari `effective_market_price` (kombinasi `tcgplayer.market` dan `cardmarket.avg30` dari database Supabase/CSV).
-* **$M_{variant}$ (Pengali Varian & Vintage):** 
-  * Vintage (Tahun rilis $< 2005$): Multiplier $+20\%$ hingga $+50\%$.
-  * Special Subtype / Edisi Khusus (Pikachu bertopi, Promo, VMAX, Secret Rare): Multiplier $+15\%$ s/d $+35\%$.
-* **$F_{condition}$ (Faktor Kondisi Fisik - Model 2 YOLOv8):**
-  * `Clean / Mint` = $1.00$ | `Scratched` = $0.85$ | `Edge Wear` = $0.80$ | `Bent / Crease` = $0.65$
-* **$F_{market}$ (Faktor Attributes Marketplace):**
-  * Bahasa: English/Japanese = $1.00$ | Bahasa Indonesia = $0.85$
-  * Proteksi: Loose = $1.00$ | In-Sleeve/Toploader = $1.05$ | Sealed Pack = $1.25$
+> Dokumentasi rinci mengenai variabel data, skema SQL, dan analisis statistik:
+> * 📄 [`docs/clip_model_architecture_and_rationale.md`](docs/clip_model_architecture_and_rationale.md) — Arsitektur & rasional ilmiah CLIP ViT-B-32.
+> * 📄 [`docs/dataset_dictionary.md`](docs/dataset_dictionary.md) — Kamus data 22 variabel CSV.
+> * 📄 [`docs/supabase_database_dictionary.md`](docs/supabase_database_dictionary.md) — Skema database PostgreSQL Supabase.
+> * 📄 [`docs/schema.sql`](docs/schema.sql) — Script DDL pembuatan tabel database.
 
 ---
 
@@ -133,130 +139,144 @@ $$P_{\text{final}} = P_{\text{base}} \times M_{\text{variant}} \times F_{\text{c
 pokemon-card-value-analytic-tool/
 ├── .github/
 │   └── workflows/
-│       └── daily_price_cron.yml          # GitHub Actions cron otomatis pelacak harga harian
+│       └── daily_price_cron.yml          # GitHub Actions cron pelacak harga harian otomatis
 │
 ├── backend/                              # Backend Python, Database, & CV Engine
-│   ├── app/                              # Modular REST API & Business Logic (FastAPI)
-│   │   ├── schemas.py                    # Validasi tipe data Pydantic (Request, Response, Pricing, Defect)
-│   │   ├── analytics_engine.py           # Mesin valuasi harga wajar w/ Formula Valuasi Dinamis & sinyal BUY/HOLD/SELL
-│   │   ├── cv_service.py                 # Jembatan CV in-memory (Model 1 CLIP 20.617 kartu + Model 2 YOLO)
-│   │   └── main.py                       # Entrypoint FastAPI Server (Endpoints /identify, /analyze, /health)
-│   ├── dataset/                          # Master Dataset & Berkas Citra
-│   │   ├── pokemon_cards_dataset_cleaned.csv  # CSV Bersih (20.617 baris, 22 kolom fitur)
-│   │   ├── pokemon_cards_dataset_cleaned.json # JSON Bersih (20.617 item)
-│   │   ├── broken_links_report.csv       # Laporan deterministik 53 tautan gambar mati
-│   │   ├── raw_images/                   # 20.617 gambar master PNG asli
+│   ├── app/                              # Modular REST API (FastAPI)
+│   │   ├── main.py                       # Server Entrypoint (/identify, /analyze, /cards, /sets)
+│   │   ├── cv_service.py                 # In-Memory Bridge (Model 1 CLIP + Model 2 YOLO)
+│   │   ├── analytics_engine.py           # Formula Valuasi Harga Wajar & Sinyal Transaksi
+│   │   └── schemas.py                    # Skema validasi Pydantic (Request, Response, Pricing)
+│   │
+│   ├── dataset/                          # Master Data & Asset Citra
+│   │   ├── pokemon_cards_dataset_cleaned.csv  # Dataset Bersih (20.617 baris, 22 kolom)
+│   │   ├── pokemon_cards_dataset_cleaned.json # Dataset JSON
 │   │   ├── compressed_images/            # 20.617 gambar JPG 640x640 terkompresi
 │   │   └── card-condition-dataset/       # Dataset Roboflow untuk pelatihan Model 2
-│   ├── models/                           # Engine Model 1 Resmi & Vektor Indeks
-│   │   ├── card_identifier.py            # Engine Model 1 (CLIP ViT-B/32 + FAISS + ORB)
-│   │   ├── card_identifier_oncam.py       # Pemindai kamera langsung (Webcam / IP Webcam HP)
-│   │   ├── card_identifier_manual.py     # Skrip pengujian foto manual dengan GUI File Explorer
-│   │   ├── build_card_index.py           # Skrip pembuat indeks FAISS resmi berbasis CLIP
-│   │   ├── card_embeddings.index         # Vektor index FAISS (512-dim, 20.617 kartu)
+│   │
+│   ├── models/                           # Model AI & Engine Identifikasi
+│   │   ├── card_identifier.py            # Engine Utama Model 1 (CLIP + FAISS + ORB + Sigmoid)
+│   │   ├── card_identifier_realtime.py   # Live Scanner HUD 30+ FPS (Asynchronous Worker Thread)
+│   │   ├── card_identifier_oncam.py      # Pemindai Snapshot Kamera Interaktif
+│   │   ├── card_identifier_manual.py     # Pengujian Foto Statis (GUI File Explorer / CLI)
+│   │   ├── card_condition_grader.py      # Engine Model 2 (Roboflow YOLOv8 Defect Detection)
+│   │   ├── build_card_index.py           # Generator Vektor Indeks FAISS resmi (CLIP ViT-B-32)
+│   │   ├── card_embeddings.index         # Binary Indeks FAISS (512-dim, 20.617 kartu, ~42 MB)
 │   │   ├── card_id_map.json              # Pemetaan indeks FAISS ke card_id resmi
-│   │   └── legacy_mobilenet/             # [Arsip] Baseline MobileNetV3 untuk komparasi
+│   │   └── legacy_mobilenet/             # [Arsip] Baseline MobileNetV3 untuk studi komparasi
+│   │
 │   ├── notebooks/                        # Eksplorasi Analisis Data (Jupyter Notebooks)
-│   │   ├── eda_research_tcg.ipynb        # Riset data, visualisasi sebaran & pemodelan
-│   │   └── valuation_analytics.ipynb     # Analisis mendalam valuasi & arbitrase pasar
-│   ├── clean_csv_broken_links.py         # Skrip filter validasi status HTTP tautan gambar
-│   ├── export_broken_links.py            # Skrip audit & ekspor kartu bertautan rusak
-│   ├── pokemon_cards_dataset_download.py # Skrip pengunduh paralel ribuan gambar master PNG
-│   ├── compress_images.py                # Skrip kompresi gambar paralel ke format JPG
-│   ├── json_to_csv.py                    # Skrip sinkronisasi & ekstraksi JSON mentah ke CSV
-│   ├── seed_supabase.py                  # Skrip seeding dataset bersih ke database Supabase
-│   ├── daily_price_tracker.py            # Engine sinkronisasi harga harian dari pokemontcg.io
-│   ├── .env.example                      # Template konfigurasi variabel lingkungan
-│   └── requirements.txt                  # Dependensi library Python backend
+│   │   ├── eda_research_tcg.ipynb        # Visualisasi distribusi data & pemodelan
+│   │   └── valuation_analytics.ipynb     # Analisis mendalam pasar & arbitrase harga
+│   │
+│   ├── seed_supabase.py                  # Seeding dataset bersih ke Supabase Cloud
+│   ├── daily_price_tracker.py            # Sinkronisasi harga harian dari pokemontcg.io
+│   ├── compress_images.py                # Kompresi paralel gambar ke format JPG Lanczos
+│   ├── requirements.txt                  # Dependensi Python Backend
+│   └── .env                              # Konfigurasi API Keys & CAMERA_SOURCE
 │
-├── frontend/                             # User Interface (React / Vite)
+├── frontend/                             # Single Page Application (React 18 + Vite)
 │   ├── src/
-│   │   ├── components/                   # Komponen UI (Scanner, PriceChart, SignalBadge)
-│   │   ├── App.jsx                       # Komponen Utama Dashboard Web
-│   │   └── main.jsx                      # Entrypoint React Client
-│   └── package.json                      # Dependensi Node.js frontend
+│   │   ├── components/
+│   │   │   ├── CatalogPage.jsx           # Katalog Interaktif 20.000+ kartu (Filter, Search, Sort)
+│   │   │   ├── ScannerDashboard.jsx      # Live Scanner Web UI (Webcam Feed & Valuasi Instan)
+│   │   │   ├── DashboardPage.jsx         # Analitika Data Pasar & Visualisasi Agregat
+│   │   │   ├── UploadPage.jsx            # Upload Foto Statis & Deteksi Cacat YOLOv8
+│   │   │   ├── HeroSection.jsx           # Banner Utama Interaktif
+│   │   │   └── Navbar.jsx                # Navigasi Global
+│   │   ├── App.jsx                       # Routing & State Manajer
+│   │   └── main.jsx                      # Entrypoint React
+│   └── package.json                      # Dependensi Node.js
 │
-├── docs/                                 # Dokumentasi Teknis & Kamus Data
-│   ├── dataset_summary_and_metrics.md    # Ringkasan eksekutif, statistik harga & metrik dataset
-│   ├── dataset_dictionary.md             # Kamus data & skema 22 variabel fitur dataset CSV
-│   ├── supabase_database_dictionary.md   # Skema relasional & kamus tabel Supabase Cloud
-│   └── schema.sql                        # Script SQL DDL pembuatan tabel database Supabase
-│
-├── .gitignore                            # Filter virtual env, index binary, & secret credentials
-└── README.md                             # Dokumentasi Utama Repositori GitHub
+├── docs/                                 # Dokumentasi Teknis Lengkap
+└── README.md                             # Dokumentasi Utama Proyek
 ```
 
 ---
 
-## 🚀 Panduan Penggunaan & Eksekusi
+## 🚀 Panduan Menjalankan Sistem
 
-### 1. Pemindaian Kartu Kamera Langsung (Live On-Cam)
-Mendukung webcam laptop maupun **Kamera HP (via IP Webcam)** yang didefinisikan di berkas `.env` (`CAMERA_SOURCE`):
-```bash
-python backend/models/card_identifier_oncam.py
-```
-* **Spasi / Klik:** Mengambil gambar (*capture*) pada kotak panduan.
-* **Q:** Keluar dari pemindai.
-
-### 2. Pengujian Foto Kartu Manual (Manual File Scanner)
-Dapat dijalankan secara interaktif dengan jendela File Explorer atau langsung lewat command line:
-```bash
-# Mode Interaktif (Jendela Dialog File Explorer):
-python backend/models/card_identifier_manual.py
-
-# Mode Otomatis dengan Validasi Kartu Target:
-python backend/models/card_identifier_manual.py path/foto_kartu.jpg --expected_card_id me55-15
-```
-
-### 3. Membangun Ulang Indeks Vektor CLIP (Saat Menambah Kartu)
-```bash
-python backend/models/build_card_index.py
-```
-
-### 4. Menjalankan Pelacak Harga Harian (Daily Price Tracker)
-```bash
-# Mengambil harga harian terbaru dari API dan menyimpannya ke Supabase:
-python backend/daily_price_tracker.py
-```
+### Persyaratan Awal:
+* **Python 3.10 – 3.12** dengan virtual environment terisolasi (`pokemon_env`).
+* **Node.js 18+** & npm.
+* Kamera laptop atau Kamera HP melalui aplikasi **DroidCam**.
 
 ---
 
-## 🌐 Menjalankan Full-Stack Application
+### 1. Menjalankan Live Scanner HUD (Real-Time 30+ FPS)
 
-### 1. Backend Server (FastAPI)
-```bash
+Mode ini adalah demonstrasi visual utama Model 1:
+```powershell
+# Jalankan dengan environment Python proyek:
+& "D:\pokemon_env\Scripts\python.exe" backend/models/card_identifier_realtime.py
+```
+* **Kamera HP (DroidCam):** Atur variabel `CAMERA_SOURCE=http://<IP_HP>:4747/video` di [backend/.env](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/.env).
+* **Webcam Laptop:** Atur `CAMERA_SOURCE=0` di [backend/.env](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/.env).
+* **Shortcut Keyboard saat HUD Berjalan:**
+  * `[Spasi]` : Freeze / Unfreeze frame pemindaian.
+  * `[M]` : Toggle mode Fullscreen.
+  * `[R]` : Rotasi orientasi tampilan (0° / 90° / 180° / 270°).
+  * `[F]` : Mengirim sinyal Autofokus ke kamera HP.
+  * `[Q]` : Keluar dari aplikasi.
+
+---
+
+### 2. Menjalankan Backend Server (FastAPI)
+
+```powershell
 cd backend
-python -m venv .venv
-
-# Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# Linux / macOS:
-source .venv/bin/activate
-
-pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --port 8000
+& "D:\pokemon_env\Scripts\python.exe" -m uvicorn app.main:app --reload --port 8000
 ```
-* **Status Server:** Berjalan di `http://127.0.0.1:8000`
-* **Dokumentasi Interaktif (Swagger UI):** Kunjungi `http://127.0.0.1:8000/docs` di browser untuk menguji API secara langsung.
-* **Endpoint Tersedia:**
-  * `POST /identify`: Khusus On-Cam (eksekusi cepat Model 1 CLIP sub-200ms).
-  * `POST /analyze`: Khusus Upload Foto Statis (Model 1 + Model 2 YOLO Condition Grader & Valuasi Harga Akhir).
-  * `GET  /health`: Healthcheck untuk Docker & cloud monitoring.
+* Server berjalan di: `http://127.0.0.1:8000`
+* Dokumentasi Interaktif (Swagger UI): `http://127.0.0.1:8000/docs`
+* **Endpoints Utama:**
+  * `POST /identify` : Identifikasi cepat Model 1 (Base64 citra kamera).
+  * `POST /analyze` : Analisis lengkap citra statis (Model 1 + Model 2 YOLOv8).
+  * `GET  /cards` : Katalog kartu Pokémon (mendukung parameter `search`, `supertype`, `rarity`, `set_id`, `sort_by`, `page`, `limit`).
+  * `GET  /sets` : Daftar seluruh set kartu untuk filter dropdown.
+  * `GET  /cards/{card_id}/history` : Riwayat tren harga harian untuk grafik pasar.
+  * `GET  /health` : Healthcheck status server.
 
-### 2. Frontend Dashboard (React / Vite)
-```bash
+---
+
+### 3. Menjalankan Frontend Web Portal (React + Vite)
+
+Buka terminal baru:
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
-*(Frontend berjalan di `http://localhost:5173`)*
+Buka browser di: **`http://localhost:5173`**
+* **Navigasi Halaman:**
+  * **CATALOG (`#catalog`):** Eksplorasi 20.000+ kartu lengkap dengan foto, nama, nomor set, dan harga pasar wajar.
+  * **DASHBOARD (`#dashboard`):** Pindai kartu langsung melalui browser menggunakan webcam, visualisasikan grafik pergerakan harga historis, dan terima rekomendasi transaksi (BUY/HOLD/SELL).
+  * **UPLOAD / INSPECT:** Unggah berkas foto kartu dari galeri untuk analisis cacat fisik komprehensif.
+
+---
+
+### 4. Pengujian Model & Skrip Tambahan
+
+* **Uji Foto Manual (GUI File Explorer):**
+  ```powershell
+  & "D:\pokemon_env\Scripts\python.exe" backend/models/card_identifier_manual.py
+  ```
+* **Membangun Ulang Indeks Vektor FAISS:**
+  ```powershell
+  & "D:\pokemon_env\Scripts\python.exe" backend/models/build_card_index.py
+  ```
+* **Jalankan Pelacak Harga Harian:**
+  ```powershell
+  & "D:\pokemon_env\Scripts\python.exe" backend/daily_price_tracker.py
+  ```
 
 ---
 
 ## 📜 Lisensi & Atribusi
 
-* **Dataset Metadata & Harga Pasar:** [pokemontcg.io API](https://pokemontcg.io/)
-* **Vision Backbone (Model 1):** [OpenAI CLIP (OpenCLIP)](https://github.com/mlfoundations/open_clip)
-* **Dataset Kondisi Kartu (Model 2):** [Roboflow Universe — Card Grader](https://universe.roboflow.com/group-6-major-project/card-grader)
-* **Vector Search Engine:** [Meta AI FAISS](https://github.com/facebookresearch/faiss)
+* **Metadata Kartu & Harga Pasar:** [pokemontcg.io REST API](https://pokemontcg.io/)
+* **Vision Transformer Backbone (Model 1):** [OpenAI CLIP (OpenCLIP)](https://github.com/mlfoundations/open_clip)
+* **Dataset Cacat Fisik (Model 2):** [Roboflow Universe — Card Grader](https://universe.roboflow.com/group-6-major-project/card-grader)
+* **Dataset Referensi Tambahan (Model 2):** [GemSnipe Pokemon Centering Measurements](https://gemsnipe.com/) (Open-Source CC BY 4.0 via Contributor Issue #1)
+* **Vector Retrieval Engine:** [Meta AI FAISS](https://github.com/facebookresearch/faiss)
 * **Cloud Database:** [Supabase PostgreSQL](https://supabase.com/)
