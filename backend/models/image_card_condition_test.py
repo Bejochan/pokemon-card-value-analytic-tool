@@ -138,62 +138,48 @@ def _aspect_ok(rect, tol=0.20):
     return None
 
 
-def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray | None:
-    h_img, w_img = image_np.shape[:2]
+def _find_best_card_contour(binary_mask: np.ndarray, w_img: int, h_img: int) -> tuple | None:
     frame_area = h_img * w_img
-    min_area = 0.05 * frame_area
-    max_area = 0.92 * frame_area
+    min_area = 0.20 * frame_area
+    max_area = 0.95 * frame_area
     border_margin = 2
     max_sides_touch = 3
     solidity_thresh = 0.40
-    extent_thresh = 0.75
+    extent_thresh = 0.70
 
-    gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
-
-    # Otsu-based segmentation
-    # Blur sangat agresif untuk mematikan total tekstur bg
-    blurred = cv2.GaussianBlur(gray, (51, 51), 0)
-    # Otsu otomatis cari threshold optimal antara kartu vs bg
-    _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    # Morphology untuk tutup gap dan buang noise kecil
-    kernel_close = np.ones((25, 25), np.uint8)
-    kernel_open  = np.ones((15, 15), np.uint8)
-    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_close, iterations=3)
-    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN,  kernel_open,  iterations=2)
-
-    # Pakai binary mask sebagai sumber kontur, bukan edges
-    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    best = None
-
+    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
 
     candidates = []
     for c in contours:
+        hull = cv2.convexHull(c)
+        hull_area = cv2.contourArea(hull)
         area = cv2.contourArea(c)
-        if area < min_area or area > max_area:
+        effective_area = max(area, hull_area)
+        if effective_area < min_area or effective_area > max_area:
             continue
-        x, y, w, h = cv2.boundingRect(c)
+
+        x, y, w, h = cv2.boundingRect(hull)
         sides_touched = sum([
             x <= border_margin, y <= border_margin,
             x + w >= w_img - border_margin, y + h >= h_img - border_margin
         ])
         if sides_touched > max_sides_touch:
             continue
-        hull = cv2.convexHull(c)
-        hull_area = cv2.contourArea(hull)
+
         solidity = area / hull_area if hull_area > 0 else 0
-        if solidity < solidity_thresh:
+        if solidity < solidity_thresh and hull_area < min_area:
             continue
-        candidates.append((area, c))
+        candidates.append((effective_area, c, hull))
 
     if not candidates:
         return None
 
     candidates.sort(key=lambda t: t[0], reverse=True)
+    best = None
 
-    for area, c in candidates[:5]:
+    for effective_area, c, hull in candidates[:5]:
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.02 * peri, True)
 
@@ -201,7 +187,6 @@ def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray
         if len(approx) == 4 and cv2.isContourConvex(approx):
             rect = _order_points(approx)
         else:
-            hull = cv2.convexHull(c)
             hull_peri = cv2.arcLength(hull, True)
             for eps_factor in (0.02, 0.03, 0.05, 0.08):
                 hull_approx = cv2.approxPolyDP(hull, eps_factor * hull_peri, True)
@@ -210,28 +195,93 @@ def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray
                     break
 
         if rect is None:
-            min_rect = cv2.minAreaRect(c)
+            min_rect = cv2.minAreaRect(hull)
             (rw, rh) = min_rect[1]
             rect_area = rw * rh
-            extent = (area / rect_area) if rect_area > 0 else 0
+            extent = (effective_area / rect_area) if rect_area > 0 else 0
             if extent < extent_thresh:
                 continue
             box = cv2.boxPoints(min_rect)
             rect = _order_points(box)
 
-        orientation = _aspect_ok(rect)
+        orientation = _aspect_ok(rect, tol=0.22)
         if orientation is None:
             continue
 
-        if best is None or area > best[0]:
-            best = (area, rect, orientation)
+        if best is None or effective_area > best[0]:
+            best = (effective_area, rect, orientation)
+
+    return best
+
+
+def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray | None:
+    h_img, w_img = image_np.shape[:2]
+    gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
+
+    # Cek rata-rata kecerahan di pinggir frame untuk mengetahui warna background (gelap vs terang)
+    edge_strip = np.concatenate([
+        gray[:15, :].ravel(), gray[-15:, :].ravel(),
+        gray[:, :15].ravel(), gray[:, -15:].ravel()
+    ])
+    is_bright_bg = np.mean(edge_strip) >= 100
+
+    smooth = cv2.bilateralFilter(gray, 9, 60, 60)
+    clahe_edge = cv2.createCLAHE(2.0, (8, 8)).apply(smooth)
+    edges = cv2.Canny(clahe_edge, 30, 100)
+    edges_closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, np.ones((21, 21), np.uint8), iterations=2)
+
+    if not is_bright_bg:
+        # Background gelap (contoh: foto HP di atas kain hitam) -> pakai Otsu Normal
+        blurred = cv2.GaussianBlur(gray, (51, 51), 0)
+        kernel_close = np.ones((25, 25), np.uint8)
+        kernel_open  = np.ones((15, 15), np.uint8)
+        _, bin_norm = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        bin_norm = cv2.morphologyEx(bin_norm, cv2.MORPH_CLOSE, kernel_close, iterations=3)
+        bin_norm = cv2.morphologyEx(bin_norm, cv2.MORPH_OPEN,  kernel_open,  iterations=2)
+        masks_to_try = [bin_norm, edges_closed]
+    else:
+        # Background terang/putih (contoh: foto kamera Canon di atas meja putih) ->
+        # prioritaskan Canny Edge yang presisi di tepi kartu, lalu Otsu Inverse dengan blur ringan
+        blurred_light = cv2.GaussianBlur(gray, (15, 15), 0)
+        _, bin_inv = cv2.threshold(blurred_light, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        bin_inv = cv2.morphologyEx(bin_inv, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8), iterations=2)
+        masks_to_try = [edges_closed, bin_inv]
+
+    best = None
+    for mask in masks_to_try:
+        cand = _find_best_card_contour(mask, w_img, h_img)
+        if cand is not None and cand[0] >= 0.35 * (w_img * h_img):
+            best = cand
+            break
+        if cand is not None and (best is None or cand[0] > best[0]):
+            best = cand
+
+    # Fallback ke deteksi kelas 'Card' dari YOLOv8 jika semua kontur OpenCV gagal
+    if best is None:
+        try:
+            yolo_res = defect_model.predict(image_np, conf=0.15, verbose=False)[0]
+            card_boxes = []
+            for box in yolo_res.boxes:
+                cls_name = yolo_res.names[int(box.cls[0])]
+                if cls_name == "Card":
+                    card_boxes.append((float(box.conf[0]), box.xyxy[0].tolist()))
+            if card_boxes:
+                card_boxes.sort(key=lambda x: x[0], reverse=True)
+                _, (x1, y1, x2, y2) = card_boxes[0]
+                pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype="float32")
+                rect = _order_points(pts)
+                orientation = "landscape" if (x2 - x1) > (y2 - y1) else "portrait"
+                best = ((x2 - x1) * (y2 - y1), rect, orientation)
+                print("[*] Kartu dideteksi menggunakan fallback YOLOv8 ('Card' class).")
+        except Exception:
+            pass
 
     if best is None:
         return None
 
     _, rect, orientation = best
     width, height = out_size
-    margin = 120  # Margin 120 piksel agar background terlihat sangat luas dan tidak mepet
+    margin = 120
 
     out_w = width + 2 * margin
     out_h = height + 2 * margin
@@ -246,16 +296,27 @@ def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray
         M = cv2.getPerspectiveTransform(rect, dst)
         warped = cv2.warpPerspective(image_np, M, (out_h, out_w), flags=cv2.INTER_CUBIC)
         warped = cv2.rotate(warped, cv2.ROTATE_90_CLOCKWISE)
-        return warped
+    else:
+        dst = np.array([
+            [margin, margin], 
+            [margin + width - 1, margin], 
+            [margin + width - 1, margin + height - 1], 
+            [margin, margin + height - 1]
+        ], dtype="float32")
+        M = cv2.getPerspectiveTransform(rect, dst)
+        warped = cv2.warpPerspective(image_np, M, (out_w, out_h), flags=cv2.INTER_CUBIC)
 
-    dst = np.array([
-        [margin, margin], 
-        [margin + width - 1, margin], 
-        [margin + width - 1, margin + height - 1], 
-        [margin, margin + height - 1]
-    ], dtype="float32")
-    M = cv2.getPerspectiveTransform(rect, dst)
-    return cv2.warpPerspective(image_np, M, (out_w, out_h), flags=cv2.INTER_CUBIC)
+    # Jika foto diambil di atas background putih/terang, gelapkan area margin di luar kartu
+    # agar model YOLO tidak menganggap margin putih sebagai bagian kartu dan bisa melihat
+    # bercak putih Corner/Edge Wear di pinggir kartu.
+    if is_bright_bg:
+        pad = 5
+        card_mask = np.zeros(warped.shape[:2], dtype=np.uint8)
+        card_mask[margin - pad : margin + height + pad, margin - pad : margin + width + pad] = 255
+        warped[card_mask == 0] = (20, 20, 22)
+
+    return warped
+
 
 
 def get_yolo_predictions(image: np.ndarray) -> dict | None:
@@ -390,11 +451,14 @@ def process_side(image_path: str, side_label: str,
     gray = cv2.cvtColor(cropped_card, cv2.COLOR_BGR2GRAY)
     score = sharpness_score(gray)
     print(f"[*] Skor ketajaman: {score:.1f} (ambang: {SHARPNESS_THRESHOLD:.0f})")
+    work_image = cropped_card.copy()
     if score < SHARPNESS_THRESHOLD:
-        print(f"[!] Gambar {side_label} agak blur — menerapkan preprocessing tambahan...")
+        print(f"[!] Gambar {side_label} agak soft/blur — menerapkan unsharp masking tambahan...")
+        blurred_usm = cv2.GaussianBlur(work_image, (0, 0), 2.0)
+        work_image = cv2.addWeighted(work_image, 1.5, blurred_usm, -0.5, 0)
 
-    # Terapkan CLAHE untuk meningkatkan kontras sebelum dikirim ke API
-    lab = cv2.cvtColor(cropped_card, cv2.COLOR_BGR2LAB)
+    # Terapkan CLAHE untuk meningkatkan kontras sebelum dikirim ke model
+    lab = cv2.cvtColor(work_image, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
     clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
     enhanced = cv2.merge((clahe.apply(l), a, b))
@@ -409,8 +473,8 @@ def process_side(image_path: str, side_label: str,
     raw_preds = result.get("predictions", [])
     detections = classify_defect_severity(raw_preds, low_thresh, high_thresh)
     detections = nms(detections)
-    h, w = cropped_card.shape[:2]
-    detections = filter_edge_detections(detections, w, h, border_ratio=0.25)
+    # h, w = cropped_card.shape[:2]
+    # detections = filter_edge_detections(detections, w, h, border_ratio=0.25)
     print_side_summary(side_label, detections)
 
     annotated = draw_detections(cropped_card, detections)
