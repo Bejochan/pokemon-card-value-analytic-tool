@@ -76,10 +76,13 @@ def summarize(records, temperature, top_k):
     return stats
 
 
+DEFAULT_VAL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dataset", "val_samples"))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--val_dir", required=True,
-                         help="Folder berisi foto validasi, nama file: <card_id>__apa_saja.ext")
+    parser.add_argument("--val_dir", default=DEFAULT_VAL_DIR,
+                         help=f"Folder berisi foto validasi (default: {DEFAULT_VAL_DIR})")
     parser.add_argument("--top_k", type=int, default=5)
     parser.add_argument("--temperatures", nargs="+", type=float,
                          default=[0.03, 0.05, 0.06, 0.08, 0.10, 0.15, 0.20])
