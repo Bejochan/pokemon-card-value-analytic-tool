@@ -28,6 +28,7 @@ venv.bak/
 *.engine
 *.bin
 *.pkl
+*.joblib
 *.tmp
 pokemon-cards/
 # Scratch & Debug Testing Files
