@@ -85,7 +85,7 @@ def main():
                          help=f"Folder berisi foto validasi (default: {DEFAULT_VAL_DIR})")
     parser.add_argument("--top_k", type=int, default=5)
     parser.add_argument("--temperatures", nargs="+", type=float,
-                         default=[0.03, 0.05, 0.06, 0.08, 0.10, 0.15, 0.20])
+                         default=[0.005, 0.01, 0.03, 0.05, 0.08, 0.10, 0.20])
     parser.add_argument("--target_correct_conf", type=float, default=92.0,
                          help="Target rata-rata confidence untuk tebakan benar (default: 92%)")
     args = parser.parse_args()
