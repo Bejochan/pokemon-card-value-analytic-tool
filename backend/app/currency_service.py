@@ -3,7 +3,7 @@ backend/app/currency_service.py
 ================================
 Layanan Konversi Mata Uang Otomatis (USD -> IDR) Real-Time untuk Regokemon:
 1. Menarik data kurs valuta asing live dari API publik gratis (open.er-api.com).
-2. Menerapkan In-Memory Cache (TTL 6 jam) agar performa API tetap sub-milidetik (0 ms)
+2. Menerapkan In-Memory Cache (TTL 1 minggu / 7 hari) agar performa API tetap sub-milidetik (0 ms)
    dan tidak melakukan request berulang-ulang ke internet setiap kali ada user membuka web.
 3. Dilengkapi sistem Fallback aman jika koneksi internet terputus atau API pihak ketiga lambat.
 """
@@ -16,8 +16,8 @@ from typing import Dict, Any, Optional
 # Kurs fallback jika internet mati total atau API kurs luar down
 FALLBACK_USD_TO_IDR: float = float(os.getenv("DEFAULT_USD_TO_IDR", "16500.0"))
 
-# Waktu kedaluwarsa cache (6 jam = 21.600 detik)
-CACHE_TTL_SECONDS: float = 6 * 3600.0
+# Waktu kedaluwarsa cache (1 minggu = 7 hari = 604.800 detik)
+CACHE_TTL_SECONDS: float = 7 * 24 * 3600.0
 
 # Penyimpanan cache in-memory
 _cached_rate: Optional[float] = None
@@ -62,7 +62,7 @@ def fetch_live_usd_to_idr() -> Optional[float]:
 def get_usd_to_idr_rate() -> float:
     """
     Mengambil kurs USD ke IDR saat ini:
-    - Jika cache masih segar (< 6 jam), langsung kembalikan dari memori RAM (0 ms).
+    - Jika cache masih segar (< 1 minggu / 7 hari), langsung kembalikan dari memori RAM (0 ms).
     - Jika cache sudah kedaluwarsa, ambil nilai terbaru dari internet.
     - Jika internet gagal, gunakan cache terakhir atau nilai fallback yang aman.
     """

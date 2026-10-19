@@ -13,6 +13,8 @@ function CatalogPage() {
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [selectedSupertype, setSelectedSupertype] = useState('all');
+  const [selectedRarity, setSelectedRarity] = useState('all');
+  const [selectedHolo, setSelectedHolo] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
 
   // Set Selector
@@ -22,11 +24,11 @@ function CatalogPage() {
   ]);
   const [activeSet, setActiveSet] = useState({ set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' });
 
-  // 1. Ambil daftar Sets secara dinamis dari backend
+  // 1. Ambil daftar Sets secara dinamis dari backend (kronologis rilis terbaru ke lama)
   useEffect(() => {
     const fetchSets = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/sets?limit=30');
+        const response = await fetch('http://127.0.0.1:8000/sets?limit=150');
         if (response.ok) {
           const sets = await response.json();
           if (Array.isArray(sets) && sets.length > 0) {
@@ -40,9 +42,12 @@ function CatalogPage() {
                 } else if (sNameLower.includes('ascended')) {
                   logoPath = '/ascended-heroes-logo.png';
                 }
+                const yearStr = s.release_year ? ` (${s.release_year})` : '';
                 return {
                   set_id: s.set_id,
-                  name: s.name,
+                  name: `${s.name}${yearStr}`,
+                  raw_name: s.name,
+                  release_date: s.release_date,
                   logo: logoPath
                 };
               })
@@ -68,6 +73,8 @@ function CatalogPage() {
 
       if (activeSearch.trim()) params.append('search', activeSearch.trim());
       if (selectedSupertype !== 'all') params.append('supertype', selectedSupertype);
+      if (selectedRarity !== 'all') params.append('rarity', selectedRarity);
+      if (selectedHolo !== 'all') params.append('holo', selectedHolo);
       if (activeSet.set_id !== 'all') params.append('set_id', activeSet.set_id);
       if (sortBy) params.append('sort_by', sortBy);
 
@@ -99,7 +106,7 @@ function CatalogPage() {
   // Re-fetch saat filter / search / sort / set berubah
   useEffect(() => {
     fetchCards(page);
-  }, [page, activeSearch, selectedSupertype, activeSet, sortBy]);
+  }, [page, activeSearch, selectedSupertype, selectedRarity, selectedHolo, activeSet, sortBy]);
 
   // Handler Submit Pencarian
   const handleSearchSubmit = (e) => {
@@ -112,6 +119,23 @@ function CatalogPage() {
     setPage(1);
     setSelectedSupertype(prev => prev === type ? 'all' : type);
   };
+
+  const handleResetFilters = () => {
+    setSelectedSupertype('all');
+    setSelectedRarity('all');
+    setSelectedHolo('all');
+    setActiveSet({ set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' });
+    setSearchInput('');
+    setActiveSearch('');
+    setPage(1);
+  };
+
+  const isAnyFilterActive = 
+    selectedSupertype !== 'all' || 
+    selectedRarity !== 'all' || 
+    selectedHolo !== 'all' || 
+    activeSet.set_id !== 'all' || 
+    activeSearch.trim() !== '';
 
   return (
     <div className="catalog-container">
@@ -193,36 +217,71 @@ function CatalogPage() {
                 onChange={() => handleSupertypeChange('Energy')} 
               /> Energy
             </label>
-            {selectedSupertype !== 'all' && (
+
+            <select 
+              className="filter-select"
+              value={selectedRarity}
+              onChange={(e) => {
+                setSelectedRarity(e.target.value);
+                setPage(1);
+              }}
+              title="Filter Tingkat Kelangkaan (Rarity)"
+            >
+              <option value="all">Semua Rarity</option>
+              <option value="Common">Common</option>
+              <option value="Uncommon">Uncommon</option>
+              <option value="Rare">Rare</option>
+              <option value="Ultra">Ultra / Secret Rare</option>
+            </select>
+
+            <select 
+              className="filter-select"
+              value={selectedHolo}
+              onChange={(e) => {
+                setSelectedHolo(e.target.value);
+                setPage(1);
+              }}
+              title="Filter Efek Foil"
+            >
+              <option value="all">Semua Foil</option>
+              <option value="holo">✨ Holo Only</option>
+              <option value="non_holo">Normal Print</option>
+            </select>
+
+            {isAnyFilterActive && (
               <button 
                 className="reset-filter-btn" 
-                onClick={() => setSelectedSupertype('all')}
+                onClick={handleResetFilters}
+                title="Reset Semua Filter"
               >
-                Reset
+                ✕ Reset
               </button>
             )}
           </div>
 
-          <div className="catalog-count-info">
-            Menampilkan <strong>{cardsData.length}</strong> dari <strong>{totalCards.toLocaleString('id-ID')}</strong> kartu
-          </div>
+          <div className="filter-right-controls">
+            <div className="catalog-count-info">
+              Menampilkan <strong>{cardsData.length}</strong> dari <strong>{totalCards.toLocaleString('id-ID')}</strong> kartu
+            </div>
 
-          <div className="sort-group">
-            <span className="filter-label">Sort by:</span>
-            <select 
-              className="sort-dropdown"
-              value={sortBy}
-              onChange={(e) => {
-                setSortBy(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="newest">Default / Rilis</option>
-              <option value="name_asc">Nama (A - Z)</option>
-              <option value="name_desc">Nama (Z - A)</option>
-              <option value="price_desc">Harga Tertinggi</option>
-              <option value="price_asc">Harga Terendah</option>
-            </select>
+            <div className="sort-group">
+              <span className="filter-label">Sort by:</span>
+              <select 
+                className="sort-dropdown"
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="newest">Rilis: Terbaru ke Lama</option>
+                <option value="oldest">Rilis: Terlama ke Baru</option>
+                <option value="price_desc">Harga Tertinggi</option>
+                <option value="price_asc">Harga Terendah</option>
+                <option value="name_asc">Nama (A - Z)</option>
+                <option value="name_desc">Nama (Z - A)</option>
+              </select>
+            </div>
           </div>
         </div>
 
