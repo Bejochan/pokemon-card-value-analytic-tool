@@ -265,13 +265,14 @@ def get_cards(
     search: Optional[str] = None,
     supertype: Optional[str] = None,
     rarity: Optional[str] = None,
+    holo: Optional[str] = None,
     set_id: Optional[str] = None,
     sort_by: Optional[str] = "newest"
 ):
     """
     Endpoint fleksibel untuk Halaman Katalog:
-    Mendukung pagination, pencarian nama kartu, filter supertype/rarity/set,
-    serta pengurutan harga/nama.
+    Mendukung pagination, pencarian nama kartu, filter supertype/rarity/holo/set,
+    serta pengurutan harga/nama/rilis.
     """
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_key = os.getenv("SUPABASE_KEY", "")
@@ -287,7 +288,7 @@ def get_cards(
     # Susun query PostgREST Supabase
     url_parts = [
         f"{supabase_url}/rest/v1/cards",
-        "?select=card_id,name,supertype,rarity,image_small,sets(set_id,name),card_prices(effective_market_price)",
+        "?select=card_id,name,supertype,rarity,image_small,sets(set_id,name,release_date),card_prices(effective_market_price)",
         f"&limit={safe_limit}",
         f"&offset={offset}"
     ]
@@ -307,13 +308,28 @@ def get_cards(
         clean_rarity = rarity.strip()
         url_parts.append(f"&rarity=ilike.*{clean_rarity}*")
 
+    # Filter Holo
+    if holo and holo.strip() and holo.lower() != "all":
+        if holo.lower() == "holo":
+            url_parts.append("&rarity=ilike.*Holo*")
+        elif holo.lower() == "non_holo":
+            url_parts.append("&rarity=not.ilike.*Holo*")
+
     # Filter Set ID
     if set_id and set_id.strip() and set_id.lower() != "all":
         clean_set = set_id.strip()
         url_parts.append(f"&set_id=eq.{clean_set}")
 
-    # Pengurutan
-    if sort_by == "name_asc":
+    # Pengurutan Kronologis Rilis & Harga
+    if sort_by in ("newest", "release_desc"):
+        url_parts.append("&order=sets(release_date).desc.nullslast,name.asc")
+    elif sort_by in ("oldest", "release_asc"):
+        url_parts.append("&order=sets(release_date).asc.nullslast,name.asc")
+    elif sort_by == "price_desc":
+        url_parts.append("&order=card_prices(effective_market_price).desc.nullslast,name.asc")
+    elif sort_by == "price_asc":
+        url_parts.append("&order=card_prices(effective_market_price).asc.nullslast,name.asc")
+    elif sort_by == "name_asc":
         url_parts.append("&order=name.asc")
     elif sort_by == "name_desc":
         url_parts.append("&order=name.desc")
@@ -410,15 +426,16 @@ def get_cards(
 
 
 @app.get("/sets")
-def get_sets(limit: int = 50):
+def get_sets(limit: int = 150):
     """
-    Mengambil daftar Set Pokémon dari Supabase untuk dropdown filter katalog.
+    Mengambil daftar Set Pokémon dari Supabase untuk dropdown filter katalog,
+    diurutkan secara kronologis dari set rilis paling baru ke lawas.
     """
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_key = os.getenv("SUPABASE_KEY", "")
     if not supabase_url or not supabase_key:
         return []
-    url = f"{supabase_url}/rest/v1/sets?select=set_id,name,series&limit={limit}&order=name.asc"
+    url = f"{supabase_url}/rest/v1/sets?select=set_id,name,series,release_date,release_year&limit={limit}&order=release_date.desc.nullslast"
     headers = {
         "apikey": supabase_key,
         "Authorization": f"Bearer {supabase_key}"
@@ -471,7 +488,7 @@ def get_card_forecast(card_id: str):
 
 
 @app.post("/cards/{card_id}/condition", response_model=CardConditionResponse)
-async def evaluate_card_condition_base64(card_id: str, data: CardConditionRequest):
+def evaluate_card_condition_base64(card_id: str, data: CardConditionRequest):
     """
     Endpoint Penilaian Kondisi Fisik Kartu (Card Condition Model via Base64).
     Mendukung upload foto tampak depan (front_image) dan tampak belakang (back_image).
