@@ -3,7 +3,7 @@ backend/app/cv_service.py
 =========================
 Layanan Computer Vision (CV Service) untuk Regokemon:
 1. Memuat dan mengelola Model 1 (OpenAI CLIP ViT-B-32 + FAISS Index 20.617 kartu).
-2. Menghubungkan Model 2 (Roboflow YOLOv8 Condition Grader) untuk deteksi cacat fisik.
+2. Menghubungkan Model 2 (Local YOLOv8 Condition Grader & Roboflow fallback) untuk deteksi cacat fisik depan & belakang.
 3. Mendekode gambar Base64 / Bytes murni di memori RAM tanpa I/O file sampah di disk.
 """
 
@@ -23,6 +23,27 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+# Inisialisasi awal PyTorch di Windows sebelum modul OpenCV/NumPy dimuat
+try:
+    import torch
+except Exception:
+    pass
+    # Pastikan dependensi DLL PyTorch (c10.dll, libiomp5md.dll) dapat ditemukan di Windows
+    try:
+        torch_lib = os.path.join(sys.prefix, "Lib", "site-packages", "torch", "lib")
+        if os.path.exists(torch_lib):
+            if hasattr(os, "add_dll_directory"):
+                os.add_dll_directory(torch_lib)
+            os.environ["PATH"] = torch_lib + os.pathsep + os.environ.get("PATH", "")
+    except Exception:
+        pass
+
+# Inisialisasi awal PyTorch di Windows sebelum modul OpenCV/NumPy dimuat
+try:
+    import torch
+except Exception:
+    pass
+
 from app.analytics_engine import evaluate_card_valuation, DEFAULT_USD_TO_IDR
 from app.currency_service import get_usd_to_idr_rate, convert_usd_to_idr
 
@@ -31,8 +52,8 @@ from app.currency_service import get_usd_to_idr_rate, convert_usd_to_idr
 # INISIALISASI MODEL VISION SINGLETON (LAZY LOADING)
 # =====================================================================
 
-# Inisialisasi awal hanya bernilai None (RAM & GPU belum terpakai saat startup)
 _card_identifier = None
+_defect_model = None
 
 def get_card_identifier():
     """
@@ -50,6 +71,30 @@ def get_card_identifier():
             print(f"[ERROR] [CV Service] Gagal memuat Model 1 AI Engine: {e}")
             return None
     return _card_identifier
+
+
+def get_defect_model():
+    """
+    Mengambil instance model YOLOv8 Condition Grader lokal secara Lazy.
+    Menggunakan model 'best-model-v5-card-condition.pt' yang sudah dilatih secara lokal.
+    """
+    global _defect_model
+    if _defect_model is None:
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            backend_dir = os.path.dirname(current_dir)
+            model_path = os.path.join(backend_dir, "models", "best-model-v5-card-condition.pt")
+            if os.path.exists(model_path):
+                from ultralytics import YOLO
+                _defect_model = YOLO(model_path)
+                print(f"[OK] [CV Service] Model 2 YOLOv8 Condition Grader lokal berhasil dimuat dari {model_path}")
+            else:
+                print(f"[WARN] [CV Service] File model lokal tidak ditemukan di: {model_path}")
+        except Exception as e:
+            print(f"[WARN] [CV Service] Gagal memuat Model 2 YOLO lokal: {e}")
+            return None
+    return _defect_model
+
 
 ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY", "")
 ROBOFLOW_CONFIDENCE = int(os.getenv("ROBOFLOW_CONFIDENCE", "80"))
@@ -82,7 +127,9 @@ def decode_base64_to_cv2(image_b64: str) -> Tuple[Optional[np.ndarray], Optional
     Mengembalikan (img_bgr, clean_base64_string).
     """
     try:
-        # Bersihkan prefix data URL jika ada (e.g., 'data:image/jpeg;base64,...')
+        if not image_b64:
+            return None, None
+            
         if "," in image_b64:
             clean_b64 = image_b64.split(",")[1].strip()
         else:
@@ -104,6 +151,9 @@ def decode_base64_to_cv2(image_b64: str) -> Tuple[Optional[np.ndarray], Optional
 def decode_bytes_to_cv2(image_bytes: bytes) -> Tuple[Optional[np.ndarray], Optional[str]]:
     """Mendekode raw bytes menjadi gambar OpenCV BGR di RAM."""
     try:
+        if not image_bytes:
+            return None, None
+            
         img_arr = np.frombuffer(image_bytes, np.uint8)
         img_bgr = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
         clean_b64 = base64.b64encode(image_bytes).decode("utf-8")
@@ -114,16 +164,50 @@ def decode_bytes_to_cv2(image_bytes: bytes) -> Tuple[Optional[np.ndarray], Optio
 
 
 # =====================================================================
-# PEMANGGILAN MODEL 2 (ROBOFLOW CONDITION GRADER) DI RAM
+# DETEKSI CACAT FISIK KARTU (MODEL 2 YOLO LOKAL & ROBOFLOW FALLBACK)
 # =====================================================================
+
+def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.15) -> List[Dict[str, Any]]:
+    """
+    Mendeteksi cacat fisik (Corner Wear, Edge Wear, Scratch) menggunakan Model 2 YOLO lokal.
+    Mengabaikan bounding box kartu itu sendiri ('Card').
+    """
+    model = get_defect_model()
+    if model is None or img_bgr is None:
+        return []
+
+    try:
+        results = model.predict(img_bgr, conf=conf_threshold, verbose=False)
+        result = results[0]
+        defects = []
+        for box in result.boxes:
+            cls_name = result.names[int(box.cls[0])]
+            if cls_name == "Card":
+                continue  # 'Card' adalah deteksi kontur kartu, bukan cacat fisik
+
+            cx, cy, w, h = box.xywh[0].tolist()
+            conf = float(box.conf[0])
+            defects.append({
+                "label": cls_name,
+                "confidence": round(conf, 2),
+                "bbox": {
+                    "x": round(cx, 1),
+                    "y": round(cy, 1),
+                    "width": round(w, 1),
+                    "height": round(h, 1)
+                }
+            })
+        return defects
+    except Exception as e:
+        print(f"[CV Service] Error inference local YOLO defect model: {e}")
+        return []
+
 
 def detect_defects_in_memory(clean_base64_data: str) -> List[Dict[str, Any]]:
     """
-    Mengirimkan payload Base64 langsung ke endpoint Roboflow Cloud Inference via HTTP.
-    Tidak ada penulisan file fisik sementara ke disk.
+    Fallback: Mengirimkan payload Base64 ke endpoint Roboflow Cloud Inference via HTTP.
     """
     if not ROBOFLOW_API_KEY:
-        print("[CV Service] Peringatan: ROBOFLOW_API_KEY belum diset di .env. Pengecekan cacat dilewati.")
         return []
 
     try:
@@ -135,10 +219,9 @@ def detect_defects_in_memory(clean_base64_data: str) -> List[Dict[str, Any]]:
             api_url,
             data=clean_base64_data,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=15
+            timeout=2.0
         )
         if response.status_code != 200:
-            print(f"[CV Service] Roboflow API error HTTP {response.status_code}: {response.text[:200]}")
             return []
 
         result_json = response.json()
@@ -163,6 +246,35 @@ def detect_defects_in_memory(clean_base64_data: str) -> List[Dict[str, Any]]:
         return []
 
 
+def detect_card_defects_dual_side(
+    front_bgr: Optional[np.ndarray],
+    back_bgr: Optional[np.ndarray] = None,
+    front_b64: Optional[str] = None,
+    back_b64: Optional[str] = None
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """
+    Mendeteksi cacat fisik pada kedua sisi kartu (Tampak Depan & Tampak Belakang).
+    Memprioritaskan local YOLOv8 model, lalu fallback ke Roboflow jika model lokal tidak aktif.
+    """
+    front_defects = []
+    back_defects = []
+
+    model = get_defect_model()
+    if model is not None:
+        if front_bgr is not None:
+            front_defects = detect_defects_from_image(front_bgr)
+        if back_bgr is not None:
+            back_defects = detect_defects_from_image(back_bgr)
+    else:
+        # Fallback Roboflow Cloud
+        if front_b64:
+            front_defects = detect_defects_in_memory(front_b64)
+        if back_b64:
+            back_defects = detect_defects_in_memory(back_b64)
+
+    return front_defects, back_defects
+
+
 # =====================================================================
 # FUNGSI SERVICE UTAMA
 # =====================================================================
@@ -174,7 +286,6 @@ def process_card_identification(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str
     """
     identifier = get_card_identifier()
     
-    # Penanganan jika model gagal dimuat
     if identifier is None:
         return {
             "status": "error",
@@ -195,7 +306,6 @@ def process_card_identification(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str
 def build_candidates_list(candidates_raw: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Memformat daftar runner-up kandidat kartu untuk ditampilkan di UI."""
     candidates = []
-    # Mulai dari indeks 1 (kartu alternatif, karena indeks 0 adalah top match)
     for c in candidates_raw[1:]:
         candidates.append({
             "rank": c.get("rank", 0),
@@ -225,7 +335,6 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
             "execution_time_ms": ai_result.get("execution_time_ms", 0.0)
         }
 
-    # Hitung harga dasar (tanpa diskon cacat fisik)
     price_usd = float(top_match.get("effective_market_price") or 0.0)
     price_usd = get_live_price(top_match.get("card_id"), price_usd)
     current_rate = get_usd_to_idr_rate()
@@ -266,24 +375,62 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
     }
 
 
-def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dict[str, Any]:
+def run_analyze_flow(
+    img_bgr: np.ndarray,
+    clean_b64: str,
+    back_bgr: Optional[np.ndarray] = None,
+    back_b64: Optional[str] = None,
+    card_id_override: Optional[str] = None,
+    top_k: int = 4
+) -> Dict[str, Any]:
     """
     Alur khusus UPLOAD FOTO STATIS:
-    Menjalankan Model 1 (Identifikasi Kartu) + Model 2 (Roboflow YOLO Condition Grader).
+    Menjalankan Model 1 (Identifikasi Kartu dari foto depan / card_id override) + 
+    Model 2 (YOLO Condition Grader pada foto depan & belakang jika disediakan).
     """
-    # 1. Identifikasi Jenis Kartu (Model 1)
-    ai_result = process_card_identification(img_bgr, top_k=top_k)
-    top_match = ai_result.get("top_match")
+    top_match = None
+    ai_result = {}
+
+    if card_id_override and card_id_override.strip():
+        from app.analytics_engine import get_card_metadata
+        meta = get_card_metadata(card_id_override.strip())
+        top_match = {
+            "card_id": meta["card_id"],
+            "name": meta["name"],
+            "set_name": meta.get("set_name", ""),
+            "set_id": meta.get("set_id", ""),
+            "set_series": meta.get("set_series", ""),
+            "release_year": meta.get("release_year"),
+            "rarity": meta.get("rarity", ""),
+            "supertype": meta.get("supertype", ""),
+            "subtypes": meta.get("subtypes", ""),
+            "types": meta.get("types", ""),
+            "hp": meta.get("hp"),
+            "effective_market_price": meta.get("effective_market_price", 0.0),
+            "confidence_percentage": 100.0,
+            "confidence_label": "Manual / Known ID",
+            "image_url_large": meta.get("image_large", None)
+        }
+    else:
+        # 1. Identifikasi Jenis Kartu (Model 1 pada tampak depan via CLIP)
+        ai_result = process_card_identification(img_bgr, top_k=top_k)
+        top_match = ai_result.get("top_match")
 
     if not top_match:
         return {
             "status": "error",
-            "message": ai_result.get("message") or "AI tidak dapat mengenali kartu dari foto yang diberikan.",
+            "message": ai_result.get("message") or "Model 1 (CLIP Index) sedang offline atau belum dibangun (card_embeddings.index tidak ditemukan). Silakan gunakan form 'card_id' atau gunakan endpoint spesifik '/upload/cards/{card_id}/condition'.",
             "execution_time_ms": ai_result.get("execution_time_ms", 0.0)
         }
 
-    # 2. Deteksi Cacat Fisik (Model 2 YOLOv8 via Roboflow Cloud)
-    defects = detect_defects_in_memory(clean_b64)
+    # 2. Deteksi Cacat Fisik (Model 2 YOLOv8 Lokal atau Roboflow pada depan & belakang)
+    front_defects, back_defects = detect_card_defects_dual_side(
+        front_bgr=img_bgr,
+        back_bgr=back_bgr,
+        front_b64=clean_b64,
+        back_b64=back_b64
+    )
+    defects = front_defects + back_defects
 
     # 3. Hitung Valuasi Harga Wajar Akhir & Diskon Kerusakan
     base_price_usd = float(top_match.get("effective_market_price") or 0.0)
@@ -301,6 +448,9 @@ def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dic
         defects=defects,
         usd_rate=get_usd_to_idr_rate()
     )
+
+    valuation["condition_report"]["front_defects"] = front_defects
+    valuation["condition_report"]["back_defects"] = back_defects
 
     candidates = build_candidates_list(ai_result.get("candidates", []))
 
