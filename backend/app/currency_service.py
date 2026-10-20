@@ -28,7 +28,7 @@ _last_rate_source: str = "init"
 def fetch_live_usd_to_idr() -> Optional[float]:
     """
     Menembak API valuta asing publik gratis untuk mendapatkan kurs 1 USD ke IDR.
-    Menggunakan timeout 4 detik agar tidak memblokir server.
+    Menggunakan timeout 1 detik agar tidak memblokir server saat offline / sandbox.
     """
     endpoints = [
         # Provider 1: Open Exchange Rates public mirror (sangat stabil & tanpa API key)
@@ -39,21 +39,18 @@ def fetch_live_usd_to_idr() -> Optional[float]:
 
     for url in endpoints:
         try:
-            res = requests.get(url, timeout=4)
+            res = requests.get(url, timeout=1.0)
             if res.status_code == 200:
                 data = res.json()
-                # Penanganan format provider 1
                 if "rates" in data and "IDR" in data["rates"]:
                     val = float(data["rates"]["IDR"])
                     if val > 0:
                         return val
-                # Penanganan format provider 2
                 elif "rates" in data and isinstance(data["rates"], dict):
                     val = float(data["rates"].get("IDR", 0))
                     if val > 0:
                         return val
-        except Exception as e:
-            # Lewati ke provider berikutnya jika ada timeout
+        except Exception:
             continue
 
     return None
@@ -80,19 +77,16 @@ def get_usd_to_idr_rate() -> float:
         _cached_rate = round(live_rate, 2)
         _last_fetched_time = current_time
         _last_rate_source = "live_api"
-        print(f"[INFO] [Currency Service] Kurs live USD -> IDR diperbarui: Rp {_cached_rate:,.2f}")
         return _cached_rate
 
     # 3. Fallback jika gagal mengambil data live
     if _cached_rate is not None:
-        print(f"[WARN] [Currency Service] Gagal refresh kurs live, mempertahankan cache sebelumnya: Rp {_cached_rate:,.2f}")
         return _cached_rate
 
     # 4. Fallback awal jika belum pernah fetch sama sekali
     _cached_rate = FALLBACK_USD_TO_IDR
     _last_fetched_time = current_time
     _last_rate_source = "fallback"
-    print(f"[WARN] [Currency Service] Menggunakan kurs fallback default: Rp {FALLBACK_USD_TO_IDR:,.2f}")
     return _cached_rate
 
 

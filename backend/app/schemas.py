@@ -17,11 +17,27 @@ class ImageDataRequest(BaseModel):
     """Payload penerimaan gambar dari Frontend (React)."""
     image: str = Field(
         ...,
-        description="String Base64 gambar kartu (mendukung prefix 'data:image/...;base64,' maupun raw base64)."
+        description="String Base64 foto tampak depan kartu (mendukung prefix 'data:image/...;base64,' maupun raw base64)."
+    )
+    back_image: Optional[str] = Field(
+        None,
+        description="String Base64 foto tampak belakang kartu untuk evaluasi cacat fisik 2 sisi (opsional)."
     )
     expected_card_id: Optional[str] = Field(
         None,
         description="ID kartu acuan jika dalam mode validasi atau benchmarking (opsional)."
+    )
+
+
+class CardConditionRequest(BaseModel):
+    """Payload penerimaan foto tampak depan & belakang kartu untuk Condition Grading."""
+    front_image: Optional[str] = Field(
+        None,
+        description="String Base64 foto tampak depan kartu."
+    )
+    back_image: Optional[str] = Field(
+        None,
+        description="String Base64 foto tampak belakang kartu."
     )
 
 
@@ -42,7 +58,7 @@ class PricingDetails(BaseModel):
 
 class DefectItem(BaseModel):
     """Detail satu cacat fisik yang terdeteksi oleh Model 2 YOLOv8."""
-    label: str = Field(..., description="Jenis cacat fisik (scratched, edge_wear, crease, dll).")
+    label: str = Field(..., description="Jenis cacat fisik (Corner Wear, Edge Wear, Scratch, dll).")
     confidence: float = Field(..., description="Skor keyakinan deteksi cacat (0.0 - 1.0).")
     bbox: Optional[Dict[str, float]] = Field(None, description="Koordinat bounding box cacat {x, y, width, height}.")
 
@@ -52,7 +68,9 @@ class ConditionReport(BaseModel):
     condition_tier: str = Field("Near Mint / Mint", description="Kategori kondisi (Mint, Lightly Played, Heavily Played, Damaged).")
     has_defects: bool = Field(False, description="Apakah terdeteksi cacat fisik pada kartu.")
     defect_count: int = Field(0, description="Jumlah total cacat fisik yang terdeteksi.")
-    defects: List[DefectItem] = Field(default_factory=list, description="Daftar cacat fisik terperinci.")
+    front_defects: List[DefectItem] = Field(default_factory=list, description="Daftar cacat fisik pada tampak depan kartu.")
+    back_defects: List[DefectItem] = Field(default_factory=list, description="Daftar cacat fisik pada tampak belakang kartu.")
+    defects: List[DefectItem] = Field(default_factory=list, description="Daftar gabungan seluruh cacat fisik terperinci.")
     evaluation_status: str = Field("evaluated", description="Status evaluasi: evaluated, bypassed_oncam, atau error.")
 
 
@@ -76,6 +94,13 @@ class CardCandidate(BaseModel):
     official_image_url: Optional[str] = None
     price_usd: Optional[float] = None
     price_idr: Optional[int] = None
+
+
+class ForecastPoint(BaseModel):
+    """Satu titik data prediksi harga pada hari tertentu."""
+    day: int = Field(..., description="Hari ke-N dari sekarang (1-7).")
+    date: str = Field(..., description="Tanggal prediksi (YYYY-MM-DD).")
+    predicted_price_usd: float = Field(0.0, description="Harga prediksi dalam USD.")
 
 
 # =====================================================================
@@ -141,4 +166,32 @@ class AnalyzeResponse(BaseModel):
     candidates: List[CardCandidate] = Field(default_factory=list)
     recommendation_signal: str = Field("HOLD", description="Sinyal transaksi: BUY, HOLD, atau SELL.")
     execution_time_ms: float = 0.0
+
+class ForecastResponse(BaseModel):
+    """Respon forecast harga 7 hari beserta sinyal transaksi."""
+    status: str = Field("success", description="Status respon: success atau error.")
+    message: str = Field("", description="Pesan deskriptif hasil forecast.")
+    card_id: str = Field(..., description="ID kartu yang di-forecast.")
+    card_name: Optional[str] = Field(None, description="Nama kartu.")
+    current_price_usd: float = Field(0.0, description="Harga pasar saat ini dalam USD.")
+    current_price_idr: int = Field(0, description="Harga pasar saat ini dalam Rupiah.")
+    forecast: List[ForecastPoint] = Field(default_factory=list, description="Daftar prediksi harga 7 hari ke depan.")
+    predicted_price_day7_usd: float = Field(0.0, description="Harga prediksi pada hari ke-7 dalam USD.")
+    predicted_price_day7_idr: int = Field(0, description="Harga prediksi pada hari ke-7 dalam Rupiah.")
+    change_pct: float = Field(0.0, description="Persentase perubahan harga dari hari ini ke hari ke-7.")
+    signal: str = Field("HOLD", description="Sinyal transaksi: BUY, HOLD, atau SELL.")
+    mispricing_gap_pct: float = Field(0.0, description="Persentase selisih harga pasar aktual vs harga wajar prediksi.")
+    ai_confidence_pct: float = Field(95.8, description="Persentase kepercayaan model ML.")
+    currency_rate: float = Field(16500.0, description="Kurs acuan USD ke IDR.")
+
+
+class CardConditionResponse(BaseModel):
+    """Respon standalone penilaian kondisi fisik kartu (tampak depan & tampak belakang)."""
+    status: str = Field("success", description="Status respon: success atau error.")
+    message: str = Field("", description="Pesan deskriptif hasil penilaian.")
+    card_id: str = Field(..., description="ID kartu yang dinilai.")
+    card_name: Optional[str] = Field(None, description="Nama kartu.")
+    condition_report: Optional[ConditionReport] = Field(None, description="Laporan kondisi fisik lengkap (depan + belakang).")
+    pricing: Optional[PricingDetails] = Field(None, description="Rincian valuasi harga setelah penyesuaian kondisi.")
+    condition_score_pct: float = Field(100.0, description="Skor kondisi kartu dalam persen (100% = Mint).")
 
