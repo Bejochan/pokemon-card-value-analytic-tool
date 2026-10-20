@@ -197,15 +197,32 @@ def build_candidates_list(candidates_raw: List[Dict[str, Any]]) -> List[Dict[str
     candidates = []
     # Mulai dari indeks 1 (kartu alternatif, karena indeks 0 adalah top match)
     for c in candidates_raw[1:]:
+        p_usd = None
+        p_idr = None
+        raw_price = c.get("effective_market_price")
+        if raw_price is not None and str(raw_price).strip() != "":
+            try:
+                p_usd = float(raw_price)
+                if not np.isnan(p_usd) and p_usd > 0:
+                    p_idr = convert_usd_to_idr(p_usd)
+                else:
+                    p_usd = None
+            except (ValueError, TypeError):
+                p_usd = None
+                p_idr = None
+
         candidates.append({
             "rank": c.get("rank", 0),
             "card_id": c.get("card_id", ""),
             "name": c.get("name", "Unknown"),
             "confidence_percentage": c.get("confidence_percentage", 0.0),
             "raw_similarity_score": c.get("raw_similarity_score", 0.0),
+            "orb_verification_score": c.get("orb_verification_score"),
             "set_name": c.get("set_name"),
             "rarity": c.get("rarity"),
-            "official_image_url": c.get("image_url_large")
+            "official_image_url": c.get("image_url_large"),
+            "price_usd": p_usd,
+            "price_idr": p_idr
         })
     return candidates
 
@@ -238,6 +255,7 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
         "message": f"Berhasil mendeteksi: {top_match.get('name', 'Unknown')}",
         "card_id": top_match.get("card_id"),
         "name": top_match.get("name"),
+        "number": str(top_match.get("number")) if top_match.get("number") is not None else None,
         "set_name": top_match.get("set_name"),
         "set_id": top_match.get("set_id"),
         "set_series": top_match.get("set_series"),
@@ -249,6 +267,9 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
         "hp": float(top_match.get("hp")) if top_match.get("hp") else None,
         "confidence_percentage": top_match.get("confidence_percentage", 0.0),
         "confidence_label": top_match.get("confidence_label", "Uncertain"),
+        "raw_similarity_score": top_match.get("raw_similarity_score"),
+        "orb_verification_score": top_match.get("orb_verification_score"),
+        "margin_to_runner_up": top_match.get("margin_to_runner_up"),
         "official_image_url": top_match.get("image_url_large"),
         "pricing": {
             "base_price_usd": price_usd,
@@ -264,6 +285,7 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
         "candidates": candidates,
         "execution_time_ms": ai_result.get("execution_time_ms", 0.0)
     }
+
 
 
 def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dict[str, Any]:
@@ -309,6 +331,7 @@ def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dic
         "message": f"Berhasil menganalisis: {top_match.get('name', 'Unknown')}",
         "card_id": top_match.get("card_id"),
         "name": top_match.get("name"),
+        "number": str(top_match.get("number")) if top_match.get("number") is not None else None,
         "set_name": top_match.get("set_name"),
         "set_id": top_match.get("set_id"),
         "set_series": top_match.get("set_series"),
@@ -320,6 +343,9 @@ def run_analyze_flow(img_bgr: np.ndarray, clean_b64: str, top_k: int = 4) -> Dic
         "hp": float(top_match.get("hp")) if top_match.get("hp") else None,
         "confidence_percentage": top_match.get("confidence_percentage", 0.0),
         "confidence_label": top_match.get("confidence_label", "Uncertain"),
+        "raw_similarity_score": top_match.get("raw_similarity_score"),
+        "orb_verification_score": top_match.get("orb_verification_score"),
+        "margin_to_runner_up": top_match.get("margin_to_runner_up"),
         "official_image_url": top_match.get("image_url_large"),
         "pricing": valuation["pricing"],
         "estimated_price": valuation["pricing"]["final_price_idr"],

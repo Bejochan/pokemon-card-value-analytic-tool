@@ -70,9 +70,12 @@ class CardCandidate(BaseModel):
     name: str
     confidence_percentage: float
     raw_similarity_score: float
+    orb_verification_score: Optional[float] = None
     set_name: Optional[str] = None
     rarity: Optional[str] = None
     official_image_url: Optional[str] = None
+    price_usd: Optional[float] = None
+    price_idr: Optional[int] = None
 
 
 # =====================================================================
@@ -85,6 +88,7 @@ class IdentifyResponse(BaseModel):
     message: str
     card_id: Optional[str] = None
     name: Optional[str] = None
+    number: Optional[str] = None
     set_name: Optional[str] = None
     set_id: Optional[str] = None
     set_series: Optional[str] = None
@@ -96,6 +100,9 @@ class IdentifyResponse(BaseModel):
     hp: Optional[float] = None
     confidence_percentage: float = 0.0
     confidence_label: str = "Uncertain"
+    raw_similarity_score: Optional[float] = None
+    orb_verification_score: Optional[float] = None
+    margin_to_runner_up: Optional[float] = None
     official_image_url: Optional[str] = None
     pricing: Optional[PricingDetails] = None
     estimated_price: Optional[int] = Field(None, description="Backward-compatibility untuk frontend.")
@@ -110,6 +117,7 @@ class AnalyzeResponse(BaseModel):
     message: str
     card_id: Optional[str] = None
     name: Optional[str] = None
+    number: Optional[str] = None
     set_name: Optional[str] = None
     set_id: Optional[str] = None
     set_series: Optional[str] = None
@@ -121,6 +129,9 @@ class AnalyzeResponse(BaseModel):
     hp: Optional[float] = None
     confidence_percentage: float = 0.0
     confidence_label: str = "Uncertain"
+    raw_similarity_score: Optional[float] = None
+    orb_verification_score: Optional[float] = None
+    margin_to_runner_up: Optional[float] = None
     official_image_url: Optional[str] = None
     pricing: Optional[PricingDetails] = None
     estimated_price: Optional[int] = Field(None, description="Backward-compatibility untuk frontend.")
@@ -130,3 +141,4 @@ class AnalyzeResponse(BaseModel):
     candidates: List[CardCandidate] = Field(default_factory=list)
     recommendation_signal: str = Field("HOLD", description="Sinyal transaksi: BUY, HOLD, atau SELL.")
     execution_time_ms: float = 0.0
+

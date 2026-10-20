@@ -3,15 +3,38 @@
   width: 100%;
   min-height: calc(100vh - 70px);
   background-image: url('/bg-dashboard.jpg'); 
-  
-  /* Kembalikan ke cover agar rasio gambar tetap proporsional dan tidak melar */
   background-size: cover; 
-  
   background-position: center;
   display: flex;
   justify-content: center;
   align-items: center;
   overflow: hidden;
+}
+
+/* KHUSUS HALAMAN DETAIL: Izinkan Scroll Vertikal Halus */
+.dashboard-container.details-mode {
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-items: flex-start;
+  padding: 15px 0 40px 0;
+  height: auto;
+  min-height: calc(100vh - 70px);
+  scroll-behavior: smooth;
+}
+
+/* Sleek Scrollbar untuk Halaman Detail */
+.dashboard-container.details-mode::-webkit-scrollbar {
+  width: 8px;
+}
+.dashboard-container.details-mode::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.15);
+}
+.dashboard-container.details-mode::-webkit-scrollbar-thumb {
+  background: rgba(30, 27, 75, 0.4);
+  border-radius: 4px;
+}
+.dashboard-container.details-mode::-webkit-scrollbar-thumb:hover {
+  background: rgba(30, 27, 75, 0.7);
 }
 
 .price-view {
@@ -79,21 +102,14 @@
 .price-text {
   position: absolute; 
   z-index: 2;
-  font-size: 100px; 
-  
-  /* Karena titik pusatnya sekarang ada di bagian bawah teks, */
-  /* kamu perlu membesarkan angka top ini (misal 60%, 70%, 75%) */
-  /* agar teksnya kembali turun ke tengah kotak hijau. */
-  top: 80%;  
-  left: 55%; 
-  
-  /* INI KUNCINYA: Kombinasi translate dan translateY di ujung kiri dan kanan */
-  /* akan memaksa perspektif 3D hanya melengkungkan bagian atas teks saja. */
+  font-size: 78px; 
+  top: 76%;  
+  left: 58%; 
   transform: translate(-50%, 0%) perspective(500px) rotateY(25deg) translateY(-50%); 
-  
   color: white;
   font-family: 'Anton', sans-serif;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
+  white-space: nowrap;
   text-shadow: 6px 6px 0px rgba(0,0,0,0.15);
 }
 
@@ -142,24 +158,22 @@
 /* --- TATA LETAK HALAMAN DETAIL -------------------------------------------------------------------------------------------------------------- */
 .details-view {
   width: 100%;
-  /* 1. Ubah 100vh menjadi 100% agar ukurannya pas mengikuti sisa ruang di bawah navbar */
-  height: 100%; 
+  height: auto; 
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   position: relative;
   padding: 0;
   box-sizing: border-box;
-  /* 2. Tambahkan margin negatif untuk menarik seluruh tata letak sedikit lebih tinggi lagi */
-  margin-top: -30px; 
+  margin-top: 0; 
 }
 
 .up-arrow-btn {
   background: none;
   border: none;
   cursor: pointer;
-  margin-bottom: 0px;
+  margin-bottom: 8px;
   transition: transform 0.2s;
 }
 .up-arrow-btn:hover {
@@ -168,19 +182,21 @@
 
 .details-grid {
   display: flex;
-  gap: 30px;
+  gap: 20px;
   width: 100%;
   max-width: 100%;
-  min-height: 580px;
+  min-height: 540px;
   height: auto;
+  box-sizing: border-box;
 }
 
 .info-box {
   background-color: #ffffff;
   border-radius: 25px;
-  padding: 30px;
+  padding: 24px 20px;
   box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-  flex: 1; /* Membuat kedua kotak berukuran sama besar */
+  flex: 1;
+  min-width: 0; /* PENTING: Mencegah flex child overflow ke kanan */
   display: flex;
   box-sizing: border-box;
 }
@@ -188,31 +204,36 @@
 /* --- KOTAK KIRI (KARTU & TABEL) --- */
 .card-info-box {
   border-radius: 0 25px 25px 0; /* Atas-kiri, Atas-kanan, Bawah-kanan, Bawah-kiri */
+  gap: 16px;
 }
 
 .card-visuals {
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 1;
+  flex: 0 0 220px;
+  max-width: 220px;
 }
 
 .detail-card-img {
   width: 100%;
-  max-width: 260px;
+  max-width: 220px;
   border-radius: 12px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
 
 .celebration-logo {
-  margin-top: 20px;
+  margin-top: 14px;
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
   color: #1e1b4b;
+  font-size: 13px;
+  text-align: center;
 }
 
 .card-specs {
-  flex: 1.2;
+  flex: 1;
+  min-width: 0;
 }
 
 /* RAHASIA TABEL INNER BORDER */
@@ -322,64 +343,70 @@
   flex-direction: column; 
   /* Menyebarkan elemen agar mengisi ruang kosong secara merata */
   justify-content: flex-start; 
-  /* gap diperkecil agar compact (sebelumnya 15px) */
-  gap: 15px; 
+  gap: 12px; 
+  min-width: 0; /* PENTING: Mencegah overflow ke kanan */
 }
 
 .analytics-title {
   font-family: 'Montserrat', sans-serif;
   font-weight: 800;
   color: #1e1b4b;
-  font-size: 24px;
-  margin: 0 0 15px 0; 
+  font-size: 22px;
+  margin: 0 0 10px 0; 
 }
 
 /* --- TATA LETAK KOTAK STATISTIK --- */
 .stats-container {
   display: flex;
   flex-direction: column;
-  gap: 8px; /* Spasi antar baris diperkecil */
-  /* Jarak bawah diminimalkan (sebelumnya 15px) agar teks grafik naik */
+  gap: 8px;
   margin-bottom: 2px; 
-  /* FIX: statistik tidak boleh ikut menyusut, biar grafik yang mengalah */
   flex-shrink: 0;
 }
 
 .stats-row {
   display: flex;
-  gap: 15px;
+  gap: 10px;
 }
 
 .stat-card {
   flex: 1;
+  min-width: 0;
   background-color: #f8f9fa;
   border: 1px solid #eaeaea;
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 10px;
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  overflow: hidden;
 }
 
 .stat-label {
   font-family: 'Montserrat', sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: #6c757d;
   text-transform: uppercase;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-value {
   font-family: 'Anton', sans-serif;
-  font-size: 28px;
-  letter-spacing: 1px;
+  font-size: 24px;
+  letter-spacing: 0.5px;
   color: #1e1b4b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-sub {
   font-family: 'Montserrat', sans-serif;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   margin-left: 3px;
   color: #adb5bd;

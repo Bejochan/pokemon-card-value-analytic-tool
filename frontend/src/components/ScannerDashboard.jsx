@@ -83,7 +83,7 @@ function ScannerDashboard({ scanResult }) {
   if (recommendationSignal === 'SELL') signalColor = 'text-pink';
 
   return (
-    <div className="dashboard-container">
+    <div className={`dashboard-container ${dashboardView === 'details' ? 'details-mode' : 'price-mode'}`}>
 
       {/* TAMPILAN 1: HALAMAN HARGA */}
       {dashboardView === 'price' && (
@@ -91,11 +91,6 @@ function ScannerDashboard({ scanResult }) {
 
           {/* Efek Cahaya / Glow di belakang kartu */}
           <div className="glow-effect"></div>
-
-          {/* Badge Confidence AI */}
-          <div className={`confidence-badge ${confidenceLabel === 'Tinggi' ? 'badge-high' : confidenceLabel === 'Sedang' ? 'badge-mid' : 'badge-low'}`}>
-            🤖 AI Confidence: <strong>{confidencePct.toFixed(1)}%</strong> ({confidenceLabel})
-          </div>
 
           {/* Gambar Kartu Hasil Scan */}
           <img src={officialImage} alt="Scanned Card" className="scanned-card" />
@@ -147,15 +142,11 @@ function ScannerDashboard({ scanResult }) {
                   <tbody>
                     <tr><td>Name</td><td>{cardName}</td></tr>
                     <tr><td>Set</td><td>{setName}</td></tr>
-                    <tr><td>Set ID</td><td>{setId}</td></tr>
+                    <tr><td>Set Code</td><td>{setId}</td></tr>
                     <tr><td>Series</td><td>{setSeries}</td></tr>
                     <tr><td>Year</td><td>{releaseYear}</td></tr>
                     <tr><td>Rarity</td><td>{rarity}</td></tr>
-                    <tr><td>Supertype</td><td>{supertype}</td></tr>
                     <tr><td>Subtypes</td><td>{subtypes}</td></tr>
-                    <tr><td>Types</td><td>{types}</td></tr>
-                    <tr><td>HP</td><td>{hp !== '-' ? `${hp} HP` : '-'}</td></tr>
-                    <tr><td>Condition</td><td>{conditionTier}</td></tr>
                   </tbody>
                 </table>
 
@@ -205,14 +196,6 @@ function ScannerDashboard({ scanResult }) {
                           {conditionDiscountPct > 0 ? `- ${conditionDiscountPct.toFixed(2)}%` : '0.00%'}
                         </td>
                       </tr>
-                      <tr>
-                        <td>Condition Multiplier</td>
-                        <td>×{conditionMultiplier.toFixed(2)}</td>
-                      </tr>
-                      <tr>
-                        <td>Exchange Rate</td>
-                        <td>Rp {Math.round(currencyRate).toLocaleString('id-ID')} / USD</td>
-                      </tr>
                       <tr className="highlight-price-row">
                         <td><strong>Final Value (USD)</strong></td>
                         <td className="text-green"><strong>${finalPriceUsd.toFixed(2)}</strong></td>
@@ -224,6 +207,10 @@ function ScannerDashboard({ scanResult }) {
                       <tr>
                         <td>Condition Tier</td>
                         <td>{conditionTier}</td>
+                      </tr>
+                      <tr>
+                        <td>Est. value</td>
+                        <td className="text-green"><strong>{Math.max(0, 100 - conditionDiscountPct).toFixed(2)}%</strong></td>
                       </tr>
                     </tbody>
                   </table>
