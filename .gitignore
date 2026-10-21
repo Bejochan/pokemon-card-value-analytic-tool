@@ -1,4 +1,13 @@
 # ============================================
+# Environment & Secrets (Credentials)
+# ============================================
+.env
+*.env
+backend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# ============================================
 # Python & Virtual Environments
 # ============================================
 __pycache__/
@@ -12,7 +21,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-.env
 
 # ============================================
 # Jupyter Notebook Cache & Checkpoints
@@ -21,7 +29,7 @@ venv.bak/
 *-checkpoint.ipynb
 
 # ============================================
-# Model Weights & Heavy Datasets
+# Model Weights, Embeddings & Heavy Binaries
 # ============================================
 *.pt
 *.onnx
@@ -30,44 +38,57 @@ venv.bak/
 *.pkl
 *.joblib
 *.tmp
-pokemon-cards/
-# Scratch & Debug Testing Files
-scratch/
-**/scratch/
-debug_*.jpg
-debug_*.png
-*_result.jpg
-backend/models/*.pt
 *.index
 **/*.index
+backend/models/*.pt
 backend/models/**/*.index
-# Note: legacy_mobilenet python scripts are tracked for baseline report comparison; heavy .index files are ignored above.
+backend/wheels/
+
+# ============================================
+# Heavy Datasets & Compressed Archives
+# ============================================
+pokemon-cards/
 backend/dataset/*.zip
 backend/dataset/card-condition-dataset/
 backend/dataset/pokemon-cards-dataset/
 backend/dataset/raw_images/
 backend/dataset/compressed_images/
+
+# ============================================
+# Scratch, Temporary & Debug Media Testing Files
+# ============================================
+scratch/
+**/scratch/
+debug_*.jpg
+debug_*.png
+*_result.jpg
 debug_manual_aligned.jpg
 debug_manual_aligned_clip.jpg
 debug_last_scan_aligned.jpg
 debug_last_scan_aligned_clip.jpg
 debug_hoothoot_upright.jpg
 backend/debug_gambar_dari_web.jpg
-backend/wheels/
 
 # ============================================
-# Node.js & Frontend
+# Local AI Auditing Tools & Reports
+# ============================================
+anti-slop/
+**/anti-slop/
+
+# ============================================
+# Node.js & Frontend Build Outputs
 # ============================================
 node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.cache/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-frontend/dist/
-frontend/.cache/
 
 # ============================================
-# IDE & System Files
+# IDE, Editor & OS System Files
 # ============================================
 .vscode/
 .idea/
@@ -75,3 +96,4 @@ frontend/.cache/
 *.swo
 .DS_Store
 Thumbs.db
+desktop.ini
