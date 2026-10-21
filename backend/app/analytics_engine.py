@@ -29,6 +29,16 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(current_dir)
 load_dotenv(os.path.join(backend_dir, ".env"))
 
+import sys
+if backend_dir not in sys.path:
+    sys.path.append(backend_dir)
+
+try:
+    from models.chronos_forecaster import ChronosForecaster
+except Exception as e:
+    print(f"[Analytics Engine] Peringatan: Gagal memuat ChronosForecaster: {e}")
+    ChronosForecaster = None
+
 from app.currency_service import get_usd_to_idr_rate, convert_usd_to_idr
 
 # Fallback konstanta jika dibutuhkan secara statis
@@ -216,14 +226,66 @@ def calculate_mispricing_signal(actual_price: float, predicted_price: float) -> 
 
 
 # =====================================================================
-# 7-DAY MULTI-STEP RECURSIVE FORECASTING
+# TIME-SERIES DATA FETCHING & DYNAMIC TUNNEL SIGNALS
+# =====================================================================
+
+def fetch_card_price_series(card_id: str) -> Tuple[List[str], List[float]]:
+    """Mengambil deret waktu riwayat harga dari Supabase card_price_history.
+    
+    Diurutkan secara kronologis (ascending) berdasarkan tanggal rekaman.
+    """
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+    if not supabase_url or not supabase_key or not card_id:
+        return [], []
+    try:
+        url = f"{supabase_url}/rest/v1/card_price_history?card_id=eq.{card_id}&select=recorded_date,effective_market_price&order=recorded_date.asc"
+        headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
+        res = requests.get(url, headers=headers, timeout=5.0)
+        if res.status_code == 200:
+            data = res.json()
+            dates = [item["recorded_date"] for item in data if item.get("effective_market_price") is not None]
+            prices = [float(item["effective_market_price"]) for item in data if item.get("effective_market_price") is not None]
+            return dates, prices
+    except Exception as e:
+        print(f"[Analytics Engine] Gagal fetch card_price_history: {e}")
+    return [], []
+
+
+def calculate_dynamic_tunnel_signal(current_price: float, p10_next: float, p90_next: float, p50_next: float) -> Tuple[str, str, float]:
+    """Evaluasi posisi harga riil saat ini terhadap lorong keyakinan kuantil P10-P90 (Dynamic Confidence Tunnel).
+    
+    Mengembalikan tuple (signal, reason, gap_to_p50_pct).
+    """
+    if current_price <= 0 or p50_next <= 0:
+        return "HOLD", "Data harga acuan tidak mencukupi untuk penentuan sinyal preskriptif.", 0.0
+
+    gap_to_p50_pct = round(((current_price - p50_next) / p50_next) * 100, 2)
+
+    # 1. Menembus batas bawah pesimis -> Margin of Safety Tinggi (Undervalued)
+    if current_price < p10_next:
+        reason = f"Harga pasar (${current_price:.2f}) berada di bawah batas pesimis P10 (${p10_next:.2f}), memberikan margin keamanan beli tinggi (Undervalued)."
+        return "BUY", reason, gap_to_p50_pct
+
+    # 2. Menembus batas atas optimis -> Kemahalan Ekstrem (Overvalued)
+    elif current_price > p90_next:
+        reason = f"Harga pasar (${current_price:.2f}) melambung di atas batas optimis P90 (${p90_next:.2f}), momentum ideal merealisasikan profit (Overvalued)."
+        return "SELL", reason, gap_to_p50_pct
+
+    # 3. Berada di dalam lorong keyakinan -> Transaksi Wajar
+    else:
+        reason = f"Harga pasar (${current_price:.2f}) stabil bergerak di dalam lorong wajar model [${p10_next:.2f} - ${p90_next:.2f}]."
+        return "HOLD", reason, gap_to_p50_pct
+
+
+# =====================================================================
+# 7-DAY MULTI-STEP FORECASTING ENGINE (AMAZON CHRONOS-BOLT)
 # =====================================================================
 
 def forecast_7_days(card_id: str, current_price_override: Optional[float] = None) -> Dict[str, Any]:
-    """
-    Melakukan peramalan harga multi-step (7 hari ke depan) secara rekursif
-    berdasarkan model ML Random Forest dan lag harga.
-    Menghasilkan sinyal transaksi: BUY, HOLD, atau SELL.
+    """Peramalan harga 7 hari ke depan dengan Amazon Chronos-Bolt Foundation Model & Dynamic Confidence Tunnel.
+    
+    Menghasilkan pita kuantil P10, P50, dan P90 serta rekomendasi sinyal transaksi (BUY/HOLD/SELL).
     """
     meta = get_card_metadata(card_id)
     card_name = meta["name"]
@@ -231,124 +293,158 @@ def forecast_7_days(card_id: str, current_price_override: Optional[float] = None
     rarity = meta["rarity"]
     supertype = meta["supertype"]
     hp = meta["hp"]
-    
-    # Ambil lag harga awal
-    lag_1, lag_2 = get_price_lags(card_id)
-    
-    # Tentukan harga saat ini
-    if current_price_override is not None and current_price_override > 0:
-        curr_price = float(current_price_override)
-    elif lag_1 > 0:
-        curr_price = lag_1
-    else:
-        curr_price = float(meta["effective_market_price"] or 0.0)
-        
-    if lag_1 <= 0:
-        lag_1 = curr_price
-    if lag_2 <= 0:
-        lag_2 = lag_1
 
     current_rate = get_usd_to_idr_rate()
     today = datetime.date.today()
-    
-    # Jika model ML tidak tersedia, kembalikan proyeksi flat
-    if _forecast_model is None:
+
+    # 1. Ambil deret waktu harga riil dari Supabase
+    hist_dates, hist_prices = fetch_card_price_series(card_id)
+
+    # Tentukan harga dasar saat ini
+    if current_price_override is not None and current_price_override > 0:
+        curr_price = float(current_price_override)
+    elif hist_prices:
+        curr_price = float(hist_prices[-1])
+    else:
+        curr_price = float(meta["effective_market_price"] or 0.0)
+
+    # 2. Eksekusi Amazon Chronos-Bolt jika data riwayat memadai (>= 5 observasi)
+    forecast_res = None
+    if ChronosForecaster is not None and len(hist_prices) >= 5:
+        forecast_res = ChronosForecaster.forecast_7d(hist_dates, hist_prices)
+
+    if forecast_res:
+        future_dates = forecast_res["future_dates"]
+        p10 = forecast_res["p10"]
+        p50 = forecast_res["p50"]
+        p90 = forecast_res["p90"]
+        predicted_day7 = p50[-1]
+
+        pct_chg = round(((predicted_day7 - curr_price) / curr_price) * 100, 2) if curr_price > 0 else 0.0
+        signal, signal_reason, gap_pct = calculate_dynamic_tunnel_signal(curr_price, p10[0], p90[0], p50[0])
+
+        # Hitung tingkat keyakinan AI dinamis berbasis rasio sebaran kuantil
+        spread_ratio = (p90[0] - p10[0]) / max(p50[0], 0.01)
+        ai_confidence = round(max(55.0, min(98.5, 100.0 - (spread_ratio * 25.0))), 1)
+
         forecast_points = []
-        for d in range(1, 8):
-            dt_str = (today + datetime.timedelta(days=d)).strftime("%Y-%m-%d")
+        for d in range(7):
             forecast_points.append({
-                "day": d,
-                "date": dt_str,
-                "predicted_price_usd": round(curr_price, 2)
+                "day": d + 1,
+                "date": future_dates[d],
+                "predicted_price_usd": p50[d],
+                "p10_usd": p10[d],
+                "p50_usd": p50[d],
+                "p90_usd": p90[d]
             })
+
+        quantile_ribbon = {
+            "future_dates": future_dates,
+            "p10": p10,
+            "p50": p50,
+            "p90": p90
+        }
+
         return {
             "status": "success",
-            "message": "Model forecasting offline, menggunakan estimasi dasar.",
+            "message": f"Berhasil menghitung peramalan harga 7 hari dengan Amazon Chronos-Bolt untuk {card_name}.",
             "card_id": card_id,
             "card_name": card_name,
             "current_price_usd": round(curr_price, 2),
             "current_price_idr": int(round(curr_price * current_rate)),
             "forecast": forecast_points,
-            "predicted_price_day7_usd": round(curr_price, 2),
-            "predicted_price_day7_idr": int(round(curr_price * current_rate)),
-            "change_pct": 0.0,
-            "signal": "HOLD",
-            "mispricing_gap_pct": 0.0,
-            "ai_confidence_pct": 95.8,
+            "predicted_price_day7_usd": round(predicted_day7, 2),
+            "predicted_price_day7_idr": int(round(predicted_day7 * current_rate)),
+            "change_pct": pct_chg,
+            "signal": signal,
+            "signal_reason": signal_reason,
+            "mispricing_gap_pct": gap_pct,
+            "ai_confidence_pct": ai_confidence,
+            "quantile_ribbon": quantile_ribbon,
             "currency_rate": current_rate
         }
 
-    # Parameter fitur statis kartu
+    # Fallback jika riwayat < 5 hari atau Chronos offline
+    lag_1, lag_2 = get_price_lags(card_id)
+    if curr_price <= 0:
+        curr_price = lag_1 if lag_1 > 0 else float(meta["effective_market_price"] or 1.0)
+    p_lag_1, p_lag_2 = (lag_1 if lag_1 > 0 else curr_price), (lag_2 if lag_2 > 0 else curr_price)
+
     age = 2026 - int(release_year) if release_year else 0
     hp_val = float(hp) if hp and not pd.isna(hp) else 0.0
     rarity_enc = encode_category(rarity, _rarity_categories)
     supertype_enc = encode_category(supertype, _supertype_categories)
 
-    # Proyeksi 7 hari ke depan secara rekursif
-    p_lag_1, p_lag_2 = lag_1, lag_2
     forecast_points = []
+    p10_list, p50_list, p90_list, f_dates = [], [], [], []
 
     for day in range(1, 8):
         next_date = (today + datetime.timedelta(days=day)).strftime("%Y-%m-%d")
-        x_input = pd.DataFrame([{
-            "price_lag_1": p_lag_1,
-            "price_lag_2": p_lag_2,
-            "rarity_enc": rarity_enc,
-            "supertype_enc": supertype_enc,
-            "age": age,
-            "hp": hp_val
-        }])
-        
-        try:
-            pred_log = _forecast_model.predict(x_input)[0]
-            next_price = float(np.expm1(pred_log))
-            next_price = max(0.01, round(next_price, 2))
-        except Exception as e:
-            print(f"[Analytics Engine] Forecast step {day} error: {e}")
-            next_price = p_lag_1
+        f_dates.append(next_date)
+        if _forecast_model is not None:
+            x_input = pd.DataFrame([{
+                "price_lag_1": p_lag_1,
+                "price_lag_2": p_lag_2,
+                "rarity_enc": rarity_enc,
+                "supertype_enc": supertype_enc,
+                "age": age,
+                "hp": hp_val
+            }])
+            try:
+                pred_log = _forecast_model.predict(x_input)[0]
+                next_price = max(0.01, round(float(np.expm1(pred_log)), 2))
+            except Exception:
+                next_price = p_lag_1
+        else:
+            next_price = round(curr_price, 2)
+
+        p10_val = round(next_price * 0.90, 2)
+        p50_val = next_price
+        p90_val = round(next_price * 1.10, 2)
+
+        p10_list.append(p10_val)
+        p50_list.append(p50_val)
+        p90_list.append(p90_val)
 
         forecast_points.append({
             "day": day,
             "date": next_date,
-            "predicted_price_usd": next_price
+            "predicted_price_usd": p50_val,
+            "p10_usd": p10_val,
+            "p50_usd": p50_val,
+            "p90_usd": p90_val
         })
         p_lag_2 = p_lag_1
         p_lag_1 = next_price
 
     predicted_day7 = forecast_points[-1]["predicted_price_usd"]
-    
-    # Hitung persentase kenaikan/penurunan harga 7 hari
-    if curr_price > 0:
-        pct_chg = round(((predicted_day7 - curr_price) / curr_price) * 100, 2)
-    else:
-        pct_chg = 0.0
-
-    # Evaluasi mispricing gap terhadap fair value ML
+    pct_chg = round(((predicted_day7 - curr_price) / curr_price) * 100, 2) if curr_price > 0 else 0.0
     predicted_fair_value = predict_fair_value_ml(card_id, release_year, rarity, supertype, hp, lags=(lag_1, lag_2))
-    _, mispricing_gap_pct = calculate_mispricing_signal(curr_price, predicted_fair_value)
+    ml_sig, mispricing_gap_pct = calculate_mispricing_signal(curr_price, predicted_fair_value)
 
-    # Penentuan Sinyal Transaksi:
-    if pct_chg >= 5.0 or mispricing_gap_pct < -15.0:
-        signal = "BUY"
-    elif pct_chg <= -5.0 or mispricing_gap_pct > 15.0:
-        signal = "SELL"
-    else:
-        signal = "HOLD"
+    fallback_reason = "Riwayat deret waktu kartu kurang dari 5 hari; menggunakan estimasi regresi tabular dengan batas rentang default."
 
     return {
         "status": "success",
-        "message": f"Berhasil menghitung peramalan harga 7 hari untuk {card_name}.",
+        "message": f"Estimasi tren 7 hari untuk {card_name} (Riwayat deret waktu < 5 hari).",
         "card_id": card_id,
         "card_name": card_name,
         "current_price_usd": round(curr_price, 2),
         "current_price_idr": int(round(curr_price * current_rate)),
         "forecast": forecast_points,
-        "predicted_price_day7_usd": predicted_day7,
+        "predicted_price_day7_usd": round(predicted_day7, 2),
         "predicted_price_day7_idr": int(round(predicted_day7 * current_rate)),
         "change_pct": pct_chg,
-        "signal": signal,
+        "signal": ml_sig,
+        "signal_reason": fallback_reason,
         "mispricing_gap_pct": mispricing_gap_pct,
-        "ai_confidence_pct": 95.8,
+        "ai_confidence_pct": None,
+        "quantile_ribbon": {
+            "future_dates": f_dates,
+            "p10": p10_list,
+            "p50": p50_list,
+            "p90": p90_list
+        },
         "currency_rate": current_rate
     }
 
@@ -521,20 +617,38 @@ def evaluate_card_valuation(
     final_price_usd = round(base_price * m_variant * f_condition, 2)
     final_price_idr = int(round(final_price_usd * current_rate))
 
-    # ML Prediction
-    predicted_fair_value_usd = predict_fair_value_ml(card_id, release_year, rarity, supertype, hp)
-    
-    # 4. Tentukan Sinyal Transaksi
-    ml_signal, gap_pct = calculate_mispricing_signal(final_price_usd, predicted_fair_value_usd)
-    
-    if discount_pct >= 30.0:
-        signal = "HOLD"
-    elif _forecast_model is not None and predicted_fair_value_usd > 0:
-        signal = ml_signal
-    elif f_condition >= 0.95 and base_price > 0:
-        signal = "BUY"
-    else:
-        signal = "HOLD"
+    # 4. Integrasi Model 3 Chronos-Bolt untuk Valuasi Preskriptif
+    hist_dates, hist_prices = fetch_card_price_series(card_id)
+    forecast_ribbon = None
+    signal_reason = None
+
+    if ChronosForecaster is not None and len(hist_prices) >= 5:
+        forecast_res = ChronosForecaster.forecast_7d(hist_dates, hist_prices)
+        if forecast_res:
+            p10_1d = forecast_res["p10"][0]
+            p50_1d = forecast_res["p50"][0]
+            p90_1d = forecast_res["p90"][0]
+            signal, signal_reason, gap_pct = calculate_dynamic_tunnel_signal(final_price_usd, p10_1d, p90_1d, p50_1d)
+            predicted_fair_value_usd = p50_1d
+            forecast_ribbon = {
+                "future_dates": forecast_res["future_dates"],
+                "p10": forecast_res["p10"],
+                "p50": forecast_res["p50"],
+                "p90": forecast_res["p90"]
+            }
+
+    if forecast_ribbon is None:
+        predicted_fair_value_usd = predict_fair_value_ml(card_id, release_year, rarity, supertype, hp)
+        ml_signal, gap_pct = calculate_mispricing_signal(final_price_usd, predicted_fair_value_usd)
+        if discount_pct >= 30.0:
+            signal = "HOLD"
+            signal_reason = f"Kondisi fisik kartu memiliki diskon cacat {discount_pct:.1f}%; transaksi disarankan ditahan (HOLD)."
+        elif predicted_fair_value_usd > 0:
+            signal = ml_signal
+            signal_reason = f"Selisih harga terhadap nilai wajar ML: {gap_pct:+.1f}%."
+        else:
+            signal = "HOLD"
+            signal_reason = "Data riwayat transaksi deret waktu terbatas; rekomendasi ditahan."
 
     return {
         "pricing": {
@@ -558,7 +672,9 @@ def evaluate_card_valuation(
         "market_analytics": {
             "predicted_fair_value_usd": predicted_fair_value_usd,
             "predicted_fair_value_idr": int(predicted_fair_value_usd * current_rate),
-            "mispricing_gap_pct": gap_pct
+            "mispricing_gap_pct": gap_pct,
+            "signal_reason": signal_reason,
+            "forecast_7d": forecast_ribbon
         },
         "recommendation_signal": signal
     }
