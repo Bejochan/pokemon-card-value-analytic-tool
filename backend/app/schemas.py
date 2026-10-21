@@ -74,11 +74,21 @@ class ConditionReport(BaseModel):
     evaluation_status: str = Field("evaluated", description="Status evaluasi: evaluated, bypassed_oncam, atau error.")
 
 
+class ForecastQuantileRibbon(BaseModel):
+    """Pita kuantil peramalan deret waktu 7 hari ke depan (P10, P50, P90)."""
+    future_dates: List[str] = Field(default_factory=list, description="Daftar tanggal proyeksi 7 hari ke depan.")
+    p10: List[float] = Field(default_factory=list, description="Batas bawah kuantil pesimis P10 dalam USD.")
+    p50: List[float] = Field(default_factory=list, description="Median wajar kuantil P50 dalam USD.")
+    p90: List[float] = Field(default_factory=list, description="Batas atas kuantil optimis P90 dalam USD.")
+
+
 class MarketAnalytics(BaseModel):
-    """Analisis peramalan harga menggunakan model Machine Learning."""
+    """Analisis peramalan harga menggunakan model Machine Learning & Foundation Model."""
     predicted_fair_value_usd: float = Field(0.0, description="Harga wajar yang diprediksi oleh Machine Learning dalam USD.")
     predicted_fair_value_idr: int = Field(0, description="Harga wajar prediksi dalam Rupiah.")
     mispricing_gap_pct: float = Field(0.0, description="Persentase selisih harga pasar aktual dengan harga wajar prediksi.")
+    signal_reason: Optional[str] = Field(None, description="Alasan penentuan sinyal valuasi lorong dinamis.")
+    forecast_7d: Optional[ForecastQuantileRibbon] = Field(None, description="Data pita kuantil peramalan 7 hari.")
 
 
 class CardCandidate(BaseModel):
@@ -97,10 +107,13 @@ class CardCandidate(BaseModel):
 
 
 class ForecastPoint(BaseModel):
-    """Satu titik data prediksi harga pada hari tertentu."""
+    """Satu titik data prediksi harga pada hari tertentu dengan batas kuantil."""
     day: int = Field(..., description="Hari ke-N dari sekarang (1-7).")
     date: str = Field(..., description="Tanggal prediksi (YYYY-MM-DD).")
-    predicted_price_usd: float = Field(0.0, description="Harga prediksi dalam USD.")
+    predicted_price_usd: float = Field(0.0, description="Harga prediksi wajar P50 dalam USD.")
+    p10_usd: Optional[float] = Field(None, description="Batas bawah kuantil pesimis P10 dalam USD.")
+    p50_usd: Optional[float] = Field(None, description="Median wajar kuantil P50 dalam USD.")
+    p90_usd: Optional[float] = Field(None, description="Batas atas kuantil optimis P90 dalam USD.")
 
 
 # =====================================================================
@@ -167,8 +180,9 @@ class AnalyzeResponse(BaseModel):
     recommendation_signal: str = Field("HOLD", description="Sinyal transaksi: BUY, HOLD, atau SELL.")
     execution_time_ms: float = 0.0
 
+
 class ForecastResponse(BaseModel):
-    """Respon forecast harga 7 hari beserta sinyal transaksi."""
+    """Respon forecast harga 7 hari beserta sinyal transaksi dan pita kuantil."""
     status: str = Field("success", description="Status respon: success atau error.")
     message: str = Field("", description="Pesan deskriptif hasil forecast.")
     card_id: str = Field(..., description="ID kartu yang di-forecast.")
@@ -180,8 +194,10 @@ class ForecastResponse(BaseModel):
     predicted_price_day7_idr: int = Field(0, description="Harga prediksi pada hari ke-7 dalam Rupiah.")
     change_pct: float = Field(0.0, description="Persentase perubahan harga dari hari ini ke hari ke-7.")
     signal: str = Field("HOLD", description="Sinyal transaksi: BUY, HOLD, atau SELL.")
+    signal_reason: Optional[str] = Field(None, description="Rasionalisasi analitis sinyal transaksi.")
     mispricing_gap_pct: float = Field(0.0, description="Persentase selisih harga pasar aktual vs harga wajar prediksi.")
-    ai_confidence_pct: float = Field(95.8, description="Persentase kepercayaan model ML.")
+    ai_confidence_pct: Optional[float] = Field(None, description="Persentase kepercayaan model ML terhitung (null jika model offline).")
+    quantile_ribbon: Optional[ForecastQuantileRibbon] = Field(None, description="Data pita kuantil P10, P50, P90.")
     currency_rate: float = Field(16500.0, description="Kurs acuan USD ke IDR.")
 
 
