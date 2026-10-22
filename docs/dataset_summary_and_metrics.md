@@ -37,7 +37,7 @@ Regokemon menggabungkan dua sumber harga internasional: **TCGPlayer** (fokus pas
 ### Tabel Rincian Cakupan Harga:
 | Kategori Harga | Jumlah Kartu | Persentase | Status & Implikasi Analitika |
 | :--- | :---: | :---: | :--- |
-| **Memiliki `effective_market_price`** | **19.686** | **95,48%** | **Sangat Tinggi**. Kartu memiliki harga pasar acuan aktif ($P_{base}$) untuk model valuasi. |
+| **Memiliki `effective_market_price`** | **19.686** | **95,48%** | **Sangat Tinggi**. Kartu memiliki harga pasar acuan aktif (P_base) untuk model valuasi. |
 | **Memiliki Harga TCGPlayer** | 18.688 | 90,64% | Data mencakup varian *Normal*, *Holofoil*, dan *Reverse Holofoil*. |
 | **Memiliki Harga Cardmarket** | 19.081 | 92,55% | Data mencakup *trend price*, serta riwayat rata-rata jual (*avg1, avg7, avg30*). |
 | **Tanpa Data Harga (*Missing Price*)** | **931** | **4,52%** | Sebagian besar berupa kartu *Trophy Promo*, edisi turnamen eksklusif, atau kartu edisi awal yang sangat langka sehingga tidak ada transaksi retail harian. |
@@ -55,12 +55,12 @@ Berdasarkan 19.686 kartu yang memiliki data harga:
 | Statistik Metrik | Nilai Valuasi ($ USD) | Nilai Setara (IDR @ Rp15.500) | Keterangan Distribusi |
 | :--- | :---: | :---: | :--- |
 | **Minimum** | **$0,01** | Rp155 | Kartu Energy dasar dan Common cetakan massal. |
-| **Kuartil 1 ($Q_1$ - 25%)** | **$0,25** | Rp3.875 | 25% kartu berharga di bawah 25 sen USD. |
-| **Median ($Q_2$ - 50%)** | **$0,96** | Rp14.880 | **Nilai tengah riil pasar**: 50% kartu berada di bawah $1 USD. |
+| **Kuartil 1 (Q1 - 25%)** | **$0,25** | Rp3.875 | 25% kartu berharga di bawah 25 sen USD. |
+| **Median (Q2 - 50%)** | **$0,96** | Rp14.880 | **Nilai tengah riil pasar**: 50% kartu berada di bawah $1 USD. |
 | **Mean (Rata-Rata)** | **$22,56** | Rp349.680 | Rata-rata tertarik tinggi karena *outliers* kartu legendaris bernilai ribuan dolar. |
-| **Kuartil 3 ($Q_3$ - 75%)** | **$7,48** | Rp115.940 | Kartu *Holo Rare*, *Ultra Rare*, dan kartu kompetitif reguler. |
-| **Persentil 90 ($P_{90}$)** | **$38,25** | Rp592.875 | 10% kartu teratas memiliki nilai di atas $38 USD. |
-| **Persentil 99 ($P_{99}$)** | **$388,82** | Rp6.026.710 | 1% kartu paling langka (Secret Rare, Alternate Art, Vintage). |
+| **Kuartil 3 (Q3 - 75%)** | **$7,48** | Rp115.940 | Kartu *Holo Rare*, *Ultra Rare*, dan kartu kompetitif reguler. |
+| **Persentil 90 (P90)** | **$38,25** | Rp592.875 | 10% kartu teratas memiliki nilai di atas $38 USD. |
+| **Persentil 99 (P99)** | **$388,82** | Rp6.026.710 | 1% kartu paling langka (Secret Rare, Alternate Art, Vintage). |
 | **Maksimum** | **$4.500,00** | Rp69.750.000 | *Lugia - Aquapolis (Rare Secret)*. |
 
 ---
@@ -94,9 +94,9 @@ Setiap kategori memiliki karakteristik pemodelan analitika yang berbeda:
 
 ### B. Berdasarkan Era Rilis (Vintage vs Modern)
 Sistem analitika membagi kartu ke dalam dua era pasar dengan dinamika perilaku yang berbeda:
-* **Era Modern (Tahun $\ge$ 2005): 18.016 kartu (87,38%)**  
+* **Era Modern (Tahun >= 2005): 18.016 kartu (87,38%)**  
   * Karakteristik: Likuiditas transaksi tinggi, perputaran harga harian dipengaruhi turnamen resmi dan tren unboxing YouTube/TikTok.
-* **Era Vintage (Tahun $<$ 2005): 2.601 kartu (12,62%)**  
+* **Era Vintage (Tahun < 2005): 2.601 kartu (12,62%)**  
   * Karakteristik: Pasokan terbatas (*finite supply*), sangat sensitif terhadap kondisi fisik (*condition grading*), dan bertindak sebagai aset investasi jangka panjang (*blue-chip collectibles*).
 
 ### C. Sebaran Kartu per Seri Generasi (Series Breakdown)
@@ -125,16 +125,17 @@ Seri Lainnya (Promo)  [███                           ]   439 kartu
 
 Berikut adalah panduan file script yang mengoperasikan dataset ini di folder `backend/`:
 
-| Nama File Script | Fungsi & Tanggung Jawab Utama | File Input $\rightarrow$ Output |
+| Nama File Script | Fungsi & Tanggung Jawab Utama | File Input → Output |
 | :--- | :--- | :--- |
-| [`clean_csv_broken_links.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/clean_csv_broken_links.py) | Memeriksa ketersediaan HTTP URL CDN dan menyaring tautan yang mati (53 link). | `pokemon_cards_dataset.csv` $\rightarrow$ `pokemon_cards_dataset_cleaned.csv` |
-| [`export_broken_links.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/export_broken_links.py) | Melakukan audit jaringan dan mengekspor laporan 53 kartu rusak secara terurut deterministik. | `pokemon_cards_dataset.csv` $\rightarrow$ `broken_links_report.csv` |
-| [`pokemon_cards_dataset_download.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/pokemon_cards_dataset_download.py) | Mengunduh file fisik resolusi tinggi master PNG secara paralel (multi-threading). | URL CDN $\rightarrow$ `dataset/raw_images/*.png` (20.617 file) |
-| [`compress_images.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/compress_images.py) | Melakukan optimasi ukuran gambar ke format JPG 640×640 Lanczos untuk AI inference cepat. | `raw_images/*.png` $\rightarrow$ `compressed_images/*.jpg` (20.617 file) |
-| [`json_to_csv.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/json_to_csv.py) | Menghubungkan JSON mentah dengan aset gambar lokal dan menyinkronkan dataset bersih. | `pokemon_cards_dataset.json` $\rightarrow$ `_cleaned.csv` & `_cleaned.json` |
-| [`seed_supabase.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/seed_supabase.py) | Mengunggah dataset bersih ke cloud database Supabase dengan mode UPSERT. | `_cleaned.csv` $\rightarrow$ Supabase (`sets`, `cards`, `card_prices`) |
-| [`daily_price_tracker.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/daily_price_tracker.py) | Bot otomatis harian yang menarik update fluktuasi harga dari API ke Supabase. | API pokemontcg.io $\rightarrow$ `card_prices` & `card_price_history` |
-| [`models/build_card_index.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/models/build_card_index.py) | Mengekstrak vektor representasi CLIP ViT-B-32 (512-D) untuk pencarian sub-milidetik FAISS. | `compressed_images/` $\rightarrow$ `card_embeddings.index` & `card_id_map.json` |
+| [`clean_csv_broken_links.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/clean_csv_broken_links.py) | Memeriksa ketersediaan HTTP URL CDN dan menyaring tautan yang mati (53 link). | `pokemon_cards_dataset.csv` → `pokemon_cards_dataset_cleaned.csv` |
+| [`export_broken_links.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/export_broken_links.py) | Melakukan audit jaringan dan mengekspor laporan 53 kartu rusak secara terurut deterministik. | `pokemon_cards_dataset.csv` → `broken_links_report.csv` |
+| [`pokemon_cards_dataset_download.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/pokemon_cards_dataset_download.py) | Mengunduh file fisik resolusi tinggi master PNG secara paralel (multi-threading). | URL CDN → `dataset/raw_images/*.png` (20.617 file) |
+| [`compress_images.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/compress_images.py) | Melakukan optimasi ukuran gambar ke format JPG 640×640 Lanczos untuk AI inference cepat. | `raw_images/*.png` → `compressed_images/*.jpg` (20.617 file) |
+| [`json_to_csv.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/json_to_csv.py) | Menghubungkan JSON mentah dengan aset gambar lokal dan menyinkronkan dataset bersih. | `pokemon_cards_dataset.json` → `_cleaned.csv` & `_cleaned.json` |
+| [`seed_supabase.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/seed_supabase.py) | Mengunggah dataset bersih ke cloud database Supabase dengan mode UPSERT. | `_cleaned.csv` → Supabase (`sets`, `cards`, `card_prices`) |
+| [`daily_price_tracker.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/daily_price_tracker.py) | Bot otomatis harian yang menarik update fluktuasi harga dari API ke Supabase. | API pokemontcg.io → `card_prices` & `card_price_history` |
+| [`models/build_card_index.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/models/build_card_index.py) | Mengekstrak vektor representasi CLIP ViT-B-32 (512-D) untuk pencarian sub-milidetik FAISS. | `compressed_images/` → `card_embeddings.index` & `card_id_map.json` |
+| [`models/chronos_forecaster.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/models/chronos_forecaster.py) | Engine peramalan deret waktu Amazon Chronos-Bolt untuk proyeksi harga kuantil 7 hari & sinyal preskriptif. | `card_price_history` → Pita Kuantil P10/P50/P90 & Sinyal BUY/HOLD/SELL |
 
 ---
 

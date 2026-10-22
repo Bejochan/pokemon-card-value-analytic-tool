@@ -3,7 +3,7 @@
 > **Pokemon Card Value Analytic Tool (REGOKEMON)**  
 > **Database Engine:** Supabase Cloud (PostgreSQL 15+)  
 > **Skema:** `public`  
-> **Total Entitas Master:** 161 Sets, 20.426 Kartu (`cards`), Snapshot Harga (`card_prices`), dan Riwayat Harga Harian (`card_price_history`)  
+> **Total Entitas Master:** 172 Sets, 20.617 Kartu (`cards`), Snapshot Harga (`card_prices`), dan Riwayat Harga Harian (`card_price_history`)  
 > **File DDL / Skema Asli:** [`docs/schema.sql`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/docs/schema.sql)  
 > **Skrip Seeding & Tracker:** [`backend/seed_supabase.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/seed_supabase.py) & [`backend/daily_price_tracker.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/daily_price_tracker.py)
 
@@ -205,9 +205,10 @@ CREATE INDEX IF NOT EXISTS idx_card_prices_effective ON public.card_prices(effec
                                                [ Rekomendasi BUY / HOLD / SELL ]
 ```
 
-1. **Inferensi Model 1 (CLIP):** Mengembalikan `card_id` kartu dengan skor kemiripan tertinggi.
-2. **Pencarian Cepat Supabase:** Backend FastAPI menarik data `effective_market_price` ($P_{base}$), `release_year`, dan `rarity` dari Supabase.
-3. **Kombinasi Kondisi Fisik Model 2 (YOLOv8):** Kerusakan fisik (Scratched, Bent, Edge Wear) dikalikan ke harga acuan pasar untuk menghasilkan estimasi harga wajar kartu bekas yang realistis.
+1. **Inferensi Model 1 (CLIP):** Mengembalikan `card_id` kartu dengan skor kemiripan visual tertinggi.
+2. **Pencarian Cepat Supabase:** Backend FastAPI menarik data `effective_market_price` ($P_{base}$), `release_year`, dan `rarity` dari tabel `card_prices`, serta deret waktu historis dari `card_price_history`.
+3. **Pemeriksaan Cacat Fisik Model 2 (YOLOv8):** Menilai cacat fisik (Scratched, Bent, Edge Wear) untuk mengoreksi nilai wajar kondisi aktual ($P_{final}$).
+4. **Peramalan & Sinyal Model 3 (Amazon Chronos-Bolt):** Memproyeksikan pita kuantil dinamis 7 hari (P10, P50, P90) dan menghasilkan sinyal preskriptif BUY/HOLD/SELL berdasarkan posisi harga terhadap lorong valuasi.
 
 ---
 
