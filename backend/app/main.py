@@ -91,8 +91,8 @@ from app.currency_service import (
 
 app = FastAPI(
     title="Regokemon Analytics & Valuation API",
-    description="Dual-Model Computer Vision & Fair Value Estimator for Pokémon TCG Marketplace.",
-    version="3.0.0"
+    description="Triple-Engine AI (Vision & Time-Series) & Fair Value Estimator for Pokémon TCG Marketplace.",
+    version="3.1.0"
 )
 
 app.add_middleware(
