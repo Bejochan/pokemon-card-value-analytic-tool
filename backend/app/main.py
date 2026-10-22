@@ -28,6 +28,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import requests
 
+# Mencegah fragmentasi VRAM CUDA di PyTorch (terutama GPU 4GB)
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 # Pastikan terminal Windows tidak crash saat print karakter/emoji
 if sys.platform == "win32":
     try:

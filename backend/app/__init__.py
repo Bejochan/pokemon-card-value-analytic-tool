@@ -11,6 +11,9 @@ import sys
 # Mencegah konflik OpenMP libiomp5md di Windows
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
+# Mencegah fragmentasi VRAM CUDA di PyTorch (penting untuk GPU 4GB)
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 # Inisialisasi awal PyTorch
 try:
     import torch
