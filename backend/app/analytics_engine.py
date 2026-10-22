@@ -62,7 +62,8 @@ try:
         _forecast_model.n_jobs = 1
         print(f"[Analytics Engine] Berhasil memuat model ML dari {model_path} (n_jobs=1)")
     else:
-        print(f"[Analytics Engine] Peringatan: File model tidak ditemukan di {model_path}")
+        # Model time-series utama menggunakan Amazon Chronos-Bolt Foundation Model
+        pass
     
     # Load dataset for categorical mapping & metadata lookup
     dataset_path = os.path.join(backend_dir, "dataset", "pokemon_cards_dataset_cleaned.csv")
