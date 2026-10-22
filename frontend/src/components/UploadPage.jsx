@@ -153,10 +153,10 @@ function UploadPage({ onUploadComplete }) {
             body: JSON.stringify({ image: base64String })
           });
           const data = await response.json();
-          if (data.status === 'success') {
+          if (response.ok && data.status === 'success') {
             onUploadComplete(data);
           } else {
-            alert(data.message || 'Error dari AI');
+            alert(data.message || data.detail || 'Terjadi kendala saat menganalisis kartu.');
           }
         } catch (error) {
           console.error('Error uploading file:', error);
