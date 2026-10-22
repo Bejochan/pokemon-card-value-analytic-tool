@@ -15,6 +15,7 @@ Engine ini adalah model resmi Model 1 untuk Regokemon:
 """
 
 import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import json
 import time
 import cv2
@@ -63,6 +64,7 @@ class CardIdentifier:
         self.clip_model = None
         self.transform = None
         self._orb = None
+        self.device = DEVICE
 
         self._load_resources()
 
@@ -80,10 +82,21 @@ class CardIdentifier:
         if os.path.exists(self.csv_path):
             self.df_metadata = pd.read_csv(self.csv_path).set_index("card_id", drop=False)
 
-        print(f"Memuat model CLIP ({CLIP_MODEL_NAME}/{CLIP_PRETRAINED}) ke {DEVICE}...")
-        model, _, preprocess = open_clip.create_model_and_transforms(
-            CLIP_MODEL_NAME, pretrained=CLIP_PRETRAINED, device=DEVICE
-        )
+        print(f"Memuat model CLIP ({CLIP_MODEL_NAME}/{CLIP_PRETRAINED}) ke {self.device}...")
+        try:
+            model, _, preprocess = open_clip.create_model_and_transforms(
+                CLIP_MODEL_NAME, pretrained=CLIP_PRETRAINED, device=self.device
+            )
+        except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
+            if "out of memory" in str(e).lower() and self.device.type == "cuda":
+                print(f"[WARN] [CardIdentifier] CUDA OOM saat alokasi CLIP. Membersihkan VRAM dan fallback ke CPU...")
+                torch.cuda.empty_cache()
+                self.device = torch.device("cpu")
+                model, _, preprocess = open_clip.create_model_and_transforms(
+                    CLIP_MODEL_NAME, pretrained=CLIP_PRETRAINED, device=self.device
+                )
+            else:
+                raise e
         model.eval()
         self.clip_model = model
         self.transform = preprocess
@@ -204,7 +217,7 @@ class CardIdentifier:
     # FEATURE EXTRACTION (CLIP)
     # ------------------------------------------------------------------
     def _extract_embedding(self, pil_img):
-        tensor_img = self.transform(pil_img).unsqueeze(0).to(DEVICE)
+        tensor_img = self.transform(pil_img).unsqueeze(0).to(self.device)
         with torch.no_grad():
             feat = self.clip_model.encode_image(tensor_img)
             feat = feat / feat.norm(dim=-1, keepdim=True)
