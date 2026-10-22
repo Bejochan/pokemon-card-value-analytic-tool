@@ -15,6 +15,11 @@ import cv2
 import numpy as np
 from typing import Dict, Any, List, Optional, Tuple
 
+import threading
+
+# Mencegah fragmentasi VRAM CUDA di PyTorch
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 # Pastikan terminal Windows tidak crash saat print karakter/emoji
 if sys.platform == "win32":
     try:
@@ -38,61 +43,71 @@ except Exception:
     except Exception:
         pass
 
-# Inisialisasi awal PyTorch di Windows sebelum modul OpenCV/NumPy dimuat
-try:
-    import torch
-except Exception:
-    pass
-
 from app.analytics_engine import evaluate_card_valuation, DEFAULT_USD_TO_IDR
 from app.currency_service import get_usd_to_idr_rate, convert_usd_to_idr
 
 
 # =====================================================================
-# INISIALISASI MODEL VISION SINGLETON (LAZY LOADING)
+# INISIALISASI MODEL VISION SINGLETON (LAZY LOADING DENGAN THREAD LOCK)
 # =====================================================================
 
 _card_identifier = None
 _defect_model = None
+_identifier_lock = threading.Lock()
+_defect_lock = threading.Lock()
 
 def get_card_identifier():
     """
     Mengambil instance CardIdentifier secara Lazy (hanya dimuat saat pertama kali dibutuhkan).
-    Jika terjadi kendala pada PyTorch/GPU, server tetap berjalan tanpa crash.
+    Menggunakan thread lock (double-checked locking) untuk mencegah race condition
+    ketika banyak request masuk bersamaan, menghindari pemuatan model CLIP ganda
+    yang dapat memicu CUDA Out of Memory di GPU 4GB.
     """
     global _card_identifier
     if _card_identifier is None:
-        try:
-            print("[INFO] [CV Service] Permintaan scan diterima. Memuat Model 1 (CLIP + FAISS)...")
-            from models.card_identifier import CardIdentifier
-            _card_identifier = CardIdentifier()
-            print("[OK] [CV Service] Model 1 berhasil dimuat dan siap digunakan!")
-        except Exception as e:
-            print(f"[ERROR] [CV Service] Gagal memuat Model 1 AI Engine: {e}")
-            return None
+        with _identifier_lock:
+            if _card_identifier is None:
+                try:
+                    if "torch" in sys.modules:
+                        import torch
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                    print("[INFO] [CV Service] Permintaan scan diterima. Memuat Model 1 (CLIP + FAISS)...")
+                    from models.card_identifier import CardIdentifier
+                    _card_identifier = CardIdentifier()
+                    print("[OK] [CV Service] Model 1 berhasil dimuat dan siap digunakan!")
+                except Exception as e:
+                    print(f"[ERROR] [CV Service] Gagal memuat Model 1 AI Engine: {e}")
+                    if "torch" in sys.modules:
+                        import torch
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                    return None
     return _card_identifier
 
 
 def get_defect_model():
     """
-    Mengambil instance model YOLOv8 Condition Grader lokal secara Lazy.
+    Mengambil instance model YOLOv8 Condition Grader lokal secara Lazy dengan thread lock.
     Menggunakan model 'best-model-v5-card-condition.pt' yang sudah dilatih secara lokal.
     """
     global _defect_model
     if _defect_model is None:
-        try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            backend_dir = os.path.dirname(current_dir)
-            model_path = os.path.join(backend_dir, "models", "best-model-v5-card-condition.pt")
-            if os.path.exists(model_path):
-                from ultralytics import YOLO
-                _defect_model = YOLO(model_path)
-                print(f"[OK] [CV Service] Model 2 YOLOv8 Condition Grader lokal berhasil dimuat dari {model_path}")
-            else:
-                print(f"[WARN] [CV Service] File model lokal tidak ditemukan di: {model_path}")
-        except Exception as e:
-            print(f"[WARN] [CV Service] Gagal memuat Model 2 YOLO lokal: {e}")
-            return None
+        with _defect_lock:
+            if _defect_model is None:
+                try:
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    backend_dir = os.path.dirname(current_dir)
+                    model_path = os.path.join(backend_dir, "models", "best-model-v5-card-condition.pt")
+                    if os.path.exists(model_path):
+                        from ultralytics import YOLO
+                        _defect_model = YOLO(model_path)
+                        print(f"[OK] [CV Service] Model 2 YOLOv8 Condition Grader lokal berhasil dimuat dari {model_path}")
+                    else:
+                        print(f"[WARN] [CV Service] File model lokal tidak ditemukan di: {model_path}")
+                except Exception as e:
+                    print(f"[WARN] [CV Service] Gagal memuat Model 2 YOLO lokal: {e}")
+                    return None
     return _defect_model
 
 
