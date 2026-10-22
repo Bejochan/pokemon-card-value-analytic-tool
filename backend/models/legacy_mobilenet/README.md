@@ -10,7 +10,7 @@ Folder ini berisi implementasi **arsitektur alternatif / baseline awal (MobileNe
   Model utama Regokemon menggunakan **OpenAI CLIP (Vision Transformer ViT-B-32)** yang berada di folder induk (`backend/models/card_identifier.py`). CLIP terbukti jauh lebih akurat pada visual 2D ilustrasi kartu Pokémon, tahan terhadap variasi pencahayaan, dan dilengkapi fitur **4-Way Smart Auto-Orientation**.
   
 - **Tujuan Folder Ini (Alternative Baseline):**
-  Folder ini dipertahankan sebagai **komparasi akademik (Ablation Study / Baseline Comparison)** untuk laporan proyek analitika data & computer vision:
+  Folder ini dipertahankan sebagai **studi komparasi teknis (Technical Benchmark & Ablation Study)** untuk evaluasi sistem analitika data & computer vision:
   - Membuktikan secara empiris kelemahan model klasifikasi umum (MobileNet ImageNet) terhadap domain ilustrasi kartu.
   - Membandingkan metrik akurasi Top-1, Top-5, dan Mean Reciprocal Rank (MRR) antara MobileNetV3 vs CLIP ViT-B-32.
 
@@ -29,7 +29,7 @@ Folder ini berisi implementasi **arsitektur alternatif / baseline awal (MobileNe
 
 ## 🚀 Cara Menjalankan Baseline (Untuk Pengujian Komparasi)
 
-Jika ingin menguji baseline MobileNet untuk bahan laporan/grafik perbandingan:
+Jika ingin menguji baseline MobileNet untuk benchmarking dan analisis komparasi performa:
 
 ```bash
 # Pengujian foto manual dengan MobileNet:

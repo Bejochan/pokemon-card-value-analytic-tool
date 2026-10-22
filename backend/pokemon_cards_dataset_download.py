@@ -79,7 +79,7 @@ failed_count = 0
 max_workers = 16
 
 with ThreadPoolExecutor(max_workers=max_workers) as executor:
-    # Memetakan tugas ke setiap baris dataframe
+    # Memetakan worker download ke setiap baris dataframe
     futures = {executor.submit(download_single_image, row): row for _, row in df.iterrows()}
     
     # Menampilkan progress bar interaktif di terminal

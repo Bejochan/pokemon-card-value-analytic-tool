@@ -2,7 +2,7 @@
 backend/app/analytics_engine.py
 ===============================
 Mesin Analitika & Valuasi Harga Wajar Kartu Pokémon (Regokemon Engine).
-Mengimplementasikan formula valuasi resmi dari Laporan Akademik Bab II:
+Mengimplementasikan spesifikasi formula valuasi pasar resmi Regokemon:
 
     P_final = P_base * M_variant * F_condition * F_market
 
@@ -11,7 +11,7 @@ Fungsi utama:
 2. Menghitung pengali kelangkaan & vintage (M_variant).
 3. Mengonversi mata uang (USD -> IDR).
 4. Menghasilkan sinyal transaksi wajar (BUY / HOLD / SELL).
-5. Multi-step recursive forecasting harga 7 hari ke depan.
+5. Integrasi Time-Series Foundation Model Amazon Chronos-Bolt untuk peramalan kuantil probabilistik 7 hari ke depan.
 6. Standalone evaluation untuk kondisi fisik kartu (Card Condition Model) dua sisi.
 """
 

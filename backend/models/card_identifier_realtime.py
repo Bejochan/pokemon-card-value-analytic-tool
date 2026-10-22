@@ -712,7 +712,7 @@ def main():
     print("SISTEM REAL-TIME SIAP!")
     print("• Arahkan kartu ke dalam kotak panduan di sisi kiri.")
     print("• Sisi kanan menampilkan analitik live (Top-1, Top 2-4, Telemetri).")
-    print("• [Spasi] : Freeze/Pause tampilan untuk menunjukkan hasil ke dosen.")
+    print("• [Spasi] : Freeze/Pause tampilan untuk inspeksi detail hasil deteksi.")
     print("• [M]     : Toggle Layar Penuh (Fullscreen 1920x1080).")
     print("• [R]     : Putar Orientasi Kamera (0 deg / 90 deg / 180 deg / 270 deg).")
     print("• [F]     : Memicu Auto-Focus kamera HP Redmi.")

@@ -14,7 +14,7 @@
 4. [Mengapa CLIP Sangat Cocok untuk Proyek Kartu Pokémon?](#4-mengapa-clip-sangat-cocok-untuk-proyek-kartu-pokémon)
 5. [Arsitektur Two-Stage Hybrid: CLIP + FAISS + Fast ORB](#5-arsitektur-two-stage-hybrid-clip--faiss--fast-orb)
 6. [Tabel Komparasi: CLIP ViT vs Model Alternatif](#6-tabel-komparasi-clip-vit-vs-model-alternatif)
-7. [Panduan Menjawab Pertanyaan Dosen (Q&A Defense Guide)](#7-panduan-menjawab-pertanyaan-dosen-qa-defense-guide)
+7. [Technical FAQ & Pertimbangan Rekayasa Arsitektur](#7-technical-faq--pertimbangan-rekayasa-arsitektur)
 
 ---
 
@@ -58,7 +58,7 @@ Sistem **Regokemon** mengadopsi model **CLIP (*Contrastive Language-Image Pre-tr
 ### Karakteristik Utama CLIP:
 1. **Dual-Encoder Architecture:** Terdiri dari *Vision Encoder* (memproses gambar) dan *Text Encoder* (memproses teks). Pada sistem identifikasi kartu fisik Regokemon, komponen yang aktif digunakan saat inferensi *real-time* adalah **Vision Encoder**.
 2. **Contrastive Objective:** Selama masa pelatihan, model memaksimalkan nilai *cosine similarity* untuk pasangan gambar-teks yang cocok, dan meminimalkan nilai untuk pasangan yang tidak cocok.
-3. **Semantic Metric Space:** Output dari Vision Encoder adalah vektor berdimensi 512 yang terdistribusi secara seragam pada *unit hypersphere* ($L_2\text{-normalized}$), sehingga jarak sudut antar-vektor merepresentasikan kemiripan semantik dan visual.
+3. **Semantic Metric Space:** Output dari Vision Encoder adalah vektor berdimensi 512 yang terdistribusi secara seragam pada *unit hypersphere* (L2-normalized), sehingga jarak sudut antar-vektor merepresentasikan kemiripan semantik dan visual.
 
 ---
 
@@ -90,7 +90,7 @@ Gambar Kartu (224×224)
 ```
 
 ### Mengapa ViT Berbeda dari CNN Konvensional?
-* **CNN (Convolutional Neural Network):** Menggunakan *local receptive field* (filter berukuran kecil, misal $3 \times 3$). Informasi spasial global baru terbangun secara bertahap setelah melalui banyak lapisan konvolusi dan pooling.
+* **CNN (Convolutional Neural Network):** Menggunakan *local receptive field* (filter berukuran kecil, misal 3×3). Informasi spasial global baru terbangun secara bertahap setelah melalui banyak lapisan konvolusi dan pooling.
 * **ViT (Vision Transformer):** Mekanisme **Self-Attention** memungkinkan setiap *patch* pada gambar untuk berinteraksi dan mengukur korelasi langsung dengan seluruh *patch* lainnya sejak lapisan pertama. Hal ini memberikan kemampuan **Global Context Awareness** yang jauh lebih unggul.
 
 ---
@@ -103,7 +103,7 @@ Dalam sistem TCG (*Trading Card Game*), jumlah kartu terus bertambah setiap ada 
 
 | Aspek | Klasifikasi Konvensional (CNN + Softmax) | CLIP + Vector Retrieval (Regokemon) |
 | :--- | :--- | :--- |
-| **Output Layer** | Vektor probabilitas berdimensi tetap ($N$ kelas). | Vektor embedding kontinu 512 dimensi. |
+| **Output Layer** | Vektor probabilitas berdimensi tetap (N kelas). | Vektor embedding kontinu 512 dimensi. |
 | **Penambahan Kartu Baru** | **Harus melatih ulang model (*re-training*)** dari awal setiap ada rilis set kartu baru. | **Tanpa re-training.** Cukup ekstrak embedding kartu baru dan masukkan ke FAISS Index dalam 5 milidetik. |
 | **Efisiensi Database** | Memerlukan ratusan sampel gambar training per kartu. | Memerlukan 1 gambar referensi master per kartu (*one-shot reference*). |
 
@@ -191,25 +191,25 @@ Untuk mengatasi hal ini, Regokemon menerapkan **Two-Stage Identification Pipelin
 
 ---
 
-## 🎓 7. Panduan Menjawab Pertanyaan Dosen (Q&A Defense Guide)
+## 💡 7. Technical FAQ & Pertimbangan Rekayasa Arsitektur
 
-Berikut adalah panduan antisipasi pertanyaan dari dosen penguji/pembimbing Computer Vision beserta jawaban yang tepat dan berbobot:
+Bagian ini merangkum pertimbangan teknis kritis dan pertanyaan seputar desain arsitektur Computer Vision pada sistem REGOKEMON:
 
-### Q1: *"Kenapa memilih CLIP, bukan fine-tuning ResNet atau model klasifikasi biasa?"*
-> **Jawaban:**  
-> *"Jika menggunakan klasifikasi konvensional dengan output layer Softmax, model akan terkunci pada jumlah kelas tertentu. Kartu Pokémon memiliki lebih dari 20.000 varian dan terus bertambah setiap beberapa bulan saat ekspansi baru dirilis. Jika memakai klasifikasi biasa, setiap rilis kartu baru kita harus melakukan retraining seluruh model.*  
-> *Dengan CLIP, kami menggunakan pendekatan **Metric Learning / Vector Retrieval**. CLIP berperan sebagai feature extractor serbaguna yang menghasilkan representasi 512 dimensi, lalu pencarian dilakukan menggunakan FAISS. Ketika ada kartu baru, kami cukup mengekstrak embedding-nya satu kali dan memasukkannya ke indeks FAISS tanpa perlu melatih ulang model."*
-
----
-
-### Q2: *"Apakah Vision Transformer (ViT) di CLIP tidak terlalu berat untuk dijalankan real-time di laptop?"*
-> **Jawaban:**  
-> *"Kami menggunakan varian **ViT-B/32** (Base dengan patch size 32). Patch berukuran 32×32 menghasilkan sequence length yang relatif ringkas (hanya 49 patch tokens untuk input 224×224), sehingga komputasi Self-Attention-nya jauh lebih ringan dibandingkan ViT-B/16. Waktu inferensinya berkisar antara 120 hingga 150 ms.*  
-> *Selain itu, kami memisahkan proses inferensi ke dalam **Background Worker Thread Asinkron**, sehingga rendering kamera dan animasi UI tetap berjalan stabil dan mulus di atas 30 FPS tanpa terjadi freeze pada layar."*
+### Q1: *"Kenapa memilih CLIP Metric Learning, bukan fine-tuning ResNet atau model klasifikasi konvensional?"*
+> **Penjelasan Teknis:**  
+> Jika menggunakan klasifikasi konvensional dengan output layer *Softmax*, model akan terkunci pada jumlah kelas tertentu (*closed-set problem*). Kartu Pokémon memiliki lebih dari 20.000 varian unik dan katalog resmi terus bertambah setiap beberapa bulan saat ekspansi baru dirilis. Jika memakai klasifikasi biasa, setiap rilis ekspansi baru sistem wajib melakukan *retraining* seluruh parameter model dari awal.  
+> Dengan CLIP, sistem menggunakan paradigma **Metric Learning / Open-Set Vector Retrieval**. CLIP berperan sebagai *universal visual embedder* yang memproyeksikan citra kartu ke dalam ruang laten 512 dimensi, lalu pencarian tetangga terdekat dilakukan menggunakan FAISS IndexFlatIP. Ketika ekspansi baru dirilis, sistem cukup mengekstrak embedding kartu baru dalam hitungan detik dan menyematkannya ke indeks FAISS tanpa perlu *retraining* atau *downtime* server.
 
 ---
 
-### Q3: *"Mengapa masih membutuhkan ORB jika CLIP sudah akurat?"*
-> **Jawaban:**  
-> *"CLIP sangat unggul dalam menangkap kemiripan semantik dan visual global, tetapi kartu Pokémon memiliki kasus khusus yaitu **kartu reprint**. Kartu reprint menampilkan ilustrasi Pokémon yang sama persis, tetapi berasal dari set dan nomor kartu yang berbeda.*  
-> *Untuk membedakan varian tersebut secara presisi, kami menerapkan **Two-Stage Pipeline**: CLIP dan FAISS bertindak sebagai pencari cepat untuk menyaring 20.617 kartu menjadi pool kandidat kecil (Top-15), kemudian algoritma **ORB Feature Matching** melakukan verifikasi geometris lokal tingkat piksel untuk memvalidasi nomor set dan logo spesifik di bagian bawah kartu."*
+### Q2: *"Apakah Vision Transformer (ViT) di CLIP tidak terlalu berat untuk dijalankan secara real-time?"*
+> **Penjelasan Teknis:**  
+> Sistem menggunakan varian **ViT-B/32** (Base dengan patch size 32×32). Patch berukuran 32 menghasilkan *token sequence* yang ringkas (hanya 49 patch tokens untuk input 224×224), sehingga komputasi Self-Attention-nya jauh lebih ringan dan cepat dibandingkan ViT-B/16 yang memiliki 196 patch tokens.  
+> Selain itu, pada implementasi live stream kamera, sistem memisahkan proses inferensi visual ke dalam **Background Worker Thread Asinkron**, sehingga rendering kamera dan animasi antarmuka tetap berjalan mulus di atas 30 FPS tanpa terjadi frame-dropping atau UI freeze.
+
+---
+
+### Q3: *"Mengapa masih membutuhkan Two-Stage ORB Re-Ranking jika CLIP sudah akurat?"*
+> **Penjelasan Teknis:**  
+> CLIP sangat unggul dalam menangkap representasi semantik visual secara global, namun dunia kartu Pokémon memiliki kasus khusus berupa **kartu reprint**. Kartu reprint menampilkan ilustrasi karakter Pokémon yang sama persis dari ilustrator yang sama, tetapi berasal dari set rilis, tahun, dan nomor kartu yang berbeda (dengan nilai pasar yang bisa berbeda drastis).  
+> Untuk membedakan varian kembar tersebut secara presisi, sistem menerapkan **Two-Stage Pipeline**: CLIP dan FAISS bertindak sebagai penyaring cepat (Stage 1) untuk mempersempit 20.617 kartu menjadi kandidat teratas (Top-15), kemudian algoritma **ORB Keypoint Matching** (Stage 2) memverifikasi deskriptor lokal tingkat piksel untuk memvalidasi teks nomor seri dan simbol set di sudut kartu.
