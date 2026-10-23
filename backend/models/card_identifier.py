@@ -16,6 +16,10 @@ Engine ini adalah model resmi Model 1 untuk Regokemon:
 
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+if "HF_HUB_OFFLINE" not in os.environ:
+    os.environ["HF_HUB_OFFLINE"] = "1"
+if "TRANSFORMERS_OFFLINE" not in os.environ:
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
 import json
 import time
 import cv2
@@ -46,7 +50,7 @@ class CardIdentifier:
     def __init__(self, index_path=INDEX_PATH, map_path=MAP_PATH, csv_path=CSV_PATH,
                  image_dir=IMAGE_DIR, confidence_temperature=0.03,
                  calibration_pool_size=20, use_tta=False, use_orb_rerank=True,
-                 orb_rerank_pool_size=100):
+                 orb_rerank_pool_size=8):
         self.index_path = index_path
         self.map_path = map_path
         self.csv_path = csv_path
@@ -448,7 +452,7 @@ class CardIdentifier:
 
             # Urutkan berdasarkan kemiripan CLIP terlebih dahulu
             sorted_by_sim = sorted(cand_dict.items(), key=lambda x: x[1], reverse=True)
-            max_orb_eval = min(len(sorted_by_sim), top_k if fast_mode else len(sorted_by_sim))
+            max_orb_eval = min(len(sorted_by_sim), top_k if fast_mode else self.orb_rerank_pool_size)
 
             raw_cands = []
             for rank, (card_id, dist) in enumerate(sorted_by_sim):

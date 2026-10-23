@@ -9,8 +9,11 @@ Menghasilkan proyeksi 7 hari ke depan secara probabilistik dengan tiga kurva kua
 - P50: Median Wajar / Target Nilai Pasar Wajar (Fair Market Value)
 - P90: Batas Atas / Skenario Optimis Pasar
 """
-
 import os
+if "HF_HUB_OFFLINE" not in os.environ:
+    os.environ["HF_HUB_OFFLINE"] = "1"
+if "TRANSFORMERS_OFFLINE" not in os.environ:
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import numpy as np
