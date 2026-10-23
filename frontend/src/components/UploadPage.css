@@ -105,6 +105,13 @@
   border-color: #e83e8c;
 }
 
+.drop-zone.drag-active {
+  background-color: #f5f3ff;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+  transform: scale(1.02);
+}
+
 .upload-icon {
   font-size: 36px;
   margin-bottom: 8px;
