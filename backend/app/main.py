@@ -95,6 +95,12 @@ app = FastAPI(
     version="3.1.0"
 )
 
+# Mencegah remote network ping ke HuggingFace Hub jika bobot model sudah ada di local cache
+if "HF_HUB_OFFLINE" not in os.environ:
+    os.environ["HF_HUB_OFFLINE"] = "1"
+if "TRANSFORMERS_OFFLINE" not in os.environ:
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -102,6 +108,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def prewarm_models_background():
+    """Memanaskan (pre-warm) Model 1 (CLIP) dan Model 2 (YOLOv8) secara asinkron di latar belakang
+    saat server pertama kali dinyalakan. Ini memastikan saat user melakukan upload manual pertama kali,
+    model sudah siap di VRAM/RAM dan respons inferensi langsung berjalan instan (~1 detik) tanpa jeda cold-start."""
+    import threading
+
+    def _warmup_task():
+        try:
+            print("[INFO] [Startup Warmup] Memanaskan Model AI (CLIP + FAISS + YOLO) di latar belakang...")
+            from app.cv_service import get_card_identifier, get_defect_model
+            get_card_identifier()
+            get_defect_model()
+            print("[OK] [Startup Warmup] Seluruh engine AI siap melayani inferensi tanpa jeda!")
+        except Exception as e:
+            print(f"[WARN] [Startup Warmup] Warmup non-blocking notice: {e}")
+
+    threading.Thread(target=_warmup_task, daemon=True).start()
 
 
 # ---------------------------------------------------------------------

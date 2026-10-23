@@ -74,7 +74,7 @@ def get_card_identifier():
                             torch.cuda.empty_cache()
                     print("[INFO] [CV Service] Permintaan scan diterima. Memuat Model 1 (CLIP + FAISS)...")
                     from models.card_identifier import CardIdentifier
-                    _card_identifier = CardIdentifier()
+                    _card_identifier = CardIdentifier(orb_rerank_pool_size=8)
                     print("[OK] [CV Service] Model 1 berhasil dimuat dan siap digunakan!")
                 except Exception as e:
                     print(f"[ERROR] [CV Service] Gagal memuat Model 1 AI Engine: {e}")
@@ -117,24 +117,49 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 def get_live_price(card_id: str, default_price: float) -> float:
+    """
+    Mengambil harga pasar kartu.
+    Optimasi Kinerja: Mengutamakan data harga in-memory dari master CSV di RAM (0 ms latency).
+    Hanya menghubungi Supabase REST API jika harga in-memory belum tersedia (<= 0).
+    """
+    if default_price and not np.isnan(default_price) and default_price > 0:
+        return float(default_price)
+
     if not SUPABASE_URL or not SUPABASE_KEY or not card_id:
-        return default_price
+        return default_price if (default_price and not np.isnan(default_price)) else 0.0
+
     try:
         url = f"{SUPABASE_URL}/rest/v1/card_prices?select=effective_market_price&card_id=eq.{card_id}"
         headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
-        res = requests.get(url, headers=headers, timeout=5)
+        res = requests.get(url, headers=headers, timeout=1.5)
         if res.status_code == 200:
             data = res.json()
             if data and len(data) > 0 and data[0].get("effective_market_price") is not None:
-                return float(data[0]["effective_market_price"])
+                val = float(data[0]["effective_market_price"])
+                if not np.isnan(val) and val > 0:
+                    return val
     except Exception as e:
         print(f"[CV Service] Gagal fetch harga live dari Supabase: {e}")
-    return default_price
+    return default_price if (default_price and not np.isnan(default_price)) else 0.0
 
 
 # =====================================================================
-# FUNGSI HELPER DECODING GAMBAR DI RAM
+# FUNGSI HELPER DECODING & RESIZING GAMBAR DI RAM
 # =====================================================================
+
+def resize_image_if_oversized(img_bgr: np.ndarray, max_dim: int = 1280) -> np.ndarray:
+    """Membatasi resolusi maksimum gambar agar efisiensi memori dan komputasi OpenCV tetap optimal."""
+    if img_bgr is None:
+        return img_bgr
+    h, w = img_bgr.shape[:2]
+    max_side = max(h, w)
+    if max_side > max_dim:
+        scale = max_dim / float(max_side)
+        new_w = int(round(w * scale))
+        new_h = int(round(h * scale))
+        return cv2.resize(img_bgr, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    return img_bgr
+
 
 def decode_base64_to_cv2(image_b64: str) -> Tuple[Optional[np.ndarray], Optional[str]]:
     """
@@ -157,6 +182,7 @@ def decode_base64_to_cv2(image_b64: str) -> Tuple[Optional[np.ndarray], Optional
         if img_bgr is None:
             return None, None
 
+        img_bgr = resize_image_if_oversized(img_bgr, max_dim=1280)
         return img_bgr, clean_b64
     except Exception as e:
         print(f"[CV Service] Gagal mendekode Base64: {e}")
@@ -171,6 +197,10 @@ def decode_bytes_to_cv2(image_bytes: bytes) -> Tuple[Optional[np.ndarray], Optio
             
         img_arr = np.frombuffer(image_bytes, np.uint8)
         img_bgr = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+        if img_bgr is None:
+            return None, None
+
+        img_bgr = resize_image_if_oversized(img_bgr, max_dim=1280)
         clean_b64 = base64.b64encode(image_bytes).decode("utf-8")
         return img_bgr, clean_b64
     except Exception as e:
