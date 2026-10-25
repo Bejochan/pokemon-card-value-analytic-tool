@@ -600,4 +600,24 @@
 .pagination-info {
   font-size: 13.5px;
   color: #374151;
-}
+}
+
+/* Breakpoint Responsif Header Katalog */
+@media (max-width: 768px) {
+  .catalog-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 16px !important;
+    padding: 16px !important;
+  }
+
+  .set-selector-container {
+    position: static !important;
+    width: 100% !important;
+  }
+
+  .search-bar-wrapper {
+    width: 100% !important;
+  }
+}
+

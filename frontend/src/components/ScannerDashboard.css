@@ -841,3 +841,36 @@
   background-color: #d83680;
   transform: translateY(-1px);
 }
+
+/* Breakpoint Responsif Scanner Dashboard */
+@media (max-width: 860px) {
+  .details-grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px;
+    width: 95%;
+  }
+
+  .price-tag-container {
+    width: 100%;
+    max-width: 340px;
+    margin: 30px auto;
+  }
+
+  .price-shape {
+    width: 100% !important;
+    max-width: 480px;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .price-text {
+    font-size: 52px !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .chart-container {
+    width: 100%;
+    overflow-x: auto;
+  }
+}

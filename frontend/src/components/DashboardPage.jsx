@@ -85,6 +85,11 @@ const AnimatedTextScramble = ({ targetText, duration }) => {
 
 function DashboardPage() {
   const [trendingCards, setTrendingCards] = useState([]);
+  const [catalogSummary, setCatalogSummary] = useState({
+    totalCards: 20617,
+    totalSets: 172,
+    marketStatus: "Active Database"
+  });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -93,6 +98,13 @@ function DashboardPage() {
         if (response.ok) {
           const data = await response.json();
           setTrendingCards(data.trending || []);
+          if (data.total_cards) {
+            setCatalogSummary(prev => ({
+              ...prev,
+              totalCards: data.total_cards,
+              totalSets: data.total_sets || prev.totalSets
+            }));
+          }
         }
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
@@ -165,26 +177,23 @@ function DashboardPage() {
       {/* 2. STATS BANNER (PITA PINK PENUH) */}
       <div className="dashboard-stats-banner">
         <div className="stat-banner-item">
-          <span className="stat-banner-label">Total Scans Today</span>
+          <span className="stat-banner-label">Total Verified Cards</span>
           <span className="stat-banner-value">
-            {/* 3. Ganti teks statis dengan AnimatedCounter */}
-            <AnimatedCounter endValue={1452} duration={2000} />
+            <AnimatedCounter endValue={catalogSummary.totalCards} duration={1800} />
           </span>
         </div>
         <div className="stat-banner-divider"></div>
         <div className="stat-banner-item">
-          <span className="stat-banner-label">Highest Value Found</span>
+          <span className="stat-banner-label">Official Card Sets</span>
           <span className="stat-banner-value">
-            {/* 4. Gunakan prop isDecimal dan prefix untuk format uang */}
-            <AnimatedCounter endValue={850.00} duration={2000} prefix="$ " isDecimal={true} />
+            <AnimatedCounter endValue={catalogSummary.totalSets} duration={1800} />
           </span>
         </div>
         <div className="stat-banner-divider"></div>
         <div className="stat-banner-item">
-          <span className="stat-banner-label">Active Market Trend</span>
+          <span className="stat-banner-label">Market Tracking</span>
           <span className="stat-banner-value">
-            {/* Terapkan AnimatedTextScramble di sini */}
-            <AnimatedTextScramble targetText="bullish ↗" duration={2000} />
+            <AnimatedTextScramble targetText={catalogSummary.marketStatus} duration={1800} />
           </span>
         </div>
       </div>
