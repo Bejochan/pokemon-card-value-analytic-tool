@@ -11,14 +11,15 @@
   overflow: hidden;
 }
 
-/* KHUSUS HALAMAN DETAIL: Izinkan Scroll Vertikal Halus */
+/* KHUSUS HALAMAN DETAIL: Izinkan Scroll Vertikal Halus Mandiri (Locked Viewport) */
 .dashboard-container.details-mode {
+  height: calc(100vh - 70px);
+  max-height: calc(100vh - 70px);
   overflow-y: auto;
   overflow-x: hidden;
   align-items: flex-start;
-  padding: 15px 0 40px 0;
-  height: auto;
-  min-height: calc(100vh - 70px);
+  padding: 10px 0 35px 0;
+  box-sizing: border-box;
   scroll-behavior: smooth;
 }
 
@@ -164,7 +165,7 @@
   justify-content: flex-start;
   align-items: center;
   position: relative;
-  padding: 0;
+  padding: 0 0 40px 0;
   box-sizing: border-box;
   margin-top: 0; 
 }
@@ -185,7 +186,7 @@
   gap: 20px;
   width: 100%;
   max-width: 100%;
-  min-height: 540px;
+  min-height: 480px;
   height: auto;
   box-sizing: border-box;
 }
@@ -193,7 +194,7 @@
 .info-box {
   background-color: #ffffff;
   border-radius: 25px;
-  padding: 24px 20px;
+  padding: 18px 20px;
   box-shadow: 0 15px 35px rgba(0,0,0,0.1);
   flex: 1;
   min-width: 0; /* PENTING: Mencegah flex child overflow ke kanan */
@@ -211,23 +212,60 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 0 0 220px;
-  max-width: 220px;
+  gap: 10px;
+  flex: 0 0 170px;
+  max-width: 170px;
 }
 
-.detail-card-img {
+.card-thumb-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
-  max-width: 220px;
-  border-radius: 12px;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+}
+
+.card-thumb-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.card-thumb-label.scan-label {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.card-thumb-label.master-label {
+  background: rgba(0, 210, 106, 0.12);
+  color: #008744;
+  border: 1px solid rgba(0, 210, 106, 0.25);
+}
+
+.detail-card-img.user-scan-img,
+.detail-card-img.master-official-img {
+  width: auto;
+  max-width: 135px;
+  max-height: 135px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.14);
+  object-fit: contain;
+  background-color: #f8fafc;
 }
 
 .celebration-logo {
-  margin-top: 14px;
+  margin-top: 4px;
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
   color: #1e1b4b;
-  font-size: 13px;
+  font-size: 11px;
   text-align: center;
 }
 
@@ -374,8 +412,8 @@
   min-width: 0;
   background-color: #f8f9fa;
   border: 1px solid #eaeaea;
-  border-radius: 10px;
-  padding: 12px 10px;
+  border-radius: 8px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -384,11 +422,11 @@
 
 .stat-label {
   font-family: 'Montserrat', sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #6c757d;
   text-transform: uppercase;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -396,7 +434,7 @@
 
 .stat-value {
   font-family: 'Anton', sans-serif;
-  font-size: 24px;
+  font-size: 20px;
   letter-spacing: 0.5px;
   color: #1e1b4b;
   white-space: nowrap;
@@ -564,74 +602,197 @@
   color: #ffffff;
 }
 
-/* GRAFIK SVG */
+/* GRAFIK SVG & PERAMALAN HARGA */
 .chart-container {
   background-color: #ffffff;
-  border-radius: 15px;
-  /* Ubah flex: 1 menjadi flex-grow yang lebih kecil agar tidak terlalu tinggi */
-  /* FIX: grafik mengisi SISA ruang saja. Sebelumnya flex-end membuat isi
-     grafik meluap ke ATAS dan menimpa kotak Trading Signal & Alternative Matches */
-  flex: 1 1 0;
-  overflow: hidden;
+  border: 1px solid #f1f5f9;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  /* Kurangi margin bottom agar tombol naik */
-  margin-bottom: 0px; 
   width: 100%;
-  min-height: 120px;
+  padding: 10px 12px 10px 12px;
+  box-sizing: border-box;
+  position: relative;
+  margin-top: 4px;
+  margin-bottom: 8px;
 }
 
-.svg-wrapper {
-  width: 100%;
-  /* Sisakan sedikit ruang margin agar titik ujung tidak terpotong tepi putih */
-  padding: 0 15px; 
-  box-sizing: border-box;
-  flex: 1;
-  min-height: 0;
+.chart-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.chart-title-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .chart-subtitle {
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
   color: #1e1b4b;
-  font-size: 18px; 
-  margin: 15px 0 10px 0;
+  font-size: 14px; 
+  margin: 0;
+}
+
+.forecast-trend-tag {
+  background: rgba(0, 210, 106, 0.12);
+  color: #00a854;
+  border: 1px solid rgba(0, 210, 106, 0.3);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+}
+
+.chart-legend-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.legend-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-bar {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.history-bar {
+  background-color: #c2185b;
+}
+
+.forecast-bar {
+  background-color: #00d26a;
+  border-top: 1px dashed #00d26a;
+}
+
+.legend-name {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.svg-wrapper {
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.chart-hover-card {
+  position: absolute;
+  top: -10px;
+  transform: translate(-50%, -100%);
+  background: #1e1b4b;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  font-family: 'Montserrat', sans-serif;
+  pointer-events: none;
+  z-index: 20;
+  white-space: nowrap;
+}
+
+.hover-type-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.hover-date {
+  font-size: 10px;
+  color: #e2e8f0;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.hover-price-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #00d26a;
+}
+
+.hover-usd-val {
+  font-size: 11px;
+  color: #cbd5e1;
+  font-weight: 500;
 }
 
 .market-chart {
   width: 100%;
-  height: 100%;
-  
-  /* 1. HAPUS atau komentari max-height yang mencekik grafik ini */
-  /* max-height: 120px; */ 
-  
-  /* 2. AKTIFKAN KEMBALI aspect-ratio ini. 
-        Rasio 5/2 persis sama dengan viewBox 500/200, 
-        sehingga lingkaran dijamin bulat sempurna meskipun ditarik selebar apa pun */
-  /* aspect-ratio: 5 / 2; -- dimatikan: memaksa tinggi tetap & bikin overflow */
-  
+  height: 125px;
   display: block; 
   overflow: visible;
+}
+
+.chart-dot {
+  transition: transform 0.15s ease, r 0.15s ease;
+}
+
+.chart-dot:hover {
+  r: 8;
 }
 
 .chart-labels {
   display: flex;
   justify-content: space-between;
-  margin-top: 5px;
-  /* Padding 5px memastikan TENGAH teks sejajar dengan titik ujung grafik di atasnya */
-  padding: 0 5px; 
+  margin-top: 4px;
   box-sizing: border-box;
   font-family: 'Montserrat', sans-serif;
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 700;
   color: #adb5bd;
 }
 
+.chart-date-label {
+  text-align: center;
+}
+
+.chart-date-label.history {
+  color: #94a3b8;
+}
+
+.chart-date-label.anchor {
+  color: #1e1b4b;
+  font-weight: 800;
+}
+
+.chart-date-label.forecast {
+  color: #00a854;
+}
+
+.chart-empty-state {
+  padding: 30px 0;
+  text-align: center;
+  color: #94a3b8;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .marketplace-btn {
   flex-shrink: 0; 
-  /* Jarak atas diperkecil (sebelumnya 15px) agar compact */
-  margin-top: 5px; 
+  margin-top: auto; 
+  margin-bottom: 2px; 
   background-color: #e83e8c; 
   color: white;
   font-family: 'Anton', sans-serif;
@@ -639,12 +800,14 @@
   letter-spacing: 1px;
   border: none;
   border-radius: 8px;
-  padding: 12px; 
+  padding: 10px 14px; 
+  height: 42px;
   cursor: pointer;
-  transition: background-color 0.2s;
-  width: 100%; /* Pastikan tombol mengambil ruang penuh */
+  transition: background-color 0.2s, transform 0.15s;
+  width: 100%;
 }
 
 .marketplace-btn:hover {
   background-color: #d83680;
+  transform: translateY(-1px);
 }

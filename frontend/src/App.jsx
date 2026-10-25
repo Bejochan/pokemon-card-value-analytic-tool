@@ -33,7 +33,10 @@ function App() {
         )}
 
         {currentPage === 'result' && (
-          <ScannerDashboard scanResult={scanResult} />
+          <ScannerDashboard 
+            scanResult={scanResult} 
+            onScanOther={() => setCurrentPage('upload')}
+          />
         )}
 
         {/* --- PERBAIKAN 2 --- */}
