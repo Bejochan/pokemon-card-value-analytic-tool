@@ -149,6 +149,10 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   const forecastItems = (forecastData?.forecast || []).map((f) => {
     const pUsd = Number(f.predicted_price_usd);
     const pIdr = Math.round(pUsd * currentRateVal);
+    const p10Usd = f.p10_usd !== undefined ? Number(f.p10_usd) : (pUsd * 0.90);
+    const p90Usd = f.p90_usd !== undefined ? Number(f.p90_usd) : (pUsd * 1.10);
+    const p10Idr = Math.round(p10Usd * currentRateVal);
+    const p90Idr = Math.round(p90Usd * currentRateVal);
     const dateObj = new Date(f.date);
     const formattedDate = !isNaN(dateObj) 
       ? dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
@@ -159,7 +163,11 @@ function ScannerDashboard({ scanResult, onScanOther }) {
       label: `H+${f.day}`,
       dayNum: f.day,
       priceUsd: pUsd,
-      priceIdr: pIdr
+      priceIdr: pIdr,
+      p10Usd,
+      p90Usd,
+      p10Idr,
+      p90Idr
     };
   });
 
@@ -176,12 +184,16 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   const usableW = svgWidth - padLeft - padRight;
   const usableH = svgHeight - padTop - padBottom;
 
-  const allPrices = combinedPoints.map(p => p.priceUsd).filter(p => !isNaN(p) && p > 0);
+  const allPrices = [
+    ...combinedPoints.map(p => p.priceUsd),
+    ...forecastItems.map(p => p.p90Usd),
+    ...forecastItems.map(p => p.p10Usd)
+  ].filter(p => !isNaN(p) && p > 0);
   const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : 1;
   const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : 2;
   const priceRange = maxPrice === minPrice ? (maxPrice * 0.25 || 0.25) : (maxPrice - minPrice);
-  const plotMin = Math.max(0, minPrice - (priceRange * 0.20));
-  const plotMax = maxPrice + (priceRange * 0.20);
+  const plotMin = Math.max(0, minPrice - (priceRange * 0.15));
+  const plotMax = maxPrice + (priceRange * 0.15);
   const plotRange = plotMax - plotMin;
 
   // 3 Titik Garis Panduan & Label Harga Sumbu Y (Atas, Tengah, Bawah)
@@ -196,7 +208,16 @@ function ScannerDashboard({ scanResult, onScanOther }) {
     const x = total > 1 ? padLeft + (idx * (usableW / (total - 1))) : padLeft + (usableW / 2);
     const norm = (pt.priceUsd - plotMin) / plotRange;
     const y = padTop + usableH - (norm * usableH);
-    return { ...pt, x, y };
+    
+    let yP10 = y;
+    let yP90 = y;
+    if (pt.type === 'forecast' && pt.p10Usd && pt.p90Usd) {
+      const normP10 = (pt.p10Usd - plotMin) / plotRange;
+      const normP90 = (pt.p90Usd - plotMin) / plotRange;
+      yP10 = padTop + usableH - (normP10 * usableH);
+      yP90 = padTop + usableH - (normP90 * usableH);
+    }
+    return { ...pt, x, y, yP10, yP90 };
   });
 
   // Polyline koordinat Riwayat Pasar (history s/d anchor hari ini)
@@ -204,6 +225,21 @@ function ScannerDashboard({ scanResult, onScanOther }) {
 
   // Polyline koordinat Prediksi AI (anchor hari ini s/d H+7)
   const forecastCoords = pointsWithCoords.slice(historyItems.length).map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  // Poligon Pita Kuantil (Quantile Ribbon P10 - P90)
+  const todayPoint = pointsWithCoords[historyItems.length];
+  const forecastPtsWithCoords = pointsWithCoords.slice(historyItems.length + 1);
+  let ribbonPolygonPoints = '';
+  if (todayPoint && forecastPtsWithCoords.length > 0) {
+    const upperLine = forecastPtsWithCoords.map(p => `${p.x.toFixed(1)},${p.yP90.toFixed(1)}`);
+    const lowerLine = [...forecastPtsWithCoords].reverse().map(p => `${p.x.toFixed(1)},${p.yP10.toFixed(1)}`);
+    ribbonPolygonPoints = [
+      `${todayPoint.x.toFixed(1)},${todayPoint.y.toFixed(1)}`,
+      ...upperLine,
+      ...lowerLine,
+      `${todayPoint.x.toFixed(1)},${todayPoint.y.toFixed(1)}`
+    ].join(' ');
+  }
 
 
   return (
@@ -373,6 +409,11 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                   <div className={`stat-card signal-${recommendationSignal.toLowerCase()}`}>
                     <span className="stat-label">Trading Signal</span>
                     <span className={`stat-value ${signalColor}`}>{recommendationSignal}</span>
+                    {forecastData?.signal_reason && (
+                      <span className="stat-signal-desc" title={forecastData.signal_reason}>
+                        {forecastData.signal_reason}
+                      </span>
+                    )}
                   </div>
                   <div className="stat-card">
                     <span className="stat-label">AI Confidence</span>
@@ -458,7 +499,11 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                     </div>
                     <div className="legend-entry">
                       <span className="legend-bar forecast-bar"></span>
-                      <span className="legend-name">Prediksi AI (7 Hari)</span>
+                      <span className="legend-name">Target Wajar (P50)</span>
+                    </div>
+                    <div className="legend-entry">
+                      <span className="legend-bar ribbon-bar"></span>
+                      <span className="legend-name">Rentang Wajar (P10 - P90)</span>
                     </div>
                   </div>
                 </div>
@@ -476,13 +521,18 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                         }}
                       >
                         <div className="hover-type-label">
-                          {hoveredPoint.type === 'history' ? 'Riwayat Pasar' : (hoveredPoint.type === 'anchor' ? 'Harga Saat Ini' : 'Prediksi AI')}
+                          {hoveredPoint.type === 'history' ? 'Riwayat Pasar' : (hoveredPoint.type === 'anchor' ? 'Harga Saat Ini' : 'Prediksi AI (P50)')}
                         </div>
                         <div className="hover-date">{hoveredPoint.date}</div>
                         <div className="hover-price-val">
                           {formatIDR(hoveredPoint.priceIdr)}
                           <span className="hover-usd-val"> (${hoveredPoint.priceUsd.toFixed(2)})</span>
                         </div>
+                        {hoveredPoint.type === 'forecast' && hoveredPoint.p10Idr && hoveredPoint.p90Idr && (
+                          <div className="hover-range-text" style={{ fontSize: '9px', color: '#cbd5e1', marginTop: '2px', fontWeight: 600 }}>
+                            Rentang: {formatIDR(hoveredPoint.p10Idr)} – {formatIDR(hoveredPoint.p90Idr)}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -512,6 +562,17 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                           </text>
                         </g>
                       ))}
+
+                      {/* Selubung Pita Kuantil Probabilitas (Quantile Ribbon P10 - P90) */}
+                      {ribbonPolygonPoints && (
+                        <polygon
+                          points={ribbonPolygonPoints}
+                          fill="rgba(0, 210, 106, 0.22)"
+                          stroke="rgba(0, 210, 106, 0.45)"
+                          strokeWidth="1.2"
+                          strokeDasharray="3 3"
+                        />
+                      )}
 
                       {/* Segmen 1: Garis Riwayat Pasar (Solid Line) */}
                       {historyCoords && (
