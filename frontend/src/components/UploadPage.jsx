@@ -205,7 +205,10 @@ function UploadPage({ onUploadComplete }) {
       });
       const data = await response.json();
       if (response.ok && data.status === 'success') {
-        onUploadComplete(data);
+        onUploadComplete({
+          ...data,
+          user_scanned_image: base64String
+        });
       } else {
         alert(data.message || data.detail || 'Terjadi kendala saat menganalisis kartu.');
       }
@@ -628,7 +631,7 @@ function UploadPage({ onUploadComplete }) {
                   </div>
                 ) : (
                   <div className="top1-standby-content">
-                    <div className="standby-icon-spinner">🔍</div>
+                    <div className="standby-icon-spinner">●</div>
                     <div className="standby-text-block">
                       <h3 className="standby-title">
                         {isSharp ? "Mencari Kartu Pokemon..." : "Sensor Kurang Fokus / Goyang"}
@@ -731,8 +734,7 @@ function UploadPage({ onUploadComplete }) {
                 {/* ACTION BUTTONS */}
                 <div className="hud-actions-bar">
                   <button className="action-btn exit-btn-primary" onClick={stopCamera}>
-                    <span className="btn-icon">↩</span>
-                    KEMBALI KE HALAMAN SEBELUMNYA
+                    KEMBALI KE MENU SEBELUMNYA
                   </button>
 
                   <button 
@@ -740,9 +742,32 @@ function UploadPage({ onUploadComplete }) {
                     onClick={() => setIsPaused(prev => !prev)}
                     title="Freeze frame kamera agar tidak perlu terus menahan kartu"
                   >
-                    <span className="btn-icon">{isPaused ? "▶️" : "⏸️"}</span>
                     {isPaused ? "RESUME STREAM [SPASI]" : "FREEZE / PAUSE [SPASI]"}
                   </button>
+
+                  {hasCard && (
+                    <button 
+                      className="action-btn view-detail-btn"
+                      onClick={() => {
+                        let snap = null;
+                        if (captureCanvasRef.current) {
+                          snap = captureCanvasRef.current.toDataURL('image/jpeg', 0.85);
+                        }
+                        stopCamera();
+                        onUploadComplete({
+                          ...prediction,
+                          user_scanned_image: snap
+                        });
+                      }}
+                      style={{
+                        backgroundColor: '#00d26a',
+                        color: '#1e1b4b',
+                        fontWeight: '800'
+                      }}
+                    >
+                      LIHAT DETAIL LENGKAP
+                    </button>
+                  )}
                 </div>
               </div>
 
