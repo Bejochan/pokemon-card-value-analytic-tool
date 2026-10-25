@@ -364,6 +364,7 @@
 
 .highlight-price-row td {
   /* Background tetap bersih/transparan, hanya teks harga yang hijau */
+  background-color: transparent;
 }
 
 .final-idr-value {
@@ -706,6 +707,7 @@
   line-height: 1.15;
   white-space: normal;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
