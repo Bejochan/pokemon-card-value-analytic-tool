@@ -2,8 +2,10 @@ name: Daily Pokemon Price Ingestion
 
 on:
   schedule:
-    # 00:00 UTC = 07:00 WIB setiap hari
-    - cron: '0 0 * * *'
+    # 1. Jadwal Utama (Off-Peak): 01:25 UTC = 08:25 WIB (Menghindari kemacetan runner 00:00 UTC)
+    - cron: '25 1 * * *'
+    # 2. Jadwal Cadangan (Catch-Up): 13:45 UTC = 20:45 WIB (Idempoten: langsung selesai jika pagi sudah sukses)
+    - cron: '45 13 * * *'
   workflow_dispatch:
     # Mengizinkan eksekusi manual kapan pun dari tab Actions di GitHub
 
@@ -11,7 +13,7 @@ jobs:
   track-daily-prices:
     name: Sync Pokemon Prices to Supabase
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
 
     steps:
       - name: Checkout Code
@@ -28,10 +30,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests tqdm python-dotenv
 
-      - name: Run Daily Price Tracker
+      - name: Run Daily Price Tracker (Self-Healing)
         env:
           POKEMONTCG_API_KEY: ${{ secrets.POKEMONTCG_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          python backend/daily_price_tracker.py --workers 4
+          python backend/daily_price_tracker.py --workers 3 || (echo "⚠️ Percobaan pertama mengalami gangguan jaringan sementara, mencoba kembali dalam 60s..." && sleep 60 && python backend/daily_price_tracker.py --workers 2 --force)
