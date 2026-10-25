@@ -4,8 +4,8 @@
 > **Database Engine:** Supabase Cloud (PostgreSQL 15+)  
 > **Skema:** `public`  
 > **Total Entitas Master:** 172 Sets, 20.617 Kartu (`cards`), Snapshot Harga (`card_prices`), dan Riwayat Harga Harian (`card_price_history`)  
-> **File DDL / Skema Asli:** [`docs/schema.sql`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/docs/schema.sql)  
-> **Skrip Seeding & Tracker:** [`backend/seed_supabase.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/seed_supabase.py) & [`backend/daily_price_tracker.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/daily_price_tracker.py)
+> **File DDL / Skema Asli:** [`schema.sql`](schema.sql)  
+> **Skrip Seeding & Tracker:** [`backend/seed_supabase.py`](../backend/seed_supabase.py) & [`backend/daily_price_tracker.py`](../backend/daily_price_tracker.py)
 
 ---
 
@@ -95,7 +95,7 @@ Menyimpan referensi katalog ekspansi rilis Pokémon TCG sejak generasi Base Set 
 ---
 
 ### B. Tabel `public.cards` (Master Profil Kartu)
-Menyimpan identitas spesifik dari 20.426 varian kartu individual yang terdaftar.
+Menyimpan identitas spesifik dari 20.617 varian kartu individual yang terdaftar.
 
 | Nama Kolom | Tipe Data SQL | Constraints | Contoh Data | Deskripsi & Peran Analitika |
 | :--- | :---: | :---: | :--- | :--- |
@@ -177,6 +177,12 @@ CREATE INDEX IF NOT EXISTS idx_cards_rarity ON public.cards(rarity);
 
 -- Mempercepat sorting kartu termahal / termurah (ORDER BY effective_market_price)
 CREATE INDEX IF NOT EXISTS idx_card_prices_effective ON public.card_prices(effective_market_price);
+
+-- Mempercepat kueri riwayat harga deret waktu terurut tanggal
+CREATE INDEX IF NOT EXISTS idx_price_history_card_date ON public.card_price_history(card_id, recorded_date DESC);
+
+-- Mempercepat agregasi atau filter rentang tanggal pencatatan harga
+CREATE INDEX IF NOT EXISTS idx_price_history_date ON public.card_price_history(recorded_date);
 ```
 
 ---

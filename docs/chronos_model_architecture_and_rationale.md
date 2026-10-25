@@ -102,7 +102,7 @@ graph LR
 
 Salah satu tantangan terbesar data pasar kartu adalah **ketidakteraturan transaksi (*irregular time intervals*)**: ada kartu yang ditransaksikan setiap hari, namun ada kartu langka yang transaksinya hanya tercatat setiap 2 atau 3 hari sekali.
 
-Model Transformer deret waktu mengasumsikan frekuensi pengambilan sampel yang konsisten. Oleh karena itu, modul [`backend/models/chronos_forecaster.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/models/chronos_forecaster.py) menerapkan pipeline standarisasi kalender harian:
+Model Transformer deret waktu mengasumsikan frekuensi pengambilan sampel yang konsisten. Oleh karena itu, modul [`backend/models/chronos_forecaster.py`](../backend/models/chronos_forecaster.py) menerapkan pipeline standarisasi kalender harian:
 
 ```python
 # 1. Parsing tanggal dan agregasi rata-rata harian jika ada transaksi ganda
@@ -149,7 +149,7 @@ Harga ($)
 
 ## 🎯 7. Algoritma Sinyal Perdagangan Preskriptif (BUY, HOLD, SELL)
 
-Berdasarkan posisi harga listing kartu saat ini terhadap lorong kuantil dinamis H+1 (esok hari), sistem mengeksekusi logika keputusan pasar preskriptif di [`backend/app/analytics_engine.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/app/analytics_engine.py):
+Berdasarkan posisi harga listing kartu saat ini terhadap lorong kuantil dinamis H+1 (esok hari), sistem mengeksekusi logika keputusan pasar preskriptif di [`backend/app/analytics_engine.py`](../backend/app/analytics_engine.py):
 
 ```
        KONDISI HARGA LISTING SAAT INI (P_actual)           REKOMENDASI SISTEM

@@ -5,8 +5,8 @@
 > **Versi Dataset:** 3.0 (Cleaned, Synchronized & Seeded to Supabase)  
 > **Jumlah Baris:** 20.617 Kartu (100% Konsisten dengan Supabase & Gambar Fisik `compressed_images/*.jpg`)  
 > **Jumlah Fitur:** 22 Kolom Fitur  
-> **Ringkasan Statistik & Metrik Lengkap:** Lihat [`docs/dataset_summary_and_metrics.md`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/docs/dataset_summary_and_metrics.md)  
-> **Dokumentasi Database Supabase:** Lihat [`docs/supabase_database_dictionary.md`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/docs/supabase_database_dictionary.md)
+> **Ringkasan Statistik & Metrik Lengkap:** Lihat [`dataset_summary_and_metrics.md`](dataset_summary_and_metrics.md)  
+> **Dokumentasi Database Supabase:** Lihat [`supabase_database_dictionary.md`](supabase_database_dictionary.md)
 
 ---
 

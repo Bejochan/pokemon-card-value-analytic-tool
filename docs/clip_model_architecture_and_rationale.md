@@ -163,7 +163,7 @@ Untuk mengatasi hal ini, Regokemon menerapkan **Two-Stage Identification Pipelin
 │ • Mengembalikan Top-K Kandidat Terdekat (~120 ms)               │
 └─────────────────────────────────────────────────────────────────┘
           │
-          ▼ (Top-K Pool, e.g. K=15 untuk Real-Time)
+          ▼ (Top-K Pool: K=8 Sweet Spot Optimal / K=15 untuk Live Streaming)
 ┌─────────────────────────────────────────────────────────────────┐
 │ TAHAP 2: Local Fine-Grained Verification (Fast ORB Reranking)   │
 │ • Ekstraksi keypoint geometris lokal (sudut set, teks halus)     │
@@ -212,4 +212,4 @@ Bagian ini merangkum pertimbangan teknis kritis dan pertanyaan seputar desain ar
 ### Q3: *"Mengapa masih membutuhkan Two-Stage ORB Re-Ranking jika CLIP sudah akurat?"*
 > **Penjelasan Teknis:**  
 > CLIP sangat unggul dalam menangkap representasi semantik visual secara global, namun dunia kartu Pokémon memiliki kasus khusus berupa **kartu reprint**. Kartu reprint menampilkan ilustrasi karakter Pokémon yang sama persis dari ilustrator yang sama, tetapi berasal dari set rilis, tahun, dan nomor kartu yang berbeda (dengan nilai pasar yang bisa berbeda drastis).  
-> Untuk membedakan varian kembar tersebut secara presisi, sistem menerapkan **Two-Stage Pipeline**: CLIP dan FAISS bertindak sebagai penyaring cepat (Stage 1) untuk mempersempit 20.617 kartu menjadi kandidat teratas (Top-15), kemudian algoritma **ORB Keypoint Matching** (Stage 2) memverifikasi deskriptor lokal tingkat piksel untuk memvalidasi teks nomor seri dan simbol set di sudut kartu.
+> Untuk membedakan varian kembar tersebut secara presisi, sistem menerapkan **Two-Stage Pipeline**: CLIP dan FAISS bertindak sebagai penyaring cepat (Stage 1) untuk mempersempit 20.617 kartu menjadi kandidat teratas (Top-8 pada mode fast/upload dan Top-15 pada mode live stream), kemudian algoritma **ORB Keypoint Matching** (Stage 2) memverifikasi deskriptor lokal tingkat piksel untuk memvalidasi teks nomor seri dan simbol set di sudut kartu. Berdasarkan uji empiris, pembatasan evaluasi ke Top-8 mempertahankan akurasi 93.8% yang sama persis dengan pool 100, namun menghemat waktu komputasi disk I/O lebih dari 1.000 ms.

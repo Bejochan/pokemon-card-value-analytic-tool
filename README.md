@@ -32,19 +32,19 @@ Sistem ini memecahkan 4 masalah fundamental dalam ekosistem perdagangan kartu ko
 
 ```mermaid
 graph TD
-    Input["Input Citra Kartu (Webcam / HP DroidCam / Upload Web)"] --> Preproc["Preprocessing & Geometry<br/>• Warp Rasio 63:88<br/>• 4-Way Auto-Orientation (0°/90°/180°/270°)<br/>• CLAHE Glare & Shadow Reduction"]
+    Input["Input Citra Kartu (Webcam HUD / HP DroidCam / Web Upload Dual-Side)"] --> Preproc["Client Canvas 1280px & Preprocessing<br/>• Warp Rasio 63:88<br/>• 4-Way Auto-Orientation (0°/90°/180°/270°)<br/>• CLAHE Glare & Shadow Reduction"]
     
     Preproc --> M1["MODEL 1: Card Identifier<br/>(OpenAI CLIP ViT-B/32 + FAISS IndexFlatIP)"]
-    Preproc --> M2["MODEL 2: Condition Grader<br/>(YOLOv8 Defect Detection via Roboflow API)"]
+    Preproc --> M2["MODEL 2: Condition Grader<br/>(Local YOLOv8 Defect Model & Roboflow Fallback)"]
     
-    M1 -->|Top-K Kandidat| ORB["Hybrid Fast ORB Re-Ranking<br/>(Verifikasi Teks, Nomor Seri & Cap Set)"]
+    M1 -->|Top-8 Pool Kandidat| ORB["Hybrid Fast ORB Re-Ranking<br/>(Verifikasi Teks, Nomor Seri & Cap Set)"]
     ORB --> Sigmoid["Kalibrasi Keyakinan Sigmoid<br/>(Margin Scaling Temperature tau=0.03)"]
     Sigmoid --> CardID["Identitas Kartu Terverifikasi<br/>(ID, Nama, Set, Seri, Rarity, Harga Dasar)"]
     
-    M2 --> ConditionScore["F_condition Multiplier<br/>(Clean: 1.00x, Scratched: 0.85x, Edge: 0.80x, Bent: 0.65x)"]
+    M2 --> ConditionScore["F_condition Multiplier<br/>(Depan & Belakang: Clean 1.0x, Scratched 0.85x, Edge/Corner 0.80x, Bent 0.65x)"]
     
-    Supabase[("Supabase Cloud Database<br/>(20.617 Kartu, Set, & Price History)")] --> CardID
-    Supabase --> Hist["card_price_history<br/>(Riwayat Harga Harian Transaksi)"]
+    MemoryCache[("In-Memory Price Master RAM (0 ms)<br/>& Supabase Cloud Fallback")] --> CardID
+    Supabase[("Supabase Cloud Database<br/>(20.617 Kartu & Price History)")] --> Hist["card_price_history<br/>(Riwayat Harga Harian Transaksi)"]
     
     Hist --> Resample["Calendar Daily Resampling<br/>(Forward-Fill Missing Trading Days)"]
     Resample --> M3["MODEL 3: Time-Series Forecaster<br/>(Amazon Chronos-Bolt Mini Foundation Model)"]
@@ -75,12 +75,18 @@ graph TD
     ```
     Score_blended = 0.60 × Score_CLIP + 0.40 × Score_ORB
     ```
+  * **Optimalisasi Pool Size 8:** Menggunakan pool top-8 untuk verifikasi mikro ORB yang terbukti mempertahankan akurasi 93,8% sekaligus menghemat latensi disk I/O >1.000 ms dibandingkan evaluasi 100 pool.
 * **Kalibrasi Margin Sigmoid:**
   * Menghitung selisih margin skor ke *runner-up* kartu dengan nama berbeda (Δ), lalu diskalakan dengan temperatur τ = 0.03:
     ```
     P = 100 / (1 + exp(-Δ / τ))
     ```
   * Menghindari *overconfidence* pada varian kartu yang mirip.
+* **Optimalisasi Throughput & Latensi Tinggi:**
+  * **Client-Side Canvas 1280px Pre-Resizing:** Browser otomatis mengompresi foto mentah smartphone (10–15 MB) menjadi ~150–300 KB tanpa kehilangan fitur penting, memangkas waktu transfer HTTP sebesar 97%.
+  * **Zero-Latency In-Memory Price Resolution (0 ms):** Mengutamakan pencarian harga dari master dataset RAM (20.617 kartu), melenyapkan jeda jaringan Supabase 300–800 ms.
+  * **Background Pre-Warming:** Memuat dan memanaskan bobot CLIP dan YOLOv8 saat server FastAPI booting, melenyapkan *cold-start* bagi pengguna.
+  * **Offline Mode Isolation:** Mengunci `HF_HUB_OFFLINE=1` untuk mencegah handshake remote ke server Hugging Face saat model diinisialisasi.
 * **3 Varian Interface Model 1:**
   1. **`card_identifier_realtime.py` (Live Scanner HUD 30+ FPS):** Menggunakan arsitektur *Multithreaded Asynchronous Worker* (thread rendering kamera dipisah dari thread inferensi AI), *In-Memory ORB Cache*, dan *Temporal Smoothing* (buffer 7-frame konsensus). Latensi: **~83 ms di CPU** dan **~18 ms di GPU RTX 2050**.
   2. **`card_identifier_oncam.py` (Snapshot Camera):** Membuka webcam/IP Cam dengan tombol capture manual dan visualisasi target box.
@@ -89,14 +95,19 @@ graph TD
 
 ---
 
-### 2️⃣ Model 2: Card Condition Grader (Defect Detection via YOLOv8)
+### 2️⃣ Model 2: Card Condition Grader (Local YOLOv8 & Dual-Side Defect Inspection)
 
-* **Tujuan:** Mendeteksi dan melokalisasi jenis cacat fisik kartu secara objektif.
-* **Metode:** YOLOv8 Object Detection terlatih pada dataset Roboflow `card-grader`.
+* **Tujuan:** Mendeteksi, melokalisasi, dan mengukur tingkat keparahan cacat fisik kartu secara objektif untuk penentuan grade kondisi.
+* **Arsitektur Model:**
+  * **Local PyTorch Model (`models/best-model-v5-card-condition.pt`):** Model deteksi objek Ultralytics YOLOv8 yang telah dilatih secara lokal untuk mengenali cacat kartu dengan performa inferensi instan di RAM/GPU.
+  * **Cloud Fallback:** Terintegrasi dengan endpoint Roboflow Cloud Inference API (`card-grader`) sebagai cadangan otomatis (*graceful fallback*) jika model lokal tidak aktif.
+* **Dual-Side Inspection (Tampak Depan & Tampak Belakang):**
+  * Mendukung inspeksi cacat pada kedua sisi kartu (`detect_card_defects_dual_side`). Cacat di sisi belakang (seperti *edge whitening* atau *corner scuff*) turut diperhitungkan dalam kalkulasi grade kondisi akhir.
 * **Kelas Cacat Fisik & Pengali Depresiasi (F_condition):**
   * `Clean / Mint (Mulus)` → Multiplier = **1.00** *(Nilai penuh)*
   * `Scratched (Lecet Permukaan)` → Multiplier = **0.85** *(Penurunan 15%)*
   * `Edge Wear (Kikis Tepi)` → Multiplier = **0.80** *(Penurunan 20%)*
+  * `Corner Wear (Kikis Sudut)` → Multiplier = **0.80** *(Penurunan 20%)*
   * `Bent / Crease (Tertekuk)` → Multiplier = **0.65** *(Penurunan 35%)*
 
 ---
@@ -141,6 +152,10 @@ P_final = P_base × M_variant × F_condition × F_market
 
 | Parameter Evaluasi | Nilai Benchmark | Catatan Implementasi |
 |---|:---:|---|
+| **Latensi Upload Manual Web** | **~1.000 – 1.400 ms** | Integrasi penuh (Canvas 1280px + Model 1 + Model 2 YOLO + Valuasi) |
+| **Ukuran Payload Foto Klien** | **150 – 300 KB** | HTML5 Canvas JPEG 0.88 (dipangkas ~97% dari 10–15 MB) |
+| **Akurasi Pengenalan Kartu Riil** | **93,8%** | Uji empiris foto manual smartphone (15/16 kartu teridentifikasi tepat) |
+| **Pencarian Harga Pasar (In-Memory)** | **0,00 ms** | Akses instan dari master CSV 20.617 kartu di RAM (Zero-Latency) |
 | **Latensi Inferensi Model 1 (GPU RTX 2050)** | **~18 ms** | CUDA PyTorch Tensor Stream (`card_identifier_realtime.py`) |
 | **Latensi Inferensi Model 1 (CPU Optimized)** | **~83 ms** | Single-View + In-Memory ORB Descriptor Caching |
 | **Pencarian Indeks Vektor FAISS** | **< 1 ms** | `IndexFlatIP` untuk 20.617 kartu (~42 MB RAM) |
@@ -186,25 +201,30 @@ pokemon-card-value-analytic-tool/
 │
 ├── backend/                              # Backend Python, Database, & AI Engine
 │   ├── app/                              # Modular REST API (FastAPI)
-│   │   ├── main.py                       # Server Entrypoint (/identify, /analyze, /cards, /sets, /forecast)
-│   │   ├── cv_service.py                 # In-Memory Bridge (Model 1 CLIP + Model 2 YOLO)
+│   │   ├── main.py                       # Server Entrypoint (/identify, /analyze, /cards, /sets, /forecast, /dashboard)
+│   │   ├── cv_service.py                 # In-Memory Bridge (Model 1 CLIP + Model 2 YOLOv8 Dual-Side)
 │   │   ├── analytics_engine.py           # Formula Valuasi Harga Wajar, Chronos Forecaster, & Sinyal Pasar
+│   │   ├── currency_service.py           # Layanan sinkronisasi kurs USD ke IDR dengan fallback rate
 │   │   └── schemas.py                    # Skema validasi Pydantic (Request, Response, Forecast, Pricing)
 │   │
 │   ├── dataset/                          # Master Data & Asset Citra
 │   │   ├── pokemon_cards_dataset_cleaned.csv  # Dataset Bersih (20.617 baris, 22 kolom)
-│   │   ├── pokemon_cards_dataset_cleaned.json # Dataset JSON
-│   │   ├── compressed_images/            # 20.617 gambar JPG 640x640 terkompresi
-│   │   └── card-condition-dataset/       # Dataset Roboflow untuk pelatihan Model 2
+│   │   ├── pokemon_cards_dataset_cleaned.json # Dataset JSON (20.617 entitas kartu)
+│   │   ├── compressed_images/            # 20.617 gambar JPG 640x640 Lanczos terkompresi
+│   │   └── card-condition-dataset/       # Dataset Roboflow untuk pelatihan Model 2 YOLOv8
 │   │
 │   ├── models/                           # Model AI & Engine Identifikasi
-│   │   ├── card_identifier.py            # Engine Utama Model 1 (CLIP + FAISS + ORB + Sigmoid)
+│   │   ├── best-model-v5-card-condition.pt # Bobot PyTorch model YOLOv8 Condition Grader lokal
+│   │   ├── card_identifier.py            # Engine Utama Model 1 (CLIP + FAISS + Top-8 ORB + Sigmoid)
 │   │   ├── card_identifier_realtime.py   # Live Scanner HUD 30+ FPS (Asynchronous Worker Thread)
 │   │   ├── card_identifier_oncam.py      # Pemindai Snapshot Kamera Interaktif
 │   │   ├── card_identifier_manual.py     # Pengujian Foto Statis (GUI File Explorer / CLI)
-│   │   ├── card_condition_grader.py      # Engine Model 2 (Roboflow YOLOv8 Defect Detection)
+│   │   ├── card_condition_grader.py      # Engine Model 2 (Roboflow YOLOv8 Defect Detection fallback)
 │   │   ├── chronos_forecaster.py         # Engine Model 3 (Amazon Chronos-Bolt Mini Time-Series Forecaster)
 │   │   ├── build_card_index.py           # Generator Vektor Indeks FAISS resmi (CLIP ViT-B-32)
+│   │   ├── calibrate_confidence.py       # Kalibrasi temperatur sigmoid margin confidence (tau=0.03)
+│   │   ├── image_card_condition_test.py  # Skrip pengujian deteksi cacat pada citra kartu
+│   │   ├── live_card_condition_test.py   # Skrip pengujian deteksi cacat secara on-cam
 │   │   ├── card_embeddings.index         # Binary Indeks FAISS (512-dim, 20.617 kartu, ~42 MB)
 │   │   ├── card_id_map.json              # Pemetaan indeks FAISS ke card_id resmi
 │   │   └── legacy_mobilenet/             # [Arsip] Baseline MobileNetV3 untuk studi komparasi
@@ -215,17 +235,21 @@ pokemon-card-value-analytic-tool/
 │   │
 │   ├── seed_supabase.py                  # Seeding dataset bersih ke Supabase Cloud
 │   ├── daily_price_tracker.py            # Sinkronisasi harga harian dari pokemontcg.io
+│   ├── fetch_pokemon_data.py             # Script unduh katalog mentah dari pokemontcg.io v2 API
+│   ├── clean_csv_broken_links.py         # Pembersihan tautan CDN yang mati (53 link)
+│   ├── export_broken_links.py            # Export audit laporan broken links
 │   ├── compress_images.py                # Kompresi paralel gambar ke format JPG Lanczos
+│   ├── test_api_endpoints.py             # Uji integrasi endpoint REST API
 │   ├── requirements.txt                  # Dependensi Python Backend
 │   └── .env                              # Konfigurasi API Keys & CAMERA_SOURCE
 │
 ├── frontend/                             # Single Page Application (React 18 + Vite)
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── CatalogPage.jsx           # Katalog Interaktif 20.000+ kartu (Filter, Search, Sort)
-│   │   │   ├── ScannerDashboard.jsx      # Live Scanner Web UI (Webcam Feed & Valuasi Instan)
-│   │   │   ├── DashboardPage.jsx         # Analitika Data Pasar, Chronos Forecast & Visualisasi Agregat
-│   │   │   ├── UploadPage.jsx            # Upload Foto Statis & Deteksi Cacat YOLOv8
+│   │   │   ├── CatalogPage.jsx           # Katalog Interaktif 20.617 kartu (Filter, Search, Sort)
+│   │   │   ├── ScannerDashboard.jsx      # Live Scanner Web UI (Webcam Feed, HUD 63:88, Ketajaman & Telemetri)
+│   │   │   ├── DashboardPage.jsx         # Analitika Data Pasar, Chronos Quantile Charts & Sinyal BUY/HOLD/SELL
+│   │   │   ├── UploadPage.jsx            # Upload Foto Statis (Canvas 1280px Resize, Drag-and-Drop & YOLOv8)
 │   │   │   ├── HeroSection.jsx           # Banner Utama Interaktif
 │   │   │   └── Navbar.jsx                # Navigasi Global
 │   │   ├── App.jsx                       # Routing & State Manajer
@@ -260,8 +284,8 @@ Mode ini adalah demonstrasi visual utama Model 1:
 # Jalankan dengan environment Python proyek:
 & "D:\pokemon_env\Scripts\python.exe" backend/models/card_identifier_realtime.py
 ```
-* **Kamera HP (DroidCam):** Atur variabel `CAMERA_SOURCE=http://<IP_HP>:4747/video` di [backend/.env](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/.env).
-* **Webcam Laptop:** Atur `CAMERA_SOURCE=0` di [backend/.env](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/.env).
+* **Kamera HP (DroidCam):** Atur variabel `CAMERA_SOURCE=http://<IP_HP>:4747/video` di `backend/.env`.
+* **Webcam Laptop:** Atur `CAMERA_SOURCE=0` di `backend/.env`.
 * **Shortcut Keyboard saat HUD Berjalan:**
   * `[Spasi]` : Freeze / Unfreeze frame pemindaian.
   * `[M]` : Toggle mode Fullscreen.
@@ -280,13 +304,18 @@ cd backend
 * Server berjalan di: `http://127.0.0.1:8000`
 * Dokumentasi Interaktif (Swagger UI): `http://127.0.0.1:8000/docs`
 * **Endpoints Utama:**
-  * `POST /identify` : Identifikasi cepat Model 1 (Base64 citra kamera).
-  * `POST /analyze` : Analisis lengkap citra statis (Model 1 + Model 2 YOLOv8).
+  * `POST /identify` : Identifikasi cepat Model 1 On-Cam (Base64 citra kamera).
+  * `POST /upload/identify` : Versi Multipart Form-Data untuk identifikasi Model 1.
+  * `POST /analyze` : Analisis lengkap citra statis (Model 1 + Model 2 YOLOv8 depan & belakang + Valuasi harga wajar).
+  * `POST /upload/analyze` : Versi Multipart Form-Data untuk analisis lengkap.
   * `GET  /cards` : Katalog kartu Pokémon (mendukung parameter `search`, `supertype`, `rarity`, `set_id`, `sort_by`, `page`, `limit`).
   * `GET  /sets` : Daftar seluruh set kartu untuk filter dropdown.
   * `GET  /cards/{card_id}/history` : Riwayat tren harga harian untuk grafik pasar.
   * `GET  /cards/{card_id}/forecast` : Proyeksi harga kuantil 7 hari (P10, P50, P90) dan sinyal preskriptif via Amazon Chronos-Bolt.
-  * `POST /cards/{card_id}/condition` : Deteksi cacat fisik kartu mandiri via YOLOv8.
+  * `POST /cards/{card_id}/condition` : Deteksi cacat fisik kartu mandiri via YOLOv8 (Base64).
+  * `POST /upload/cards/{card_id}/condition` : Deteksi cacat fisik kartu mandiri via Multipart Form-Data.
+  * `GET  /dashboard` : Statistik agregat pasar, pergerakan tren, dan kartu terpopuler.
+  * `GET  /currency` : Status kurs live USD ke IDR dan waktu pembaruan terakhir.
   * `GET  /health` : Healthcheck status server.
 
 ---
@@ -301,9 +330,10 @@ npm run dev
 ```
 Buka browser di: **`http://localhost:5173`**
 * **Navigasi Halaman:**
-  * **CATALOG (`#catalog`):** Eksplorasi 20.000+ kartu lengkap dengan foto, nama, nomor set, dan harga pasar wajar.
-  * **DASHBOARD (`#dashboard`):** Pindai kartu langsung melalui browser menggunakan webcam, visualisasikan grafik pergerakan harga historis, proyeksi kuantil Amazon Chronos-Bolt, dan terima rekomendasi transaksi preskriptif (BUY/HOLD/SELL).
-  * **UPLOAD / INSPECT:** Unggah berkas foto kartu dari galeri untuk analisis cacat fisik komprehensif.
+  * **CATALOG (`#catalog`):** Eksplorasi 20.617 kartu lengkap dengan foto, nama, nomor set, kelangkaan, dan harga pasar wajar (IDR & USD).
+  * **LIVE SCANNER HUD:** Pindai kartu secara langsung melalui webcam browser dengan antarmuka Cyber Obsidian HUD (viewfinder 63:88, indikator ketajaman sensor Laplacian, laser animasi, serta telemetri FPS & latensi).
+  * **DASHBOARD (`#dashboard`):** Visualisasi analitika pasar, grafik harga historis, proyeksi kuantil dinamis 7 hari Amazon Chronos-Bolt (P10, P50, P90), dan rekomendasi preskriptif (BUY/HOLD/SELL).
+  * **UPLOAD / INSPECT:** Unggah berkas foto kartu (dengan kompresi otomatis Canvas 1280px & drag-and-drop) untuk inspeksi cacat fisik komprehensif depan & belakang via YOLOv8.
 
 ---
 

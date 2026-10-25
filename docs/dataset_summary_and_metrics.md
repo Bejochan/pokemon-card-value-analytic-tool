@@ -127,15 +127,18 @@ Berikut adalah panduan file script yang mengoperasikan dataset ini di folder `ba
 
 | Nama File Script | Fungsi & Tanggung Jawab Utama | File Input → Output |
 | :--- | :--- | :--- |
-| [`clean_csv_broken_links.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/clean_csv_broken_links.py) | Memeriksa ketersediaan HTTP URL CDN dan menyaring tautan yang mati (53 link). | `pokemon_cards_dataset.csv` → `pokemon_cards_dataset_cleaned.csv` |
-| [`export_broken_links.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/export_broken_links.py) | Melakukan audit jaringan dan mengekspor laporan 53 kartu rusak secara terurut deterministik. | `pokemon_cards_dataset.csv` → `broken_links_report.csv` |
-| [`pokemon_cards_dataset_download.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/pokemon_cards_dataset_download.py) | Mengunduh file fisik resolusi tinggi master PNG secara paralel (multi-threading). | URL CDN → `dataset/raw_images/*.png` (20.617 file) |
-| [`compress_images.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/compress_images.py) | Melakukan optimasi ukuran gambar ke format JPG 640×640 Lanczos untuk AI inference cepat. | `raw_images/*.png` → `compressed_images/*.jpg` (20.617 file) |
-| [`json_to_csv.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/json_to_csv.py) | Menghubungkan JSON mentah dengan aset gambar lokal dan menyinkronkan dataset bersih. | `pokemon_cards_dataset.json` → `_cleaned.csv` & `_cleaned.json` |
-| [`seed_supabase.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/seed_supabase.py) | Mengunggah dataset bersih ke cloud database Supabase dengan mode UPSERT. | `_cleaned.csv` → Supabase (`sets`, `cards`, `card_prices`) |
-| [`daily_price_tracker.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/daily_price_tracker.py) | Bot otomatis harian yang menarik update fluktuasi harga dari API ke Supabase. | API pokemontcg.io → `card_prices` & `card_price_history` |
-| [`models/build_card_index.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/models/build_card_index.py) | Mengekstrak vektor representasi CLIP ViT-B-32 (512-D) untuk pencarian sub-milidetik FAISS. | `compressed_images/` → `card_embeddings.index` & `card_id_map.json` |
-| [`models/chronos_forecaster.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/models/chronos_forecaster.py) | Engine peramalan deret waktu Amazon Chronos-Bolt untuk proyeksi harga kuantil 7 hari & sinyal preskriptif. | `card_price_history` → Pita Kuantil P10/P50/P90 & Sinyal BUY/HOLD/SELL |
+| [`fetch_pokemon_data.py`](../backend/fetch_pokemon_data.py) | Mengunduh dataset mentah lengkap dari pokemontcg.io API v2 secara terpaginasi. | pokemontcg.io API → `pokemon_cards_dataset.json` (20.670 kartu) |
+| [`clean_csv_broken_links.py`](../backend/clean_csv_broken_links.py) | Memeriksa ketersediaan HTTP URL CDN dan menyaring tautan yang mati (53 link). | `pokemon_cards_dataset.csv` → `pokemon_cards_dataset_cleaned.csv` |
+| [`export_broken_links.py`](../backend/export_broken_links.py) | Melakukan audit jaringan dan mengekspor laporan 53 kartu rusak secara terurut deterministik. | `pokemon_cards_dataset.csv` → `broken_links_report.csv` |
+| [`pokemon_cards_dataset_download.py`](../backend/pokemon_cards_dataset_download.py) | Mengunduh file fisik resolusi tinggi master PNG secara paralel (multi-threading). | URL CDN → `dataset/raw_images/*.png` (20.617 file) |
+| [`compress_images.py`](../backend/compress_images.py) | Melakukan optimasi ukuran gambar ke format JPG 640×640 Lanczos untuk AI inference cepat. | `raw_images/*.png` → `compressed_images/*.jpg` (20.617 file) |
+| [`json_to_csv.py`](../backend/json_to_csv.py) | Menghubungkan JSON mentah dengan aset gambar lokal dan menyinkronkan dataset bersih. | `pokemon_cards_dataset.json` → `_cleaned.csv` & `_cleaned.json` |
+| [`seed_supabase.py`](../backend/seed_supabase.py) | Mengunggah dataset bersih ke cloud database Supabase dengan mode UPSERT. | `_cleaned.csv` → Supabase (`sets`, `cards`, `card_prices`) |
+| [`daily_price_tracker.py`](../backend/daily_price_tracker.py) | Bot otomatis harian yang menarik update fluktuasi harga dari API ke Supabase. | API pokemontcg.io → `card_prices` & `card_price_history` |
+| [`card_condition_dataset_download.py`](../backend/card_condition_dataset_download.py) | Mengunduh dataset citra anotasi cacat fisik dari Roboflow untuk pelatihan Model 2 YOLOv8. | Roboflow API → `dataset/card-condition-dataset/` |
+| [`test_api_endpoints.py`](../backend/test_api_endpoints.py) | Rangkaian pengujian integrasi otomatis untuk memvalidasi respons seluruh endpoint FastAPI. | HTTP Requests → Assertion Report (Status 200 OK) |
+| [`models/build_card_index.py`](../backend/models/build_card_index.py) | Mengekstrak vektor representasi CLIP ViT-B-32 (512-D) untuk pencarian sub-milidetik FAISS. | `compressed_images/` → `card_embeddings.index` & `card_id_map.json` |
+| [`models/chronos_forecaster.py`](../backend/models/chronos_forecaster.py) | Engine peramalan deret waktu Amazon Chronos-Bolt untuk proyeksi harga kuantil 7 hari & sinyal preskriptif. | `card_price_history` → Pita Kuantil P10/P50/P90 & Sinyal BUY/HOLD/SELL |
 
 ---
 
