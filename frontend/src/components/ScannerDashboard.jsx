@@ -57,6 +57,8 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   const setSeries  = scanResult?.set_series    ?? '-';
   const releaseYear = scanResult?.release_year  ?? '-';
   const rarity     = scanResult?.rarity        ?? '-';
+  const rarityLower = (rarity || '').toLowerCase();
+  const isRareCard = ['rare', 'ultra rare', 'secret rare', 'illustration rare', 'special illustration rare', 'hyper rare', 'shiny rare', 'holofoil'].some(r => rarityLower.includes(r));
   const supertype  = scanResult?.supertype     ?? '-';
   const subtypes   = scanResult?.subtypes      ?? '-';
   const types      = scanResult?.types         ?? '-';
@@ -247,7 +249,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
 
       {/* TAMPILAN 1: HALAMAN HARGA */}
       {dashboardView === 'price' && (
-        <div className="price-view fade-in">
+        <div className={`price-view fade-in ${isRareCard ? 'has-rare-glow' : ''}`}>
 
           {/* Efek Cahaya / Glow di belakang kartu */}
           <div className="glow-effect"></div>

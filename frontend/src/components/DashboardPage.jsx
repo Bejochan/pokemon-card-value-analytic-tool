@@ -85,6 +85,7 @@ const AnimatedTextScramble = ({ targetText, duration }) => {
 
 function DashboardPage() {
   const [trendingCards, setTrendingCards] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [catalogSummary, setCatalogSummary] = useState({
     totalCards: 20617,
     totalSets: 172,
@@ -93,6 +94,7 @@ function DashboardPage() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      setIsLoading(true);
       try {
         const response = await fetch('http://127.0.0.1:8000/dashboard');
         if (response.ok) {
@@ -108,6 +110,8 @@ function DashboardPage() {
         }
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchDashboardData();
@@ -205,7 +209,16 @@ function DashboardPage() {
             Trending Cards<br />This Week :
           </div>
           <div className="trending-banner-cards">
-            {trendingCards.map(card => (
+            {isLoading ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '13px', width: '100%' }}>
+                Memuat data katalog tren pasar...
+              </div>
+            ) : trendingCards.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', width: '100%' }}>
+                Data tren pasar belum tersedia.
+              </div>
+            ) : (
+              trendingCards.map(card => (
               <div key={card.id} className="trending-card-row-item">
                 <img src={card.image} alt={card.name} className="t-row-img" />
                 
@@ -228,7 +241,8 @@ function DashboardPage() {
                 </div>
 
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
       </div>
@@ -398,7 +412,7 @@ function DashboardPage() {
           
           {/* KOTAK KIRI BAWAH: TREEMAP CHART */}
           <section className="widget-box left-box treemap-box">
-            {/* <h2 className="section-title">📦 Top Packs & Chase Cards</h2> */}
+            {/* <h2 className="section-title">Top Packs & Chase Cards</h2> */}
             
             <div className="treemap-container">
               {/* Kolom 1: 30th Celebration (Kuning) */}
