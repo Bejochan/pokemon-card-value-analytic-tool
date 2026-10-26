@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import './ScannerDashboard.css';
 
 function ScannerDashboard({ scanResult, onScanOther }) {
-  // State untuk mengontrol halaman mana yang sedang aktif di dalam Dasbor
-  const [dashboardView, setDashboardView] = useState('price');
+  // =====================================================================
+  // MODIFIKASI: State 'dashboardView' DIHAPUS karena kita menggunakan Scroll Snapping
+  // =====================================================================
+  
   const [priceHistory, setPriceHistory] = useState([]);
   const [forecastData, setForecastData] = useState(null);
   const [hoveredPoint, setHoveredPoint] = useState(null);
@@ -245,17 +247,30 @@ function ScannerDashboard({ scanResult, onScanOther }) {
 
 
   return (
-    <div className={`dashboard-container ${dashboardView === 'details' ? 'details-mode' : 'price-mode'}`}>
+    /* =====================================================================
+       MODIFIKASI: Container luar untuk Scroll Snapping (Scroll Vertikal)
+       ===================================================================== */
+    <div className="dashboard-scroll-container">
+      
+      {/* Container Background Utama */}
+      <div className="dashboard-container">
 
-      {/* TAMPILAN 1: HALAMAN HARGA */}
-      {dashboardView === 'price' && (
-        <div className={`price-view fade-in ${isRareCard ? 'has-rare-glow' : ''}`}>
+        {/* ========================================================= */}
+        {/* TAMPILAN 1: HALAMAN HARGA (Halaman Atas - snap-section)   */}
+        {/* ========================================================= */}
+        <div className={`price-view snap-section ${isRareCard ? 'has-rare-glow' : ''}`}>
 
           {/* Efek Cahaya / Glow di belakang kartu */}
           <div className="glow-effect"></div>
 
+          {/* SPARKLE KIRI ATAS (Melayang bebas) */}
+          <img src="/sparkle.gif" alt="Sparkle" className="card-sparkle sparkle-top-left" />
+
           {/* Gambar Kartu Hasil Scan */}
-          <img src={officialImage} alt="Scanned Card" className="scanned-card" />
+          <img src={officialImage} alt="Scanned Card" className="scanned-card card-bounce-in" />
+
+          {/* SPARKLE KANAN BAWAH (Melayang bebas) */}
+          <img src="/sparkle.gif" alt="Sparkle" className="card-sparkle sparkle-bottom-right" />
 
           {/* Label Harga */}
           <div className="price-tag-container">
@@ -263,29 +278,16 @@ function ScannerDashboard({ scanResult, onScanOther }) {
             <div className="price-text">{formatIDR(finalPriceIdr)}</div>
           </div>
 
-          {/* Tombol Panah Bawah */}
-          <button
-            className="down-arrow-btn"
-            onClick={() => setDashboardView('details')}
-          >
-            <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
+          {/* MODIFIKASI: Tombol Panah Bawah DIHAPUS */}
 
         </div>
-      )}
 
-      {/* TAMPILAN 2: HALAMAN DETAIL */}
-      {dashboardView === 'details' && (
-        <div className="details-view slide-up">
+        {/* ========================================================= */}
+        {/* TAMPILAN 2: HALAMAN DETAIL (Halaman Bawah - snap-section) */}
+        {/* ========================================================= */}
+        <div className="details-view snap-section">
 
-          {/* Tombol kembali ke atas */}
-          <button className="up-arrow-btn" onClick={() => setDashboardView('price')}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="18 15 12 9 6 15"></polyline>
-            </svg>
-          </button>
+          {/* MODIFIKASI: Tombol kembali ke atas DIHAPUS */}
 
           <div className="details-grid">
 
@@ -396,6 +398,19 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                     </tbody>
                   </table>
                 </div>
+                <button 
+                className="marketplace-btn"
+                onClick={() => {
+                  if (onScanOther) {
+                    onScanOther();
+                  } else {
+                    window.location.hash = '#upload';
+                    window.location.reload();
+                  }
+                }}
+              >
+                SCAN OTHER CARDS
+              </button>
               </div>
             </div>
 
@@ -403,67 +418,73 @@ function ScannerDashboard({ scanResult, onScanOther }) {
             {/* KOTAK KANAN: Analitik Pasar & Signal         */}
             {/* ============================================ */}
             <div className="info-box analytics-box">
-              <h2 className="analytics-title">Market Analytics</h2>
+              {/* <h2 className="analytics-title">Market Analytics</h2> */}
 
               <div className="stats-container">
-                {/* Baris 1: Sinyal Transaksi dari Analytics Engine */}
-                <div className="stats-row">
-                  <div className={`stat-card signal-${recommendationSignal.toLowerCase()}`}>
-                    <span className="stat-label">Trading Signal</span>
-                    <span className={`stat-value ${signalColor}`}>{recommendationSignal}</span>
-                    {forecastData?.signal_reason && (
-                      <span className="stat-signal-desc" title={forecastData.signal_reason}>
-                        {forecastData.signal_reason}
-                      </span>
-                    )}
+                
+                {/* LAYOUT BARU: Kiri (Sinyal Besar) & Kanan (2 Baris Data) */}
+                <div className="stats-split-layout">
+                  
+                  {/* ======================================= */}
+                  {/* KOLOM KIRI: Kotak Trading Signal Besar  */}
+                  {/* ======================================= */}
+                  <div className="stats-left">
+                    <div className={`stat-card signal-${recommendationSignal.toLowerCase()}`}>
+                      <span className="stat-label">Trading Signal</span>
+                      <span className={`stat-value ${signalColor}`}>{recommendationSignal}</span>
+                      {forecastData?.signal_reason && (
+                        <span className="stat-signal-desc" title={forecastData.signal_reason}>
+                          {forecastData.signal_reason}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="stat-card">
-                    <span className="stat-label">AI Confidence</span>
-                    <span className={`stat-value ${confidencePct >= 70 ? 'text-green' : confidencePct >= 40 ? 'text-yellow' : 'text-pink'}`}>
-                      {confidencePct.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">Condition Score</span>
-                    <span className={`stat-value ${conditionMultiplier >= 0.95 ? 'text-green' : conditionMultiplier >= 0.80 ? 'text-yellow' : 'text-pink'}`}>
-                      {(conditionMultiplier * 100).toFixed(0)}%
-                    </span>
+
+                  {/* ======================================= */}
+                  {/* KOLOM KANAN: Sisa Kotak Statistik       */}
+                  {/* ======================================= */}
+                  <div className="stats-right">
+                    
+                    {/* Kanan Atas: 3 Kotak Berjejer */}
+                    <div className="stats-row">
+                      <div className="stat-card">
+                        <span className="stat-label">AI Confidence</span>
+                        <span className={`stat-value ${confidencePct >= 70 ? 'text-green' : confidencePct >= 40 ? 'text-yellow' : 'text-pink'}`}>
+                          {confidencePct.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="stat-card">
+                        <span className="stat-label">Condition Score</span>
+                        <span className={`stat-value ${conditionMultiplier >= 0.95 ? 'text-green' : conditionMultiplier >= 0.80 ? 'text-yellow' : 'text-pink'}`}>
+                          {(conditionMultiplier * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="stat-card">
+                        {/* Tambahan style whiteSpace normal agar teks judul yang panjang bisa turun ke baris kedua */}
+                        <span className="stat-label text-yellow" style={{ whiteSpace: 'normal', lineHeight: '1.2' }}>Predicted Fair Value (ML)</span>
+                        <span className="stat-value text-green">{formatIDR(predictedPriceIdr)}</span>
+                      </div>
+                    </div>
+
+                    {/* Kanan Bawah: 2 Kotak (Mengikuti permintaanmu: Mispricing & Market Price) */}
+                    <div className="stats-row">
+                      <div className="stat-card">
+                        <span className="stat-label text-yellow">Mispricing Gap</span>
+                        <span className={`stat-value ${mispricingGap < 0 ? 'text-green' : mispricingGap > 0 ? 'text-pink' : 'text-yellow'}`}>
+                          {mispricingGap > 0 ? '+' : ''}{mispricingGap.toFixed(2)}%
+                        </span>
+                      </div>
+                      <div className="stat-card">
+                        <span className="stat-label">Market Price</span>
+                        <span className="stat-value text-green">{formatIDR(basePriceIdr)}</span>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
+                {/* AKHIR DARI LAYOUT SPLIT */}
 
-                {/* Baris 2: Data Detail Valuasi */}
-                <div className="stats-row">
-                  <div className="stat-card">
-                    <span className="stat-label">Rarity</span>
-                    <span className="stat-value" style={{fontSize: '0.75rem'}}>{rarity !== '-' ? rarity : 'N/A'}</span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">Release Year</span>
-                    <span className="stat-value">{releaseYear !== '-' ? releaseYear : 'N/A'}
-                      {releaseYear !== '-' && releaseYear < 2005 && <span className="stat-sub text-green"> (Vintage +20%)</span>}
-                    </span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">Market Price</span>
-                    <span className="stat-value text-green">{formatIDR(basePriceIdr)}</span>
-                  </div>
-                </div>
-
-                {/* Baris 3: Machine Learning Valuation */}
-                <div className="stats-row">
-                  <div className="stat-card" style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255,255,255,0.3)' }}>
-                    <span className="stat-label text-yellow">Predicted Fair Value (ML)</span>
-                    <span className="stat-value text-green">{formatIDR(predictedPriceIdr)}</span>
-                  </div>
-                  <div className="stat-card" style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255,255,255,0.3)' }}>
-                    <span className="stat-label text-yellow">Mispricing Gap</span>
-                    <span className={`stat-value ${mispricingGap < 0 ? 'text-green' : mispricingGap > 0 ? 'text-pink' : 'text-yellow'}`}>
-                      {mispricingGap > 0 ? '+' : ''}{mispricingGap.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Kandidat Alternatif AI */}
+                {/* Kandidat Alternatif AI (Tetap di bawah) */}
                 {candidates.length > 0 && (
                   <div className="candidates-section">
                     <h4 className="candidates-title">Alternative Matches</h4>
@@ -538,7 +559,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                       </div>
                     )}
 
-                    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="market-chart" preserveAspectRatio="none">
+                    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="market-chart">
                       {/* Garis Grid Horizontal & Label Sumbu Y di Sisi Kiri */}
                       {yTicks.map((tick, idx) => (
                         <g key={idx}>
@@ -651,25 +672,11 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                 )}
               </div>
 
-              <button 
-                className="marketplace-btn"
-                onClick={() => {
-                  if (onScanOther) {
-                    onScanOther();
-                  } else {
-                    window.location.hash = '#upload';
-                    window.location.reload();
-                  }
-                }}
-              >
-                SCAN OTHER CARDS
-              </button>
             </div>
 
           </div>
         </div>
-      )}
-
+      </div>
     </div>
   );
 }

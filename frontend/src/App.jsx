@@ -5,6 +5,7 @@ import UploadPage from './components/UploadPage';
 import ScannerDashboard from './components/ScannerDashboard';
 import CatalogPage from './components/CatalogPage';
 import DashboardPage from './components/DashboardPage';
+import Marketplace from './components/Marketplace';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -17,7 +18,7 @@ function App() {
       <Navbar onNavigate={setCurrentPage} />
       
       {/* Trik React: Atribut 'key' memaksa animasi CSS diputar ulang tiap state berubah */}
-      <div key={currentPage} className="page-transition">
+      <div key={currentPage} className={currentPage === 'result' ? '' : 'page-transition'}>
         
         {currentPage === 'home' && (
           <HeroSection onNavigate={() => setCurrentPage('upload')} />
