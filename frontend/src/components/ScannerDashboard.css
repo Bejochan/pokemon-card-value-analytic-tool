@@ -517,6 +517,7 @@
 
 /* Beri kebebasan baris lebih banyak untuk deskripsi sinyal */
 .stats-left .stat-card .stat-signal-desc {
+  line-clamp: 5;
   -webkit-line-clamp: 5; 
   font-size: 9px;
 }
