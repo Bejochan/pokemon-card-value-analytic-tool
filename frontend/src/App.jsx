@@ -17,7 +17,7 @@ function App() {
       <Navbar onNavigate={setCurrentPage} />
       
       {/* Trik React: Atribut 'key' memaksa animasi CSS diputar ulang tiap state berubah */}
-      <div key={currentPage} className="page-transition">
+      <div key={currentPage} className={currentPage === 'result' ? '' : 'page-transition'}>
         
         {currentPage === 'home' && (
           <HeroSection onNavigate={() => setCurrentPage('upload')} />

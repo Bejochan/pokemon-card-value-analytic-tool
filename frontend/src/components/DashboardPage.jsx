@@ -85,17 +85,33 @@ const AnimatedTextScramble = ({ targetText, duration }) => {
 
 function DashboardPage() {
   const [trendingCards, setTrendingCards] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [catalogSummary, setCatalogSummary] = useState({
+    totalCards: 20617,
+    totalSets: 172,
+    marketStatus: "Active Database"
+  });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      setIsLoading(true);
       try {
         const response = await fetch('http://127.0.0.1:8000/dashboard');
         if (response.ok) {
           const data = await response.json();
           setTrendingCards(data.trending || []);
+          if (data.total_cards) {
+            setCatalogSummary(prev => ({
+              ...prev,
+              totalCards: data.total_cards,
+              totalSets: data.total_sets || prev.totalSets
+            }));
+          }
         }
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchDashboardData();
@@ -165,26 +181,23 @@ function DashboardPage() {
       {/* 2. STATS BANNER (PITA PINK PENUH) */}
       <div className="dashboard-stats-banner">
         <div className="stat-banner-item">
-          <span className="stat-banner-label">Total Scans Today</span>
+          <span className="stat-banner-label">Total Verified Cards</span>
           <span className="stat-banner-value">
-            {/* 3. Ganti teks statis dengan AnimatedCounter */}
-            <AnimatedCounter endValue={1452} duration={2000} />
+            <AnimatedCounter endValue={catalogSummary.totalCards} duration={1800} />
           </span>
         </div>
         <div className="stat-banner-divider"></div>
         <div className="stat-banner-item">
-          <span className="stat-banner-label">Highest Value Found</span>
+          <span className="stat-banner-label">Official Card Sets</span>
           <span className="stat-banner-value">
-            {/* 4. Gunakan prop isDecimal dan prefix untuk format uang */}
-            <AnimatedCounter endValue={850.00} duration={2000} prefix="$ " isDecimal={true} />
+            <AnimatedCounter endValue={catalogSummary.totalSets} duration={1800} />
           </span>
         </div>
         <div className="stat-banner-divider"></div>
         <div className="stat-banner-item">
-          <span className="stat-banner-label">Active Market Trend</span>
+          <span className="stat-banner-label">Market Tracking</span>
           <span className="stat-banner-value">
-            {/* Terapkan AnimatedTextScramble di sini */}
-            <AnimatedTextScramble targetText="bullish ↗" duration={2000} />
+            <AnimatedTextScramble targetText={catalogSummary.marketStatus} duration={1800} />
           </span>
         </div>
       </div>
@@ -196,7 +209,16 @@ function DashboardPage() {
             Trending Cards<br />This Week :
           </div>
           <div className="trending-banner-cards">
-            {trendingCards.map(card => (
+            {isLoading ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '13px', width: '100%' }}>
+                Memuat data katalog tren pasar...
+              </div>
+            ) : trendingCards.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', width: '100%' }}>
+                Data tren pasar belum tersedia.
+              </div>
+            ) : (
+              trendingCards.map(card => (
               <div key={card.id} className="trending-card-row-item">
                 <img src={card.image} alt={card.name} className="t-row-img" />
                 
@@ -219,7 +241,8 @@ function DashboardPage() {
                 </div>
 
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
       </div>
@@ -389,7 +412,7 @@ function DashboardPage() {
           
           {/* KOTAK KIRI BAWAH: TREEMAP CHART */}
           <section className="widget-box left-box treemap-box">
-            {/* <h2 className="section-title">📦 Top Packs & Chase Cards</h2> */}
+            {/* <h2 className="section-title">Top Packs & Chase Cards</h2> */}
             
             <div className="treemap-container">
               {/* Kolom 1: 30th Celebration (Kuning) */}

@@ -244,7 +244,7 @@ function CatalogPage() {
               title="Filter Efek Foil"
             >
               <option value="all">Semua Foil</option>
-              <option value="holo">✨ Holo Only</option>
+              <option value="holo">Holo Only</option>
               <option value="non_holo">Normal Print</option>
             </select>
 
@@ -254,7 +254,7 @@ function CatalogPage() {
                 onClick={handleResetFilters}
                 title="Reset Semua Filter"
               >
-                ✕ Reset
+                Reset
               </button>
             )}
           </div>
@@ -293,7 +293,12 @@ function CatalogPage() {
           </div>
         ) : cardsData.length === 0 ? (
           <div className="catalog-empty-state">
-            <div className="empty-icon">🔍</div>
+            <div className="empty-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#e83e8c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
             <h3>Kartu Tidak Ditemukan</h3>
             <p>Tidak ada kartu yang cocok dengan kata kunci <em>"{activeSearch}"</em> atau filter yang dipilih.</p>
             <button 

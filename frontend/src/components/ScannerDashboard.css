@@ -1,63 +1,102 @@
-.dashboard-container {
-  position: relative;
-  width: 100%;
-  min-height: calc(100vh - 70px);
-  background-image: url('/bg-dashboard.jpg'); 
-  background-size: cover; 
-  background-position: center;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-}
+/* =========================================
+   SCROLL SNAPPING CONTAINER
+   ========================================= */
 
-/* KHUSUS HALAMAN DETAIL: Izinkan Scroll Vertikal Halus Mandiri (Locked Viewport) */
-.dashboard-container.details-mode {
-  height: calc(100vh - 70px);
-  max-height: calc(100vh - 70px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  align-items: flex-start;
-  padding: 10px 0 35px 0;
-  box-sizing: border-box;
+/* Pembungkus terluar yang mengontrol gulungan */
+.dashboard-scroll-container {
+  width: 100%;
+  height: calc(100vh - 70px); /* 70px adalah tinggi navbar, sesuaikan jika navbar-mu lebih besar */
+  overflow-y: auto; /* Mengizinkan gulir vertikal */
+  
+  /* Aktifkan fitur snap pada sumbu Y */
+  scroll-snap-type: y mandatory; 
   scroll-behavior: smooth;
 }
 
-/* Sleek Scrollbar untuk Halaman Detail */
-.dashboard-container.details-mode::-webkit-scrollbar {
-  width: 8px;
-}
-.dashboard-container.details-mode::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.15);
-}
-.dashboard-container.details-mode::-webkit-scrollbar-thumb {
-  background: rgba(30, 27, 75, 0.4);
-  border-radius: 4px;
-}
-.dashboard-container.details-mode::-webkit-scrollbar-thumb:hover {
-  background: rgba(30, 27, 75, 0.7);
+/* Sembunyikan scrollbar untuk Chrome/Safari/Edge */
+.dashboard-scroll-container::-webkit-scrollbar {
+  display: none; 
 }
 
-.price-view {
+/* =========================================
+   CONTAINER LATAR BELAKANG PANJANG
+   ========================================= */
+
+.dashboard-container {
+  width: 100%;
+  height: 100%; /* Mengambil tinggi 100% dari wadah utamanya */
+  
+  /* Pindahkan izin menggulir ke kontainer ini */
+  overflow-y: auto; 
+  
+  /* KUNCI: Sekarang scroll-snap-type berada tepat di atas anak-anaknya (.snap-section) */
+  scroll-snap-type: y mandatory; 
+  scroll-behavior: smooth;
+  
+  background-image: url('/bg-basic.png'); 
+  background-size: cover; 
+  background-position: center;
+  
+  /* BONUS UX: Membuat background diam tidak ikut tergulung saat halaman berpindah.
+     Ini akan memberikan efek paralaks yang sangat premium! */
+  background-attachment: fixed; 
+}
+
+.dashboard-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* =========================================
+   INDIVIDUAL SNAP SECTIONS (HALAMAN)
+   ========================================= */
+
+.snap-section {
+  width: 100%;
+  /* Gunakan 100% alih-alih 100vh agar patuh pada .dashboard-container */
+  height: 100%; 
+  flex-shrink: 0; /* Cegah halaman menyusut jika layarnya kecil */
+  
+  /* Kunci snap */
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
+  align-items: center;
   position: relative;
+  box-sizing: border-box;
 }
 
-/* EFEK CAHAYA (GLOW) DI BELAKANG KARTU */
+/* Hapus margin negatif yang sebelumnya dipakai di .details-view */
+.details-view {
+  /* Ubah padding atas dari 0 menjadi 40px (atau 50px) agar kotak terdorong turun */
+  padding: 40px 0px 20px 0px !important; 
+}
+
+/* price-tag, glow, animasi, dsb */
+
+.price-view {
+  /* Hapus width:100% dan height:100% yang lama, biarkan snap-section yang mengatur */
+  margin: 0 !important; 
+}
+
+/* EFEK CAHAYA (GLOW) DI BELAKANG KARTU (Hanya aktif untuk kartu langka) */
 .glow-effect {
+  display: none;
+}
+
+.has-rare-glow .glow-effect {
+  display: block;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -70%);
-  width: 350px;
-  height: 450px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 65%);
+  width: 320px;
+  height: 420px;
+  background: radial-gradient(circle, rgba(232, 62, 140, 0.35) 0%, rgba(255, 255, 255, 0) 70%);
   z-index: 1;
+  pointer-events: none;
 }
 
 /* GAMBAR KARTU */
@@ -69,6 +108,90 @@
   position: relative;
   margin-top: 20px;
   margin-bottom: -30px;
+}
+
+/* =========================================
+   ANIMASI PANTULAN KARTU FISIK (SETTLING CEPAT)
+   ========================================= */
+
+.card-bounce-in {
+  transform-origin: bottom center; 
+  animation: pingpongBounce 0.5s forwards;
+}
+
+@keyframes pingpongBounce {
+  /* --- BAGIAN 1: Jatuh dan pantulan besar (Memakan 70% waktu) --- */
+  0% {
+    transform: translateY(-60px); 
+    animation-timing-function: ease-in;
+  }
+  30% {
+    transform: translateY(0); /* Lantai 1 */
+    animation-timing-function: ease-out;
+  }
+  50% {
+    transform: translateY(-20px); /* Puncak tinggi */
+    animation-timing-function: ease-in; 
+  }
+  70% {
+    transform: translateY(0); /* Lantai 2 */
+    animation-timing-function: ease-out;
+  }
+
+  /* --- BAGIAN 2: Pantulan rendah yang dikompresi agar sangat cepat (Sisa 30% waktu) --- */
+  80% {
+    transform: translateY(-6px); /* Puncak rendah */
+    animation-timing-function: ease-in;
+  }
+  88% {
+    transform: translateY(0); /* Lantai 3 */
+    animation-timing-function: ease-out;
+  }
+  93% {
+    transform: translateY(-1px); /* Pantulan mikro ekstra yang sangat cepat */
+    animation-timing-function: ease-in;
+  }
+  97%, 100% {
+    transform: translateY(0); /* Diam sepenuhnya di lantai */
+  }
+}
+
+/* =========================================
+   KILAUAN KARTU (SIMPLE FLOATING)
+   ========================================= */
+
+.card-sparkle {
+  position: absolute;
+  width: 70px; 
+  height: 70px;
+  z-index: 4; 
+  pointer-events: none; 
+  /* Memberi efek kedip simpel
+  animation: popInSparkle 1.2s ease-out infinite; */
+}
+
+/* Mulai dari tengah, lalu geser ke KIRI ATAS kartu */
+.sparkle-top-left {
+  top: 30%;
+  left: 49%;
+  margin-left: -170px; /* Tarik ke kiri (Lebar kartu / 2 + sedikit margin) */
+  margin-top: -190px;  /* Tarik ke atas */
+}
+
+/* Mulai dari tengah, lalu geser ke KANAN BAWAH kartu */
+.sparkle-bottom-right {
+  top: 40%;
+  left: 49%;
+  margin-left: 120px; /* Dorong ke kanan */
+  margin-top: 130px;  /* Dorong ke bawah */
+  animation-delay: 0.6s; /* Kedip bergantian */
+}
+
+/* Efek Muncul Menghilang */
+@keyframes popInSparkle {
+  0% { opacity: 0; transform: scale(0.5); }
+  50% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(0.5); }
 }
 
 /* 1. KONTAINER UTAMA (Sang Jangkar) */
@@ -103,92 +226,35 @@
 .price-text {
   position: absolute; 
   z-index: 2;
-  font-size: 78px; 
-  top: 76%;  
-  left: 58%; 
+  font-size: 100px; 
+  
+  /* Karena titik pusatnya sekarang ada di bagian bawah teks, */
+  /* kamu perlu membesarkan angka top ini (misal 60%, 70%, 75%) */
+  /* agar teksnya kembali turun ke tengah kotak hijau. */
+  top: 80%;  
+  left: 55%; 
+  
+  /* INI KUNCINYA: Kombinasi translate dan translateY di ujung kiri dan kanan */
+  /* akan memaksa perspektif 3D hanya melengkungkan bagian atas teks saja. */
   transform: translate(-50%, 0%) perspective(500px) rotateY(25deg) translateY(-50%); 
+  
+  text-align: left;
+  white-space: nowrap;
+  width: max-content;
+
   color: white;
   font-family: 'Anton', sans-serif;
-  letter-spacing: 2px;
-  white-space: nowrap;
+  letter-spacing: 3px;
   text-shadow: 6px 6px 0px rgba(0,0,0,0.15);
-}
-
-/* TOMBOL PANAH BAWAH (Dengan animasi mengambang) */
-.down-arrow-btn {
-  position: absolute;
-  bottom: -35px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  z-index: 10;
-  /* animation: bounceArrow 2s infinite ease-in-out; */
-}
-
-.down-arrow-btn:hover {
-  transform: scale(1.1);
-}
-
-@keyframes bounceArrow {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(10px); }
-}
-
-/* ANIMASI TRANSISI HALAMAN */
-.fade-in {
-  animation: fadeIn 0.6s ease-out forwards;
-}
-
-.slide-up {
-  animation: slideUp 0.6s ease-out forwards;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(50px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* --- TATA LETAK HALAMAN DETAIL -------------------------------------------------------------------------------------------------------------- */
-.details-view {
-  width: 100%;
-  height: auto; 
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: center;
-  position: relative;
-  padding: 0 0 40px 0;
-  box-sizing: border-box;
-  margin-top: 0; 
-}
-
-.up-arrow-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  margin-bottom: 8px;
-  transition: transform 0.2s;
-}
-.up-arrow-btn:hover {
-  transform: translateY(-5px);
 }
 
 .details-grid {
   display: flex;
-  gap: 20px;
+  gap: 30px;
   width: 100%;
-  max-width: 100%;
-  min-height: 480px;
-  height: auto;
-  box-sizing: border-box;
+  height: 100%;
+  /* Hapus min-height kaku (seperti min-height: 580px) jika ada, dan ganti dengan ini: */
+  max-height: calc(100vh - 130px); /* Memaksa kotak memendek mengikuti batas atas dan bawah layar */
 }
 
 .info-box {
@@ -212,7 +278,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 50px;
   flex: 0 0 170px;
   max-width: 170px;
 }
@@ -251,9 +317,10 @@
 
 .detail-card-img.user-scan-img,
 .detail-card-img.master-official-img {
+  padding-top: 8px;
   width: auto;
-  max-width: 135px;
-  max-height: 135px;
+  max-width: 190px;
+  max-height: 190px;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.14);
   object-fit: contain;
@@ -386,13 +453,13 @@
   min-width: 0; /* PENTING: Mencegah overflow ke kanan */
 }
 
-.analytics-title {
+/* .analytics-title {
   font-family: 'Montserrat', sans-serif;
   font-weight: 800;
   color: #1e1b4b;
   font-size: 22px;
   margin: 0 0 10px 0; 
-}
+} */
 
 /* --- TATA LETAK KOTAK STATISTIK --- */
 .stats-container {
@@ -406,6 +473,62 @@
 .stats-row {
   display: flex;
   gap: 10px;
+}
+
+/* =========================================
+   LAYOUT STATISTIK SPLIT (KIRI BESAR & KANAN)
+   ========================================= */
+.stats-split-layout {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+/* KOLOM KIRI (Trading Signal) */
+.stats-left {
+  display: flex;
+  /* PERBAIKAN 1: Tambahkan ini agar kartu di dalamnya bisa melar ke bawah */
+  flex-direction: column; 
+  flex: 1.1; 
+  min-width: 120px; 
+}
+
+/* Memaksa kartu agar memanjang penuh mengikuti tinggi 2 baris di kanan */
+.stats-left .stat-card {
+  width: 100%;
+  
+  /* PERBAIKAN 2: Hapus height: 100% dan ganti dengan flex: 1 */
+  flex: 1; 
+  
+  /* PERBAIKAN 3: KUNCI UTAMA! Memaksa padding agar dihitung ke dalam kotak, 
+     sehingga tidak membuat kotak membengkak melewati batas */
+  box-sizing: border-box; 
+  
+  justify-content: flex-start; 
+  padding-top: 15px;
+  margin: 0; /* Memastikan tidak ada margin bawah yang mendorongnya keluar */
+}
+
+/* Membesarkan teks sinyal (SELL/BUY) agar epik di kotak yang besar */
+.stats-left .stat-card .stat-value {
+  font-size: 30px; 
+  margin: 6px 0;
+}
+
+/* Beri kebebasan baris lebih banyak untuk deskripsi sinyal */
+.stats-left .stat-card .stat-signal-desc {
+  line-clamp: 5;
+  -webkit-line-clamp: 5; 
+  font-size: 9px;
+}
+
+/* KOLOM KANAN (2 Baris Data) */
+.stats-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 2.6; /* Proporsi lebar dominan untuk 2 baris di kanan */
+  min-width: 0; /* Mencegah overflow horizontal pada teks panjang */
 }
 
 .stat-card {
@@ -452,7 +575,7 @@
 }
 
 .text-green  { color: #00d26a !important; }
-.text-pink   { color: #e83e8c !important; }
+.text-pink   { color: #fb0276 !important; }
 .text-yellow { color: #f59e0b !important; }
 .text-danger { color: #dc2626 !important; }
 .text-success{ color: #00d26a !important; }
@@ -595,8 +718,8 @@
 }
 
 .stat-card.signal-sell {
-  background-color: #dc2626;
-  border-color: #dc2626;
+  background-color: #f8a5cb;
+  /* border-color: #dc2626; */
 }
 .stat-card.signal-sell .stat-label,
 .stat-card.signal-sell .stat-value {
@@ -723,6 +846,10 @@
   width: 100%;
   box-sizing: border-box;
   position: relative;
+  /* Tambahkan flex: 1 agar wrapper selalu mengisi sisa ruang di dalam kotak grafik */
+  flex: 1; 
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-hover-card {
@@ -769,9 +896,16 @@
 
 .market-chart {
   width: 100%;
-  height: 125px;
+  /* HAPUS height statis (misal height: 125px) */
+  /* height: 125px; */
+  /* Gunakan max-height agar SVG tidak meledak terlalu besar di layar lebar */
+  max-height: 200px; 
+  /* Gunakan height: auto agar tingginya proporsional mengikuti lebarnya */
+  height: auto; 
   display: block; 
   overflow: visible;
+  /* Opsional: Tambahkan margin agar ada sedikit napas di sekelilingnya */
+  margin: 10px 0;
 }
 
 .chart-dot {
@@ -821,23 +955,56 @@
 
 .marketplace-btn {
   flex-shrink: 0; 
-  margin-top: auto; 
-  margin-bottom: 2px; 
+  /* Berikan margin atas yang lebih besar agar berjarak dari tabel */
+  margin-top: 15px; 
+  margin-bottom: 10px;
   background-color: #e83e8c; 
   color: white;
   font-family: 'Anton', sans-serif;
   font-size: 16px; 
   letter-spacing: 1px;
   border: none;
-  border-radius: 8px;
-  padding: 10px 14px; 
-  height: 42px;
+  border-radius: 12px;
+  padding: 12px; 
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.15s;
-  width: 100%;
+  transition: background-color 0.2s;
+  width: 100%; 
 }
 
 .marketplace-btn:hover {
   background-color: #d83680;
   transform: translateY(-1px);
+}
+
+/* Breakpoint Responsif Scanner Dashboard */
+@media (max-width: 860px) {
+  .details-grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px;
+    width: 95%;
+  }
+
+  .price-tag-container {
+    width: 100%;
+    max-width: 340px;
+    margin: 30px auto;
+  }
+
+  .price-shape {
+    width: 100% !important;
+    max-width: 480px;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .price-text {
+    font-size: 52px !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .chart-container {
+    width: 100%;
+    overflow-x: auto;
+  }
 }

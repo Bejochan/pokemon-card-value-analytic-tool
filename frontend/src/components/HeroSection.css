@@ -149,3 +149,30 @@
   right: -5%;
   transform: rotate(-5deg);
 }
+
+/* Breakpoint Responsif Tablet & Ponsel */
+@media (max-width: 768px) {
+  .title {
+    font-size: clamp(2.5rem, 8.5vw, 4.5rem) !important;
+    line-height: 1.15;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    text-shadow: 4px 4px 0px #ffffff;
+  }
+
+  .subtitle {
+    font-size: 16px;
+    letter-spacing: 1px;
+    padding: 0 16px;
+  }
+
+  /* Sembunyikan kartu melayang dekoratif di HP agar tidak menutupi tombol CTA */
+  .floating-card {
+    display: none !important;
+  }
+
+  .scan-button {
+    font-size: 24px;
+    padding: 12px 28px;
+  }
+}

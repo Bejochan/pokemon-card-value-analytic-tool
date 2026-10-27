@@ -737,3 +737,29 @@
   color: #a0426b;
   line-height: 1;
 }
+
+/* Breakpoint Responsif Dashboard */
+@media (max-width: 768px) {
+  .dashboard-stats-banner {
+    flex-direction: column !important;
+    height: auto !important;
+    gap: 16px !important;
+    padding: 20px 16px !important;
+  }
+
+  .stat-banner-item {
+    width: 100% !important;
+  }
+
+  .stat-banner-divider {
+    display: none !important;
+  }
+
+  .dashboard-hero-title .dashboard-title {
+    font-size: 2.2rem;
+  }
+
+  .dashboard-grid-charts {
+    grid-template-columns: 1fr !important;
+  }
+}

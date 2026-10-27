@@ -165,10 +165,15 @@ function compressAndResizeImage(file, maxDimension = 1280, quality = 0.88) {
 }
 
 function UploadPage({ onUploadComplete }) {
-  // State Upload Tradisional
+  // State Upload Tradisional & Inspeksi 2 Sisi
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [frontImage, setFrontImage] = useState(null);
+  const [backImage, setBackImage] = useState(null);
+  const [isProcessingFront, setIsProcessingFront] = useState(false);
+  const [isProcessingBack, setIsProcessingBack] = useState(false);
   const fileInputRef = useRef(null);
+  const backFileInputRef = useRef(null);
 
   // State Live Camera HUD
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -187,43 +192,80 @@ function UploadPage({ onUploadComplete }) {
   const fpsFrameCountRef = useRef(0);
   const lastFpsTimeRef = useRef(performance.now());
 
-  // --- LOGIKA UPLOAD & ANALISIS FILE CEPAT ---
+  // --- LOGIKA UPLOAD & ANALISIS DUA SISI ---
   const handleBrowseClick = () => {
-    fileInputRef.current.click();
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
   };
 
-  const processFile = async (selectedFile) => {
+  const handleFrontFileSelected = async (selectedFile) => {
     if (!selectedFile) return;
+    setIsProcessingFront(true);
+    try {
+      const base64String = await compressAndResizeImage(selectedFile, 1280, 0.88);
+      setFrontImage(base64String);
+    } catch (err) {
+      alert(err.message || 'Gagal memproses foto tampak depan.');
+    } finally {
+      setIsProcessingFront(false);
+    }
+  };
+
+  const handleBackFileSelected = async (selectedFile) => {
+    if (!selectedFile) return;
+    setIsProcessingBack(true);
+    try {
+      const base64String = await compressAndResizeImage(selectedFile, 1280, 0.88);
+      setBackImage(base64String);
+    } catch (err) {
+      alert(err.message || 'Gagal memproses foto tampak belakang.');
+    } finally {
+      setIsProcessingBack(false);
+    }
+  };
+
+  const handleExecuteAnalyze = async () => {
+    if (!frontImage) return;
     setIsUploading(true);
     try {
-      // Kompresi di browser canvas memangkas payload 95%+ dan menghemat transfer jaringan
-      const base64String = await compressAndResizeImage(selectedFile, 1280, 0.88);
       const response = await fetch('http://127.0.0.1:8000/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64String })
+        body: JSON.stringify({
+          image: frontImage,
+          back_image: backImage || null
+        })
       });
       const data = await response.json();
       if (response.ok && data.status === 'success') {
         onUploadComplete({
           ...data,
-          user_scanned_image: base64String
+          user_scanned_image: frontImage,
+          user_scanned_back_image: backImage || null
         });
       } else {
         alert(data.message || data.detail || 'Terjadi kendala saat menganalisis kartu.');
       }
     } catch (error) {
-      console.error('Error uploading file:', error);
-      alert(error.message || 'Gagal terhubung ke backend.');
+      console.error('Error uploading card:', error);
+      alert(error.message || 'Gagal terhubung ke backend analitik.');
     } finally {
       setIsUploading(false);
     }
   };
 
+  const handleResetStaged = () => {
+    setFrontImage(null);
+    setBackImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (backFileInputRef.current) backFileInputRef.current.value = '';
+  };
+
   const handleFileChange = (event) => {
     const selectedFile = event.target.files && event.target.files[0];
     if (selectedFile) {
-      processFile(selectedFile);
+      handleFrontFileSelected(selectedFile);
       event.target.value = '';
     }
   };
@@ -440,7 +482,129 @@ function UploadPage({ onUploadComplete }) {
                 {isUploading ? (
                   <div className="scanning-animation">
                     <div className="hud-spinner"></div>
-                    <p className="hud-upload-title">Menganalisis Kartu...</p>
+                    <p className="hud-upload-title">
+                      {backImage ? "Menganalisis 2 Sisi Kartu..." : "Menganalisis Kartu..."}
+                    </p>
+                    <p className="hud-upload-sub">
+                      {backImage 
+                        ? "Memeriksa identitas CLIP dan cacat fisik depan & belakang..." 
+                        : "Memeriksa identitas CLIP dan kondisi fisik kartu..."}
+                    </p>
+                  </div>
+                ) : frontImage ? (
+                  /* TAMPILAN PRATINJAU DUA SISI */
+                  <div className="staged-preview-container">
+                    <div className="staged-header">
+                      <h3 className="staged-title">Pratinjau Kartu</h3>
+                      <p className="staged-subtitle">
+                        {backImage
+                          ? "Foto depan dan belakang siap dianalisis secara lengkap."
+                          : "Sisi depan siap. Tambah sisi belakang untuk cek fisik lebih detail, atau langsung lanjutkan."}
+                      </p>
+                    </div>
+
+                    <div className="staged-cards-row">
+                      {/* SLOT SISI DEPAN */}
+                      <div className="staged-card-item">
+                        <div className="staged-card-badge">Tampak Depan</div>
+                        <div className="staged-img-wrapper">
+                          <img src={frontImage} alt="Tampak Depan" className="staged-card-img" />
+                        </div>
+                        <button
+                          type="button"
+                          className="staged-sub-action"
+                          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                          title="Pilih gambar tampak depan lain"
+                        >
+                          Ganti
+                        </button>
+                      </div>
+
+                      {/* SLOT SISI BELAKANG */}
+                      <div className="staged-card-item">
+                        <div className={`staged-card-badge ${backImage ? '' : 'badge-optional'}`}>
+                          {backImage ? "Tampak Belakang" : "Belakang (Opsional)"}
+                        </div>
+                        {backImage ? (
+                          <>
+                            <div className="staged-img-wrapper">
+                              <img src={backImage} alt="Tampak Belakang" className="staged-card-img" />
+                            </div>
+                            <button
+                              type="button"
+                              className="staged-sub-action text-danger"
+                              onClick={() => setBackImage(null)}
+                              title="Hapus foto tampak belakang"
+                            >
+                              Hapus
+                            </button>
+                          </>
+                        ) : (
+                          <div
+                            className="staged-empty-slot"
+                            onClick={() => backFileInputRef.current && backFileInputRef.current.click()}
+                            role="button"
+                            tabIndex={0}
+                            title="Klik untuk memilih foto tampak belakang"
+                          >
+                            {isProcessingBack ? (
+                              <span className="staged-slot-text">Memproses...</span>
+                            ) : (
+                              <>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                <span className="staged-slot-title">Tambah Belakang</span>
+                                <span className="staged-slot-desc">Cek goresan & sudut</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* HIDDEN INPUT FOR RE-SELECTING FRONT OR SELECTING BACK */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      style={{ display: 'none' }}
+                      onChange={handleFileChange}
+                      accept=".png, .jpg, .jpeg"
+                    />
+
+                    <input
+                      type="file"
+                      ref={backFileInputRef}
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files && e.target.files[0];
+                        if (file) {
+                          handleBackFileSelected(file);
+                          e.target.value = '';
+                        }
+                      }}
+                      accept=".png, .jpg, .jpeg"
+                    />
+
+                    {/* AKSI EKSEKUSI */}
+                    <div className="staged-actions">
+                      <button
+                        type="button"
+                        className="staged-primary-btn"
+                        onClick={handleExecuteAnalyze}
+                      >
+                        {backImage ? "Analisis Lengkap (2 Sisi)" : "Analisis Sekarang"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="staged-cancel-btn"
+                        onClick={handleResetStaged}
+                      >
+                        Pilih Ulang
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -453,11 +617,15 @@ function UploadPage({ onUploadComplete }) {
                         e.preventDefault();
                         setIsDragOver(false);
                         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                          processFile(e.dataTransfer.files[0]);
+                          handleFrontFileSelected(e.dataTransfer.files[0]);
                         }
                       }}
                     >
-                      <div className="upload-icon">☁️</div>
+                      <div className="upload-icon">
+                        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#e83e8c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+                        </svg>
+                      </div>
                       <p className="main-text">Select your card or drag and drop</p>
                       <p className="sub-text">PNG, JPG, or JPEG accepted</p>
                       
@@ -469,11 +637,11 @@ function UploadPage({ onUploadComplete }) {
                         accept=".png, .jpg, .jpeg" 
                       />
                       <button className="browse-btn" onClick={handleBrowseClick}>
-                        BROWSE FILE
+                        {isProcessingFront ? "MEMPROSES..." : "BROWSE FILE"}
                       </button>
                     </div>
 
-                    <p className="or-text">— OR —</p>
+                    <p className="or-text">OR</p>
                     
                     <button className="open-camera-btn" onClick={openCamera}>
                       OPEN CAMERA
