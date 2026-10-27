@@ -191,18 +191,17 @@ class CardIdentifier:
 
             if best_quad is not None:
                 area, rect, ori, tilt = best_quad
-                if tilt > 8.0:
-                    rect_padded = self._expand_rect(rect, factor=0.05)
-                    width, height = out_size
-                    if ori == "landscape":
-                        dst = np.array([[0, 0], [height - 1, 0], [height - 1, width - 1], [0, width - 1]], dtype="float32")
-                        M = cv2.getPerspectiveTransform(rect_padded.astype(np.float32), dst)
-                        warped = cv2.warpPerspective(image_np, M, (height, width))
-                    else:
-                        dst = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype="float32")
-                        M = cv2.getPerspectiveTransform(rect_padded.astype(np.float32), dst)
-                        warped = cv2.warpPerspective(image_np, M, (width, height))
-                    return warped, f"WARPED_TILT_{tilt:.1f}deg"
+                rect_padded = self._expand_rect(rect, factor=0.03)
+                width, height = out_size
+                if ori == "landscape":
+                    dst = np.array([[0, 0], [height - 1, 0], [height - 1, width - 1], [0, width - 1]], dtype="float32")
+                    M = cv2.getPerspectiveTransform(rect_padded.astype(np.float32), dst)
+                    warped = cv2.warpPerspective(image_np, M, (height, width))
+                else:
+                    dst = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype="float32")
+                    M = cv2.getPerspectiveTransform(rect_padded.astype(np.float32), dst)
+                    warped = cv2.warpPerspective(image_np, M, (width, height))
+                return warped, f"WARPED_QUAD_tilt_{tilt:.1f}deg"
 
             if w_img > h_img * 1.15:
                 direct = cv2.rotate(image_np, cv2.ROTATE_90_CLOCKWISE)
@@ -420,7 +419,7 @@ class CardIdentifier:
             faiss.normalize_L2(feat_p)
 
             rerank_pool = max(top_k, self.orb_rerank_pool_size) if self.use_orb_rerank else top_k
-            sub_k = min(max(rerank_pool // 2, self.calibration_pool_size), self.index.ntotal)
+            sub_k = min(max(rerank_pool, self.calibration_pool_size), self.index.ntotal)
 
             distances_p, indices_p = self.index.search(feat_p, sub_k)
 
@@ -442,40 +441,61 @@ class CardIdentifier:
                     sim = float(distances_s[0][rank])
                     cand_dict[cid] = max(cand_dict.get(cid, 0.0), sim)
 
+            # Urutkan berdasarkan kemiripan CLIP terlebih dahulu
+            sorted_by_sim = sorted(cand_dict.items(), key=lambda x: x[1], reverse=True)
+            max_orb_eval = min(len(sorted_by_sim), top_k if fast_mode else self.orb_rerank_pool_size)
+
             # Hitung deskriptor query ORB cukup 1x untuk keseluruhan kandidat
             q_orb_data = None
-            if self.use_orb_rerank:
+            if self.use_orb_rerank and max_orb_eval > 0:
                 orb = self._get_orb()
                 g_q = cv2.cvtColor(orb_query_bgr, cv2.COLOR_BGR2GRAY)
                 q_k, q_d = orb.detectAndCompute(g_q, None)
                 q_orb_data = (q_k, q_d)
 
-            # Urutkan berdasarkan kemiripan CLIP terlebih dahulu
-            sorted_by_sim = sorted(cand_dict.items(), key=lambda x: x[1], reverse=True)
-            max_orb_eval = min(len(sorted_by_sim), top_k if fast_mode else self.orb_rerank_pool_size)
+            # Pisahkan top pool (yang diverifikasi ORB) dari sisa kandidat
+            top_pool = sorted_by_sim[:max_orb_eval]
+            rest_pool = sorted_by_sim[max_orb_eval:]
 
-            raw_cands = []
-            for rank, (card_id, dist) in enumerate(sorted_by_sim):
-                entry = {
-                    "card_id": card_id,
-                    "raw_similarity_score": dist,
-                }
-                if self.use_orb_rerank and rank < max_orb_eval:
-                    orb_score = self._orb_match_score(orb_query_bgr, card_id, query_kp_desc=q_orb_data)
-                    entry["orb_verification_score"] = orb_score
-                    entry["blended_score"] = 0.60 * dist + 0.40 * (orb_score or 0.0)
-                else:
-                    entry["orb_verification_score"] = None
-                    entry["blended_score"] = dist
-
+            reranked_top = []
+            for rank, (card_id, dist) in enumerate(top_pool):
                 name = "Unknown"
                 if self.df_metadata is not None and card_id in self.df_metadata.index:
                     name = str(self.df_metadata.loc[card_id].get("name", "Unknown"))
-                entry["name"] = name
-                raw_cands.append(entry)
 
-            raw_cands.sort(key=lambda e: e["blended_score"], reverse=True)
-            return raw_cands
+                orb_score = None
+                if self.use_orb_rerank:
+                    orb_score = self._orb_match_score(orb_query_bgr, card_id, query_kp_desc=q_orb_data)
+                    # Additive ORB score: CLIP similarity + bonus verifikasi ORB
+                    blended = dist + (orb_score or 0.0) * 0.40
+                else:
+                    blended = dist
+
+                reranked_top.append({
+                    "card_id": card_id,
+                    "name": name,
+                    "raw_similarity_score": dist,
+                    "orb_verification_score": orb_score,
+                    "blended_score": blended
+                })
+
+            # Urutkan top pool berdasarkan blended score
+            reranked_top.sort(key=lambda e: e["blended_score"], reverse=True)
+
+            # Sisa kandidat tetap berada di belakang top pool dengan blended_score = dist
+            for card_id, dist in rest_pool:
+                name = "Unknown"
+                if self.df_metadata is not None and card_id in self.df_metadata.index:
+                    name = str(self.df_metadata.loc[card_id].get("name", "Unknown"))
+                reranked_top.append({
+                    "card_id": card_id,
+                    "name": name,
+                    "raw_similarity_score": dist,
+                    "orb_verification_score": None,
+                    "blended_score": dist
+                })
+
+            return reranked_top
 
         # Eksekusi Pass 1: Standar
         raw_candidates = _retrieve_and_rerank(aligned_bgr, aligned_bgr)
