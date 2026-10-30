@@ -149,48 +149,63 @@ class CardIdentifier:
     def _align_card_image_debug(self, image_np, out_size=(448, 625)):
         h_img, w_img = image_np.shape[:2]
         frame_area = h_img * w_img
+        is_portrait_frame = (h_img >= w_img)
 
         try:
             gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
             smooth = cv2.bilateralFilter(gray, d=9, sigmaColor=60, sigmaSpace=60)
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             gray_eq = clahe.apply(smooth)
-            edges = cv2.Canny(gray_eq, 40, 120)
 
             best_quad = None
             min_area = 0.20 * frame_area
             max_area = 0.90 * frame_area
 
-            for ksize in (5, 7):
-                kernel = np.ones((ksize, ksize), np.uint8)
-                closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
-                contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                if not contours:
-                    continue
-
-                for c in contours:
-                    area = cv2.contourArea(c)
-                    if area < min_area or area > max_area:
+            # Multi-threshold Canny: Standard (40, 120), lalu fallback ke sensitif (25, 80) jika kontur kartu samar
+            for c_low, c_high in [(40, 120), (25, 80)]:
+                edges = cv2.Canny(gray_eq, c_low, c_high)
+                for ksize in (5, 7):
+                    kernel = np.ones((ksize, ksize), np.uint8)
+                    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+                    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    if not contours:
                         continue
-                    hull = cv2.convexHull(c)
-                    hull_peri = cv2.arcLength(hull, True)
-                    for eps in (0.02, 0.03):
-                        approx = cv2.approxPolyDP(hull, eps * hull_peri, True)
-                        if len(approx) == 4 and cv2.isContourConvex(approx):
-                            rect = self._order_points(approx)
-                            pts = rect.reshape(4, 2)
-                            if np.any(pts[:, 0] <= 12) or np.any(pts[:, 0] >= w_img - 12) or \
-                               np.any(pts[:, 1] <= 12) or np.any(pts[:, 1] >= h_img - 12):
-                                continue
-                            ori = self._aspect_ok(rect, tol=0.18)
-                            if ori is not None:
-                                tilt = self._get_quad_tilt_angle(pts)
-                                if best_quad is None or area > best_quad[0]:
-                                    best_quad = (area, rect, ori, tilt)
-                                break
+
+                    for c in contours:
+                        area = cv2.contourArea(c)
+                        if area < min_area or area > max_area:
+                            continue
+                        hull = cv2.convexHull(c)
+                        hull_peri = cv2.arcLength(hull, True)
+                        for eps in (0.02, 0.03):
+                            approx = cv2.approxPolyDP(hull, eps * hull_peri, True)
+                            if len(approx) == 4 and cv2.isContourConvex(approx):
+                                rect = self._order_points(approx)
+                                pts = rect.reshape(4, 2)
+                                if np.any(pts[:, 0] <= 12) or np.any(pts[:, 0] >= w_img - 12) or \
+                                   np.any(pts[:, 1] <= 12) or np.any(pts[:, 1] >= h_img - 12):
+                                    continue
+                                ori = self._aspect_ok(rect, tol=0.18)
+                                if ori is not None:
+                                    tilt = self._get_quad_tilt_angle(pts)
+                                    # Cegah pemotongan palsu pada kotak ilustrasi seni (inner artwork window):
+                                    # Pada frame foto portrait, jika quad horizontal (landscape) dengan area kecil (<32%)
+                                    # dan sudut kemiringan hampir tegak (tilt < 12°), itu adalah ilustrasi gambar kartu, bukan kartu utuh!
+                                    if is_portrait_frame and ori == "landscape" and area < 0.32 * frame_area and tilt < 12.0:
+                                        continue
+
+                                    # Berikan bobot preferensi pada kontur portrait di foto portrait atau kontur berarea besar
+                                    score = area + (500000 if ori == "portrait" and is_portrait_frame else 0)
+                                    if best_quad is None or score > best_quad[0]:
+                                        best_quad = (score, area, rect, ori, tilt)
+                                    break
+
+                # Jika kontur kartu utuh yang jelas (>35% area frame) sudah ditemukan, lewati pass sensitif
+                if best_quad is not None and best_quad[1] > 0.35 * frame_area:
+                    break
 
             if best_quad is not None:
-                area, rect, ori, tilt = best_quad
+                _, area, rect, ori, tilt = best_quad
                 rect_padded = self._expand_rect(rect, factor=0.03)
                 width, height = out_size
                 if ori == "landscape":
@@ -201,7 +216,7 @@ class CardIdentifier:
                     dst = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype="float32")
                     M = cv2.getPerspectiveTransform(rect_padded.astype(np.float32), dst)
                     warped = cv2.warpPerspective(image_np, M, (width, height))
-                return warped, f"WARPED_QUAD_tilt_{tilt:.1f}deg"
+                return warped, f"WARPED_QUAD_{ori}_tilt_{tilt:.1f}deg"
 
             if w_img > h_img * 1.15:
                 direct = cv2.rotate(image_np, cv2.ROTATE_90_CLOCKWISE)
