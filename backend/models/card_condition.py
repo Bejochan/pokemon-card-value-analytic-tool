@@ -26,7 +26,7 @@ _script_dir = Path(__file__).resolve().parent
 
 # === KONFIGURASI MODEL LOKAL ===
 # Sementara langsung pakai path absolut
-local_model_path = r"best-model-v5-card-condition.pt"
+local_model_path = r"best-model-v6-card-condition.pt"
 
 print(f"[*] Memuat model YOLO dari: {local_model_path}")
 try:
