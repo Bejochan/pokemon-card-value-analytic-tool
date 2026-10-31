@@ -356,16 +356,20 @@ class CardIdentifier:
             self._ref_orb_cache[card_id] = (None, None)
             return None, None
 
-        ref_img = cv2.imread(ref_path)
-        if ref_img is None:
+        try:
+            ref_img = cv2.imread(ref_path)
+            if ref_img is None:
+                self._ref_orb_cache[card_id] = (None, None)
+                return None, None
+
+            orb = self._get_orb()
+            g2 = cv2.cvtColor(ref_img, cv2.COLOR_BGR2GRAY)
+            k2, d2 = orb.detectAndCompute(g2, None)
+            self._ref_orb_cache[card_id] = (k2, d2)
+            return k2, d2
+        except Exception:
             self._ref_orb_cache[card_id] = (None, None)
             return None, None
-
-        orb = self._get_orb()
-        g2 = cv2.cvtColor(ref_img, cv2.COLOR_BGR2GRAY)
-        k2, d2 = orb.detectAndCompute(g2, None)
-        self._ref_orb_cache[card_id] = (k2, d2)
-        return k2, d2
 
     def _orb_match_score(self, query_bgr, card_id, ratio=0.75, query_kp_desc=None):
         k2, d2 = self._get_ref_orb_descriptors(card_id)
@@ -400,6 +404,34 @@ class CardIdentifier:
         l_enh = clahe.apply(l)
         return cv2.cvtColor(cv2.merge([l_enh, a, b]), cv2.COLOR_LAB2BGR)
 
+    @staticmethod
+    def _adaptive_preprocess(aligned_bgr):
+        """
+        Pra-pemrosesan adaptif untuk menetralkan gangguan citra dunia nyata:
+        1. Low-light (< 75): Menerangkan bayangan dengan Gamma LUT (gamma < 1.0)
+           tanpa bilateral filter agresif agar detail tepi dan tekstur kartu tidak kabur.
+        2. Motion blur (lap_var < 160 & not overexposed): Unsharp masking untuk memulihkan ketajaman tepi.
+        Jika citra berada dalam kondisi normal, citra dipertahankan tanpa modifikasi (zero regression).
+        """
+        gray = cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2GRAY)
+        mean_val = np.mean(gray)
+        lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+
+        processed = aligned_bgr
+
+        # 1. Pemulihan Low-Light (Kamar Gelap / Underexposed)
+        if mean_val < 75:
+            gamma = 0.75
+            table = np.array([((i / 255.0) ** gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+            processed = cv2.LUT(processed, table)
+
+        # 2. Pemulihan Motion Blur (Kamera Berguncang)
+        if mean_val < 170 and lap_var < 160:
+            gaussian = cv2.GaussianBlur(processed, (0, 0), 2.0)
+            processed = cv2.addWeighted(processed, 1.35, gaussian, -0.35, 0)
+
+        return processed
+
     # ------------------------------------------------------------------
     # MAIN ENTRY POINT
     # ------------------------------------------------------------------
@@ -423,6 +455,9 @@ class CardIdentifier:
         # Lakukan 4-Way Smart Auto-Orientation agar kartu selalu tegak (dapat dilewati pada mode streaming realtime)
         if auto_orient:
             aligned_bgr = self._ensure_best_orientation(aligned_bgr)
+
+        # Terapkan Adaptive Pre-processing (Gamma, Unsharp, Denoising) untuk menetralkan foto terdegradasi
+        aligned_bgr = self._adaptive_preprocess(aligned_bgr)
 
         if debug_save_path:
             cv2.imwrite(debug_save_path, aligned_bgr)
