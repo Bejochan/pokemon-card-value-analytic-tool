@@ -15,6 +15,7 @@ Engine ini adalah model resmi Model 1 untuk Regokemon:
 """
 
 import os
+import gc
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 if "HF_HUB_OFFLINE" not in os.environ:
     os.environ["HF_HUB_OFFLINE"] = "1"
@@ -50,7 +51,7 @@ class CardIdentifier:
     def __init__(self, index_path=INDEX_PATH, map_path=MAP_PATH, csv_path=CSV_PATH,
                  image_dir=IMAGE_DIR, confidence_temperature=0.03,
                  calibration_pool_size=20, use_tta=False, use_orb_rerank=True,
-                 orb_rerank_pool_size=8):
+                 orb_rerank_pool_size=120):
         self.index_path = index_path
         self.map_path = map_path
         self.csv_path = csv_path
@@ -351,6 +352,10 @@ class CardIdentifier:
         if card_id in self._ref_orb_cache:
             return self._ref_orb_cache[card_id]
 
+        if len(self._ref_orb_cache) > 250:
+            self._ref_orb_cache.clear()
+            gc.collect()
+
         ref_path = self._find_reference_image_path(card_id)
         if ref_path is None:
             self._ref_orb_cache[card_id] = (None, None)
@@ -364,7 +369,9 @@ class CardIdentifier:
 
             orb = self._get_orb()
             g2 = cv2.cvtColor(ref_img, cv2.COLOR_BGR2GRAY)
+            del ref_img
             k2, d2 = orb.detectAndCompute(g2, None)
+            del g2
             self._ref_orb_cache[card_id] = (k2, d2)
             return k2, d2
         except Exception:
@@ -410,14 +417,17 @@ class CardIdentifier:
         Pra-pemrosesan adaptif untuk menetralkan gangguan citra dunia nyata:
         1. Low-light (< 75): Menerangkan bayangan dengan Gamma LUT (gamma < 1.0)
            tanpa bilateral filter agresif agar detail tepi dan tekstur kartu tidak kabur.
-        2. Motion blur (lap_var < 160 & not overexposed): Unsharp masking untuk memulihkan ketajaman tepi.
+        2. Overexposure (> 190): Memulihkan kontras highlight dengan Gamma LUT (gamma = 1.6)
+           agar simbol set, tipe, dan teks yang memutih dapat terbaca kembali.
+        3. Motion blur (lap_var < 280 & not overexposed): Directional deblurring filter
+           untuk memulihkan ketajaman tepi dan sudut kartu akibat guncangan kamera.
         Jika citra berada dalam kondisi normal, citra dipertahankan tanpa modifikasi (zero regression).
         """
         gray = cv2.cvtColor(aligned_bgr, cv2.COLOR_BGR2GRAY)
         mean_val = np.mean(gray)
         lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
 
-        processed = aligned_bgr
+        processed = aligned_bgr.copy()
 
         # 1. Pemulihan Low-Light (Kamar Gelap / Underexposed)
         if mean_val < 75:
@@ -425,10 +435,22 @@ class CardIdentifier:
             table = np.array([((i / 255.0) ** gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
             processed = cv2.LUT(processed, table)
 
-        # 2. Pemulihan Motion Blur (Kamera Berguncang)
-        if mean_val < 170 and lap_var < 160:
-            gaussian = cv2.GaussianBlur(processed, (0, 0), 2.0)
-            processed = cv2.addWeighted(processed, 1.35, gaussian, -0.35, 0)
+        # 2. Pemulihan Overexposure (Cahaya Terlalu Terang / Memutih)
+        if mean_val > 190:
+            tbl = np.array([((i / 255.0) ** 1.6) * 255 for i in np.arange(0, 256)]).astype("uint8")
+            processed = cv2.LUT(processed, tbl)
+
+        # 3. Pemulihan Motion Blur (Kamera Berguncang / Goyang)
+        if mean_val < 170 and lap_var < 280:
+            k_size = 5
+            boost = 2.5
+            k = np.zeros((k_size, k_size), dtype=np.float32)
+            center = k_size // 2
+            for d in range(k_size):
+                if d != center:
+                    k[d, d] = - (boost - 1.0) / (k_size - 1)
+            k[center, center] = boost
+            processed = cv2.filter2D(processed, -1, k)
 
         return processed
 
@@ -474,10 +496,12 @@ class CardIdentifier:
             distances_p, indices_p = self.index.search(feat_p, sub_k)
 
             cand_dict = {}
+            eval_cids = set()
             for rank in range(len(indices_p[0])):
                 cid = self.card_id_map.get(str(indices_p[0][rank]))
                 sim = float(distances_p[0][rank])
                 cand_dict[cid] = max(cand_dict.get(cid, 0.0), sim)
+                eval_cids.add(cid)
 
             # View 2: Full Square (640 x 640) - hanya jika dual_view diaktifkan
             if dual_view:
@@ -501,27 +525,34 @@ class CardIdentifier:
                 orb = self._get_orb()
                 g_q = cv2.cvtColor(orb_query_bgr, cv2.COLOR_BGR2GRAY)
                 q_k, q_d = orb.detectAndCompute(g_q, None)
+                del g_q
                 q_orb_data = (q_k, q_d)
 
-            # Pisahkan top pool (yang diverifikasi ORB) dari sisa kandidat
-            top_pool = sorted_by_sim[:max_orb_eval]
-            rest_pool = sorted_by_sim[max_orb_eval:]
-
-            reranked_top = []
-            for rank, (card_id, dist) in enumerate(top_pool):
+            reranked_all = []
+            for rank, (card_id, dist) in enumerate(sorted_by_sim):
                 name = "Unknown"
                 if self.df_metadata is not None and card_id in self.df_metadata.index:
                     name = str(self.df_metadata.loc[card_id].get("name", "Unknown"))
 
                 orb_score = None
+                blended = dist
                 if self.use_orb_rerank:
-                    orb_score = self._orb_match_score(orb_query_bgr, card_id, query_kp_desc=q_orb_data)
-                    # Additive ORB score: CLIP similarity + bonus verifikasi ORB
-                    blended = dist + (orb_score or 0.0) * 0.40
-                else:
-                    blended = dist
+                    should_eval = (rank < top_k) if fast_mode else (rank < 8 or card_id in eval_cids)
+                    if should_eval:
+                        orb_score = self._orb_match_score(orb_query_bgr, card_id, query_kp_desc=q_orb_data)
+                        if rank < 8:
+                            blended = dist + (orb_score or 0.0) * 0.40
+                        else:
+                            # Tiered verification reward untuk kandidat di luar top 8:
+                            # Hanya beri reward jika keypoint geometri benar-benar cocok kuat
+                            if (orb_score or 0.0) >= 0.08:
+                                blended = dist + orb_score * 0.70
+                            elif (orb_score or 0.0) >= 0.05:
+                                blended = dist + orb_score * 0.50
+                            else:
+                                blended = dist
 
-                reranked_top.append({
+                reranked_all.append({
                     "card_id": card_id,
                     "name": name,
                     "raw_similarity_score": dist,
@@ -529,23 +560,9 @@ class CardIdentifier:
                     "blended_score": blended
                 })
 
-            # Urutkan top pool berdasarkan blended score
-            reranked_top.sort(key=lambda e: e["blended_score"], reverse=True)
-
-            # Sisa kandidat tetap berada di belakang top pool dengan blended_score = dist
-            for card_id, dist in rest_pool:
-                name = "Unknown"
-                if self.df_metadata is not None and card_id in self.df_metadata.index:
-                    name = str(self.df_metadata.loc[card_id].get("name", "Unknown"))
-                reranked_top.append({
-                    "card_id": card_id,
-                    "name": name,
-                    "raw_similarity_score": dist,
-                    "orb_verification_score": None,
-                    "blended_score": dist
-                })
-
-            return reranked_top
+            # Urutkan seluruh kandidat berdasarkan blended score
+            reranked_all.sort(key=lambda e: e["blended_score"], reverse=True)
+            return reranked_all
 
         # Eksekusi Pass 1: Standar
         raw_candidates = _retrieve_and_rerank(aligned_bgr, aligned_bgr)
@@ -618,5 +635,8 @@ class CardIdentifier:
         if debug:
             output["debug_distinct_margin"] = round(distinct_margin, 4)
             output["debug_temperature"] = self.confidence_temperature
+
+        del aligned_bgr
+        gc.collect()
 
         return output
