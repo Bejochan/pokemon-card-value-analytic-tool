@@ -55,6 +55,7 @@ _card_identifier = None
 _defect_model = None
 _identifier_lock = threading.Lock()
 _defect_lock = threading.Lock()
+_defect_infer_lock = threading.Lock()
 
 def get_card_identifier():
     """
@@ -88,8 +89,8 @@ def get_card_identifier():
 
 def get_defect_model():
     """
-    Mengambil instance model YOLOv8 Condition Grader lokal secara Lazy dengan thread lock.
-    Menggunakan model 'best-model-v5-card-condition.pt' yang sudah dilatih secara lokal.
+    Mengambil instance model YOLO Condition Grader lokal secara Lazy dengan thread lock.
+    Memprioritaskan 'best-model-v6-card-condition.pt' (YOLO26s 800px), dengan fallback ke V5.
     """
     global _defect_model
     if _defect_model is None:
@@ -98,11 +99,16 @@ def get_defect_model():
                 try:
                     current_dir = os.path.dirname(os.path.abspath(__file__))
                     backend_dir = os.path.dirname(current_dir)
-                    model_path = os.path.join(backend_dir, "models", "best-model-v5-card-condition.pt")
+                    if backend_dir not in sys.path:
+                        sys.path.insert(0, backend_dir)
+                    from models.card_condition import resolve_defect_model_path
+
+                    v6_path = os.path.join(backend_dir, "models", "best-model-v6-card-condition.pt")
+                    model_path = resolve_defect_model_path(v6_path)
                     if os.path.exists(model_path):
                         from ultralytics import YOLO
                         _defect_model = YOLO(model_path)
-                        print(f"[OK] [CV Service] Model 2 YOLOv8 Condition Grader lokal berhasil dimuat dari {model_path}")
+                        print(f"[OK] [CV Service] Model 2 YOLO Condition Grader lokal berhasil dimuat dari {model_path}")
                     else:
                         print(f"[WARN] [CV Service] File model lokal tidak ditemukan di: {model_path}")
                 except Exception as e:
@@ -212,9 +218,12 @@ def decode_bytes_to_cv2(image_bytes: bytes) -> Tuple[Optional[np.ndarray], Optio
 # DETEKSI CACAT FISIK KARTU (MODEL 2 YOLO LOKAL & ROBOFLOW FALLBACK)
 # =====================================================================
 
-def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.15) -> List[Dict[str, Any]]:
+def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.20) -> List[Dict[str, Any]]:
     """
     Mendeteksi cacat fisik (Corner Wear, Edge Wear, Scratch) menggunakan Model 2 YOLO lokal.
+    Menjalankan pipeline khusus Model 2 di RAM (auto_detect_card perspective alignment +
+    Unsharp Masking kondisional + LAB CLAHE + inferensi imgsz=800 + NMS per-kelas)
+    tanpa mengubah gambar input asli yang dipakai Model 1 (CardIdentifier).
     Mengabaikan bounding box kartu itu sendiri ('Card').
     """
     model = get_defect_model()
@@ -222,9 +231,28 @@ def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.15)
         return []
 
     try:
-        results = model.predict(img_bgr, conf=conf_threshold, verbose=False)
-        result = results[0]
-        defects = []
+        from models.card_condition import (
+            DEFAULT_IMGSZ,
+            auto_detect_card,
+            enhance_card_for_defect,
+            nms,
+        )
+
+        with _defect_infer_lock:
+            # 1. Auto-crop & perspective alignment kartu (dengan margin luar 120px untuk deteksi tepi)
+            cropped_card = auto_detect_card(img_bgr, model=model, imgsz=DEFAULT_IMGSZ)
+            if cropped_card is None:
+                # Fallback aman jika foto sudah ter-crop rapat sehingga kontur luar tidak terdeteksi
+                cropped_card = img_bgr.copy()
+
+            # 2. Peningkatan ketajaman kondisional (Unsharp Mask) + kontras lokal (LAB CLAHE)
+            send_image = enhance_card_for_defect(cropped_card, verbose=False)
+
+            # 3. Inferensi pada resolusi native training V6.1 (imgsz=800)
+            results = model.predict(send_image, conf=conf_threshold, imgsz=DEFAULT_IMGSZ, verbose=False)
+            result = results[0]
+
+        raw_dets = []
         for box in result.boxes:
             cls_name = result.names[int(box.cls[0])]
             if cls_name == "Card":
@@ -232,14 +260,28 @@ def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.15)
 
             cx, cy, w, h = box.xywh[0].tolist()
             conf = float(box.conf[0])
+            raw_dets.append({
+                "class": cls_name,
+                "confidence": conf,
+                "x": cx,
+                "y": cy,
+                "width": w,
+                "height": h,
+            })
+
+        # 4. Deduplikasi kotak cacat yang bertumpuk pada sudut/tepi yang sama
+        deduped_dets = nms(raw_dets, iou_threshold=0.4)
+
+        defects = []
+        for det in deduped_dets:
             defects.append({
-                "label": cls_name,
-                "confidence": round(conf, 2),
+                "label": det["class"],
+                "confidence": round(float(det["confidence"]), 2),
                 "bbox": {
-                    "x": round(cx, 1),
-                    "y": round(cy, 1),
-                    "width": round(w, 1),
-                    "height": round(h, 1)
+                    "x": round(float(det["x"]), 1),
+                    "y": round(float(det["y"]), 1),
+                    "width": round(float(det["width"]), 1),
+                    "height": round(float(det["height"]), 1)
                 }
             })
         return defects

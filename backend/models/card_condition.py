@@ -5,7 +5,7 @@ Upload foto tampak depan & belakang kartu. Guide frame/crop otomatis
 (deteksi kontur), tidak perlu drag manual.
 
 Cara pakai:
-  python image_card_condition_test.py kartu_depan.jpg kartu_belakang.jpg
+  python card_condition.py kartu_depan.jpg kartu_belakang.jpg
 """
 
 import os
@@ -18,26 +18,42 @@ from collections import defaultdict
 import cv2
 import numpy as np
 from dotenv import load_dotenv
-from pathlib import Path
 from ultralytics import YOLO
 
 # Mendapatkan rute folder 'models' tempat script ini berada
 _script_dir = Path(__file__).resolve().parent
 
 # === KONFIGURASI MODEL LOKAL ===
-# Sementara langsung pakai path absolut
-local_model_path = r"best-model-v6-card-condition.pt"
+DEFAULT_MODEL_PATH = str(_script_dir / "best-model-v6-card-condition.pt")
+FALLBACK_MODEL_PATH = str(_script_dir / "best-model-v5-card-condition.pt")
+DEFAULT_IMGSZ = 800
 
-print(f"[*] Memuat model YOLO dari: {local_model_path}")
-try:
-    if not os.path.exists(local_model_path):
-        print(f"[!] File model tidak ditemukan di path: {local_model_path}")
-        sys.exit(1)
-        
-    defect_model = YOLO(local_model_path)
-except Exception as e:
-    print(f"[!] Gagal memuat model YOLO. Error: {e}")
-    sys.exit(1)
+_local_defect_model = None
+
+
+def resolve_defect_model_path(preferred_path: str | None = None) -> str:
+    """Menentukan path absolut bobot model YOLO lokal (prioritas V6, fallback V5)."""
+    candidates = []
+    if preferred_path:
+        candidates.append(preferred_path)
+    candidates.extend([DEFAULT_MODEL_PATH, FALLBACK_MODEL_PATH])
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return preferred_path or DEFAULT_MODEL_PATH
+
+
+def get_local_defect_model(model_path: str | None = None) -> YOLO:
+    """Memuat model YOLO secara lazy agar modul aman di-import oleh cv_service.py."""
+    global _local_defect_model
+    if _local_defect_model is None:
+        resolved_path = resolve_defect_model_path(model_path)
+        print(f"[*] Memuat model YOLO dari: {resolved_path}")
+        if not os.path.exists(resolved_path):
+            raise FileNotFoundError(f"File model tidak ditemukan di path: {resolved_path}")
+        _local_defect_model = YOLO(resolved_path)
+    return _local_defect_model
+
 
 CLASS_COLORS = {
     "Card":        (0, 255, 0),
@@ -54,7 +70,7 @@ SHARPNESS_THRESHOLD = 70.0
 CARD_ASPECT_RATIO = 63.0 / 88.0
 CARD_OUT_SIZE = (600, 837)  # Ukuran kartu asli (belum termasuk margin)
 
-def nms(detections: list[dict], iou_threshold: float = 0.4) -> list[dict]:
+def nms(detections: list[dict], iou_threshold: float = 0.4, cross_class_iou: float = 0.75) -> list[dict]:
     if not detections:
         return []
 
@@ -85,7 +101,23 @@ def nms(detections: list[dict], iou_threshold: float = 0.4) -> list[dict]:
             for j, b in enumerate(cls_dets[i+1:], i+1):
                 if iou(a, b) > iou_threshold:
                     suppressed.add(j)
-    return kept
+
+    # Deduplikasi lintas kelas khusus untuk kotak defect yang hampir identik (IoU > 0.75)
+    cards = [d for d in kept if d["class"] == "Card"]
+    defects = [d for d in kept if d["class"] != "Card"]
+    defects.sort(key=lambda d: d["confidence"], reverse=True)
+
+    final_defects = []
+    suppressed_cross = set()
+    for i, a in enumerate(defects):
+        if i in suppressed_cross:
+            continue
+        final_defects.append(a)
+        for j, b in enumerate(defects[i+1:], i+1):
+            if iou(a, b) > cross_class_iou:
+                suppressed_cross.add(j)
+
+    return cards + final_defects
 
 def filter_edge_detections(detections: list[dict], img_w: int, img_h: int,
                             border_ratio: float = 0.25) -> list[dict]:
@@ -136,6 +168,34 @@ def _aspect_ok(rect, tol=0.20):
     if abs(ratio - (1.0 / CARD_ASPECT_RATIO)) / (1.0 / CARD_ASPECT_RATIO) < tol:
         return "landscape"
     return None
+
+
+def _make_rounded_card_mask(
+    h_canvas: int,
+    w_canvas: int,
+    margin: int,
+    card_w: int,
+    card_h: int,
+    shrink: int = 1,
+) -> np.ndarray:
+    """Membuat mask siluet kartu Pokemon asli (rounded rectangle 63x88mm, radius sudut ~3.2mm)."""
+    mask = np.zeros((h_canvas, w_canvas), dtype=np.uint8)
+    x1 = margin + shrink
+    y1 = margin + shrink
+    x2 = margin + card_w - 1 - shrink
+    y2 = margin + card_h - 1 - shrink
+    radius = int(round(card_w * (3.2 / 63.0)))
+
+    cv2.rectangle(mask, (x1 + radius, y1), (x2 - radius, y2), 255, -1)
+    cv2.rectangle(mask, (x1, y1 + radius), (x2, y2 - radius), 255, -1)
+    for cx, cy in [
+        (x1 + radius, y1 + radius),
+        (x2 - radius, y1 + radius),
+        (x1 + radius, y2 - radius),
+        (x2 - radius, y2 - radius),
+    ]:
+        cv2.circle(mask, (cx, cy), radius, 255, -1)
+    return mask
 
 
 def _find_best_card_contour(binary_mask: np.ndarray, w_img: int, h_img: int) -> tuple | None:
@@ -214,7 +274,12 @@ def _find_best_card_contour(binary_mask: np.ndarray, w_img: int, h_img: int) -> 
     return best
 
 
-def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray | None:
+def auto_detect_card(
+    image_np: np.ndarray,
+    out_size=CARD_OUT_SIZE,
+    model=None,
+    imgsz: int = DEFAULT_IMGSZ,
+) -> np.ndarray | None:
     h_img, w_img = image_np.shape[:2]
     gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
 
@@ -259,7 +324,8 @@ def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray
     # Fallback ke deteksi kelas 'Card' dari YOLOv8 jika semua kontur OpenCV gagal
     if best is None:
         try:
-            yolo_res = defect_model.predict(image_np, conf=0.15, verbose=False)[0]
+            active_model = model if model is not None else get_local_defect_model()
+            yolo_res = active_model.predict(image_np, conf=0.15, imgsz=imgsz, verbose=False)[0]
             card_boxes = []
             for box in yolo_res.boxes:
                 cls_name = yolo_res.names[int(box.cls[0])]
@@ -306,24 +372,63 @@ def auto_detect_card(image_np: np.ndarray, out_size=CARD_OUT_SIZE) -> np.ndarray
         M = cv2.getPerspectiveTransform(rect, dst)
         warped = cv2.warpPerspective(image_np, M, (out_w, out_h), flags=cv2.INTER_CUBIC)
 
-    # Jika foto diambil di atas background putih/terang, gelapkan area margin di luar kartu
-    # agar model YOLO tidak menganggap margin putih sebagai bagian kartu dan bisa melihat
-    # bercak putih Corner/Edge Wear di pinggir kartu.
+    # Jika foto diambil di atas background putih/terang:
+    # 1. Gunakan mask rounded-rectangle sesuai lengkung sudut kartu asli (menghilangkan segitiga putih di 4 sudut)
+    # 2. Normalkan kabut kontras (veiling glare) dari piksel internal kartu sebelum menggelapkan margin luar
     if is_bright_bg:
-        pad = 5
-        card_mask = np.zeros(warped.shape[:2], dtype=np.uint8)
-        card_mask[margin - pad : margin + height + pad, margin - pad : margin + width + pad] = 255
+        card_mask = _make_rounded_card_mask(warped.shape[0], warped.shape[1], margin, width, height, shrink=1)
+        lab_pre = cv2.cvtColor(warped, cv2.COLOR_BGR2LAB)
+        l_ch, a_ch, b_ch = cv2.split(lab_pre)
+        card_l = l_ch[card_mask == 255]
+        p2 = float(np.percentile(card_l, 2))
+        p99 = float(np.percentile(card_l, 99.5))
+        if p2 > 22.0 and (p99 - p2) > 40.0:
+            scale = (245.0 - 15.0) / max(p99 - p2, 1.0)
+            l_stretched = np.clip((l_ch.astype(np.float32) - p2) * scale + 15.0, 0, 255).astype(np.uint8)
+            warped = cv2.cvtColor(cv2.merge((l_stretched, a_ch, b_ch)), cv2.COLOR_LAB2BGR)
         warped[card_mask == 0] = (20, 20, 22)
 
     return warped
 
 
+def enhance_card_for_defect(
+    cropped_card: np.ndarray,
+    sharpness_thresh: float = SHARPNESS_THRESHOLD,
+    verbose: bool = False,
+    side_label: str = "",
+) -> np.ndarray:
+    """Menerapkan Unsharp Masking kondisional dan CLAHE (LAB) murni di memori RAM."""
+    gray = cv2.cvtColor(cropped_card, cv2.COLOR_BGR2GRAY)
+    score = sharpness_score(gray)
+    if verbose:
+        print(f"[*] Skor ketajaman: {score:.1f} (ambang: {sharpness_thresh:.0f})")
+    work_image = cropped_card.copy()
+    if score < sharpness_thresh:
+        if verbose:
+            label_info = f" {side_label}" if side_label else ""
+            print(f"[!] Gambar{label_info} agak soft/blur — menerapkan unsharp masking tambahan...")
+        blurred_usm = cv2.GaussianBlur(work_image, (0, 0), 2.0)
+        work_image = cv2.addWeighted(work_image, 1.5, blurred_usm, -0.5, 0)
 
-def get_yolo_predictions(image: np.ndarray) -> dict | None:
+    # Terapkan CLAHE untuk meningkatkan kontras sebelum dikirim ke model
+    lab = cv2.cvtColor(work_image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+    enhanced = cv2.merge((clahe.apply(l), a, b))
+    send_image = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
+    return send_image
+
+
+def get_yolo_predictions(
+    image: np.ndarray,
+    model=None,
+    imgsz: int = DEFAULT_IMGSZ,
+) -> dict | None:
     """Menggunakan model YOLO lokal (didownload dari HF) untuk menggantikan Roboflow API."""
     try:
+        active_model = model if model is not None else get_local_defect_model()
         # Gunakan conf=0.01 agar filter manual (LOW_THRESH/HIGH_THRESH) di script ini tetap berfungsi sama
-        results = defect_model.predict(image, conf=0.01, verbose=False)
+        results = active_model.predict(image, conf=0.01, imgsz=imgsz, verbose=False)
         result = results[0]
         
         predictions = []
@@ -435,7 +540,8 @@ def process_side(image_path: str, side_label: str,
         print("ERROR: Tidak dapat membaca gambar. Pastikan format file didukung (JPG, PNG).")
         return None
 
-    cropped_card = auto_detect_card(image)
+    model = get_local_defect_model()
+    cropped_card = auto_detect_card(image, model=model)
     if cropped_card is None:
         debug_path = _script_dir / f"debug_{side_label.replace(' ', '_')}.jpg"
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -448,24 +554,15 @@ def process_side(image_path: str, side_label: str,
         print(f"[!] Deteksi kartu otomatis gagal...")
         return None
 
-    gray = cv2.cvtColor(cropped_card, cv2.COLOR_BGR2GRAY)
-    score = sharpness_score(gray)
-    print(f"[*] Skor ketajaman: {score:.1f} (ambang: {SHARPNESS_THRESHOLD:.0f})")
-    work_image = cropped_card.copy()
-    if score < SHARPNESS_THRESHOLD:
-        print(f"[!] Gambar {side_label} agak soft/blur — menerapkan unsharp masking tambahan...")
-        blurred_usm = cv2.GaussianBlur(work_image, (0, 0), 2.0)
-        work_image = cv2.addWeighted(work_image, 1.5, blurred_usm, -0.5, 0)
-
-    # Terapkan CLAHE untuk meningkatkan kontras sebelum dikirim ke model
-    lab = cv2.cvtColor(work_image, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
-    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
-    enhanced = cv2.merge((clahe.apply(l), a, b))
-    send_image = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
+    send_image = enhance_card_for_defect(
+        cropped_card,
+        sharpness_thresh=SHARPNESS_THRESHOLD,
+        verbose=True,
+        side_label=side_label,
+    )
 
     print(f"[*] Menganalisis {side_label} dengan Model YOLO lokal...")
-    result = get_yolo_predictions(send_image)
+    result = get_yolo_predictions(send_image, model=model)
     if result is None:
         return None
 
@@ -542,6 +639,12 @@ def main():
         if not p or not os.path.exists(p):
             print(f"ERROR: File {label} tidak ditemukan di -> {p}")
             sys.exit(1)
+
+    try:
+        get_local_defect_model()
+    except Exception as e:
+        print(f"[!] Gagal memuat model YOLO. Error: {e}")
+        sys.exit(1)
 
     front_detections = process_side(front_path, "TAMPAK DEPAN", args.low_thresh, args.high_thresh)
     back_detections = process_side(back_path, "TAMPAK BELAKANG", args.low_thresh, args.high_thresh)
