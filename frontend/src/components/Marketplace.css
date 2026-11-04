@@ -1,0 +1,668 @@
+/* =========================================
+   1. WADAH UTAMA & CHECKERBOARD
+   ========================================= */
+.mk-wrapper {
+  font-family: 'Montserrat', sans-serif;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 70px);
+  /* PERBAIKAN: Gunakan properti individual untuk kejelasan */
+  background-image: url('/bg-basic.png'); 
+  background-repeat: repeat; 
+  background-position: center -30px;
+  /* PENTING: Gunakan 'auto' agar pola tidak ditarik membesar, 
+     atau spesifikasikan ukurannya (misal: 100px 100px) */
+  background-size: auto; 
+  /* Bonus: Efek parallax seperti di ScannerDashboard */
+  background-attachment: fixed;
+}
+
+.mk-search-section {
+  width: 100%;
+  padding: 20px 0 15px 0; 
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+  /* Kosongkan background di sini karena sudah diurus oleh .mk-wrapper */
+  background: transparent; 
+}
+
+/* =========================================
+   2. PENCARIAN & TOMBOL SAVED
+   ========================================= */
+.mk-search-container {
+  position: relative; 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  /* PERBAIKAN: Hapus max-width: 1100px.
+     Ganti dengan padding-kiri-kanan 40px (atau 50px) agar sama dengan kotak biru di bawahnya */
+  padding: 0 50px; 
+  box-sizing: border-box;
+}
+
+.mk-search-box {
+  position: relative;
+  width: 100%;
+  /* PERBAIKAN: Sesuai gambar Catalog, buat bar pencarian tidak terlalu panjang.
+     Ubah max-width dari 700px menjadi sekitar 500px atau 600px */
+  max-width: 650px; 
+}
+
+.mk-search-input {
+  width: 100%;
+  height: 45px;
+  border-radius: 40px;
+  border: 3px solid #555c8f;
+  padding: 0 50px 0 25px;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 400;
+  color: #333;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.mk-search-input:focus {
+  border-color: #555c8f;
+}
+
+.mk-search-icon {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  stroke: #555c8f; 
+  stroke-width: 2.5px;
+}
+
+.mk-saved-btn {
+  /* PERBAIKAN: Kunci posisi absolut di ujung KANAN DALAM dari kontainer ber-padding */
+  position: absolute;
+  right: 50px; /* Samakan dengan padding-right .mk-search-container */
+  
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 25px;
+  background-color: white;
+  border: 2px solid transparent;
+  border-radius: 40px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #e83e8c;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+  transition: all 0.2s;
+}
+
+.mk-saved-btn:hover { 
+  transform: translateY(-2px); 
+  border-color: #fbcfe8;
+}
+
+.mk-bookmark-icon-wrapper {
+  width: 20px;
+  height: 20px;
+  color: #e83e8c;
+}
+
+/* Responsif: Di layar kecil, tombol saved akan turun ke bawah bar pencarian */
+@media (max-width: 900px) {
+  .mk-search-container {
+    flex-direction: column;
+    gap: 20px;
+  }
+  .mk-saved-btn {
+    position: static; /* Kembalikan ke posisi normal di layar HP */
+  }
+}
+
+/* =========================================
+   3. PAPAN UTAMA BIRU GELAP
+   ========================================= */
+.mk-main-board {
+  flex-grow: 1;
+  
+  /* PERBAIKAN: Paksa kotak biru mengambil 100% lebar tanpa sisa margin putih */
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  
+  background-color: #555c8f;
+  border-radius: 30px 30px 0 0;
+  padding: 30px 50px 60px 50px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================================
+   4. BARIS FILTER
+   ========================================= */
+.mk-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 30px;
+  margin-bottom: 30px;
+  margin-top: -10px;
+}
+
+.mk-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mk-filter-label {
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.mk-dropdown {
+  background-color: white;
+  color: #333;
+  padding: 8px 15px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 140px;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.mk-flags-container {
+  display: flex;
+  gap: 8px;
+  background-color: rgba(255,255,255,0.15);
+  padding: 6px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.mk-flag-circle {
+  background-color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+
+.mk-flag-circle:hover {
+  box-shadow: 0 0 0 2px #e83e8c;
+}
+
+.mk-flag-emoji {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.mk-price-inputs {
+  margin-left: auto; /* Mendorong input harga mentok ke sisi paling kanan */
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.mk-price-input {
+  width: 90px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+}
+
+.mk-price-input:focus {
+  box-shadow: 0 0 0 2px #e83e8c;
+}
+
+.mk-price-separator {
+  color: rgba(255,255,255,0.6);
+}
+
+/* =========================================
+   5. GRID KARTU PRODUK
+   ========================================= */
+.mk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 20px;
+}
+
+.mk-card {
+  background-color: white;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+}
+
+.mk-card:hover { 
+  transform: translateY(-5px); 
+  box-shadow: 0 12px 25px rgba(0,0,0,0.25);
+}
+
+/* PITA BOOKMARK */
+.mk-bookmark-ribbon {
+  position: absolute;
+  top: -8px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  color: #e83e8c;
+  z-index: 10;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.mk-bookmark-svg-white {
+  width: 100%;
+  height: 100%;
+}
+
+/* GAMBAR KARTU */
+.mk-card-img-box {
+  width: 100%;
+  aspect-ratio: 63 / 88; /* Rasio kartu Pokemon asli */
+  background-color: #f1f5f9;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mk-card-img { 
+  width: 100%; 
+  height: 100%; 
+  object-fit: cover; 
+  transition: transform 0.3s ease;
+}
+
+/* .mk-card:hover .mk-card-img {
+  transform: scale(1.05);
+} */
+
+/* ISI BAWAH KARTU */
+.mk-card-content { 
+  display: flex; 
+  flex-direction: column; 
+  flex-grow: 1; 
+  padding: 0 4px; 
+}
+
+/* Baris 1: Judul dan Harga */
+.mk-card-row-1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.mk-card-title { 
+  font-size: 13px; 
+  font-weight: 700; 
+  color: #333; 
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 8px;
+}
+
+.mk-card-price { 
+  font-size: 13px; 
+  font-weight: 800; 
+  color: #00d26a; 
+  white-space: nowrap;
+}
+
+/* Baris 2: Nama Rarity dan Garis Putus */
+.mk-card-row-2 { 
+  display: flex; 
+  align-items: center; 
+  margin-bottom: 10px; 
+}
+
+.mk-card-rarity {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  max-width: 60%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mk-dotted-line {
+  flex-grow: 1;
+  border-bottom: 2px dotted #cbd5e1;
+  margin: 0 6px;
+  position: relative;
+  top: -2px;
+}
+
+/* Baris 3: Ikon Kelangkaan dan Logo Set */
+.mk-card-row-3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: auto;
+}
+
+.mk-symbol-group { 
+  display: flex; 
+  align-items: center; 
+  gap: 5px; 
+}
+
+.mk-symbol-circle { 
+  display: inline-block;
+  width: 8px; 
+  height: 8px; 
+  background-color: #000; 
+  border-radius: 50%; 
+}
+
+.mk-symbol-star { margin-right: 2px; }
+.mk-symbol-double { display: inline-flex; align-items: center; }
+
+.mk-card-abbr { 
+  font-size: 11px; 
+  font-weight: 800; 
+  color: #333; 
+  margin-left: 2px;
+}
+
+.mk-card-set {
+  background-color: #000;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+/* KARTU KOSONG (PLACEHOLDER) */
+.mk-empty-card {
+  background-color: rgba(255,255,255,0.7);
+  border-radius: 12px;
+  min-height: 320px;
+}
+
+/* =========================================
+   6. RESPONSIVE MEDIA QUERIES
+   ========================================= */
+@media (max-width: 768px) {
+  .mk-search-section { padding: 20px; }
+  .mk-main-board { padding: 30px 20px; border-radius: 30px 30px 0 0; }
+  .mk-filter-bar { flex-direction: column; align-items: flex-start; gap: 15px; }
+  .mk-price-inputs { margin-left: 0; width: 100%; justify-content: space-between; }
+  .mk-price-input { flex-grow: 1; }
+  .mk-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+}
+
+/* =========================================
+   7. UI SIDE DRAWER (SAVED ITEMS PANEL)
+   ========================================= */
+
+/* Latar Gelap (Overlay) */
+.mk-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(30, 27, 75, 0.4); /* Biru sangat gelap yang transparan */
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.mk-drawer-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Kotak Utama Drawer */
+.mk-saved-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 100%;
+  max-width: 400px; /* Lebar maksimal panel */
+  height: 100vh;
+  background-color: #ffffff;
+  z-index: 1001;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%); /* Sembunyikan panel di luar layar sebelah kanan */
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mk-saved-drawer.open {
+  transform: translateX(0); /* Geser masuk ke dalam layar */
+}
+
+/* Bagian Header Drawer */
+.mk-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background-color: #555c8f;
+  color: #ffffff;
+}
+
+.mk-drawer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mk-drawer-icon {
+  width: 24px;
+  height: 24px;
+  color: #e83e8c; /* Kuning khas Regokemon */
+}
+
+.mk-drawer-header h2 {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.mk-drawer-count {
+  background-color: #e83e8c;
+  color: white;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.mk-drawer-close-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.mk-drawer-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: rotate(90deg);
+}
+
+/* Bagian Daftar Konten */
+.mk-drawer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background-color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Aturan untuk menyembunyikan scrollbar di dalam drawer */
+.mk-drawer-content::-webkit-scrollbar {
+  width: 6px;
+}
+.mk-drawer-content::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 10px;
+}
+
+.mk-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background-color: #ffffff;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.mk-drawer-item:hover {
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+}
+
+.mk-drawer-item-img-box {
+  width: 50px;
+  height: 70px;
+  background-color: #f1f5f9;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mk-drawer-item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mk-drawer-item-info {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  min-width: 0; /* Mencegah overflow horizontal */
+}
+
+.mk-drawer-item-name {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.mk-drawer-item-desc {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.mk-drawer-item-price {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #00d26a; /* Hijau terang */
+}
+
+.mk-drawer-remove-btn {
+  background: none;
+  border: none;
+  color: #cbd5e1;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.mk-drawer-remove-btn:hover {
+  color: #ef4444; /* Merah untuk tanda hapus */
+  background-color: #fee2e2;
+}
+
+/* Jika kosong */
+.mk-drawer-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #94a3b8;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Bagian Footer Panel */
+.mk-drawer-footer {
+  padding: 24px;
+  background-color: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+.mk-drawer-action-btn {
+  width: 100%;
+  padding: 16px;
+  background-color: #e83e8c; /* Pink utama */
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.mk-drawer-action-btn:hover {
+  background-color: #d83680;
+  transform: translateY(-2px);
+}

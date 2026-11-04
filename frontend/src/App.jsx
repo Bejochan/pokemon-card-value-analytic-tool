@@ -5,6 +5,7 @@ import UploadPage from './components/UploadPage';
 import ScannerDashboard from './components/ScannerDashboard';
 import CatalogPage from './components/CatalogPage';
 import DashboardPage from './components/DashboardPage';
+import Marketplace from './components/Marketplace';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -47,6 +48,11 @@ function App() {
         
         {currentPage === 'dashboard' && (
           <DashboardPage />
+        )}
+
+        {/* PENAMBAHAN: Render Marketplace saat state currentPage adalah 'marketplace' */}
+        {currentPage === 'marketplace' && (
+          <Marketplace />
         )}
 
       </div>

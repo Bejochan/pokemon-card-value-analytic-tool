@@ -16,6 +16,8 @@ function Navbar({ onNavigate }) {
         <a href="#home" className="nav-link" onClick={() => onNavigate('home')}>HOME</a>
         <a href="#catalog" className="nav-link" onClick={() => onNavigate('catalog')}>CATALOG</a>
         <a href="#dashboard" className="nav-link" onClick={() => onNavigate('dashboard')}>DASHBOARD</a>
+        {/* PENAMBAHAN: Tombol Marketplace */}
+        <a href="#marketplace" className="nav-link" onClick={() => onNavigate('marketplace')}>MARKETPLACE</a>
       </div>
 
       {/* KANAN: Tombol Pencarian Cepat */}
