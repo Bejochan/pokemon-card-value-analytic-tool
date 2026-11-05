@@ -156,13 +156,41 @@ function DashboardPage() {
     { year: "2025", vintage: 34.0, midEra: 18.5, modern: 9.1 }
   ];
 
-  // Fungsi Helper untuk menggambar titik koordinat pada SVG Line Chart
-  const getSvgPath = (key) => {
-    return eraTrendIndex.map((d, i) => {
-      const x = 50 + i * (630 / (eraTrendIndex.length - 1));
-      const y = 200 - (d[key] / 38) * 180;
-      return `${x},${y}`;
-    }).join(" ");
+  // Fungsi Helper perhitungan koordinat dan kurva halus SVG Line Chart
+  const getLineX = (i) => 60 + i * (600 / (eraTrendIndex.length - 1));
+  const getLineY = (val) => 195 - (val / 40) * 160;
+
+  const getSplinePath = (key) => {
+    const points = eraTrendIndex.map((d, i) => ({
+      x: getLineX(i),
+      y: getLineY(d[key])
+    }));
+    if (points.length === 0) return "";
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      const cx1 = p0.x + (p1.x - p0.x) / 2;
+      const cy1 = p0.y;
+      const cx2 = p0.x + (p1.x - p0.x) / 2;
+      const cy2 = p1.y;
+      path += ` C ${cx1} ${cy1}, ${cx2} ${cy2}, ${p1.x} ${p1.y}`;
+    }
+    return path;
+  };
+
+  const getAreaPath = (key) => {
+    const points = eraTrendIndex.map((d, i) => ({
+      x: getLineX(i),
+      y: getLineY(d[key])
+    }));
+    if (points.length === 0) return "";
+    let path = getSplinePath(key);
+    const lastX = points[points.length - 1].x;
+    const firstX = points[0].x;
+    const baseY = getLineY(0);
+    path += ` L ${lastX} ${baseY} L ${firstX} ${baseY} Z`;
+    return path;
   };
 
   return (
@@ -339,86 +367,179 @@ function DashboardPage() {
           </section>
 
         </div>
-        {/* BARIS KEDUA: GRID ASIMETRIS (Donut & Line Chart) */}
+        {/* BARIS KEDUA: GRID ASIMETRIS (Semi-Circle Rarity Arc & Spline Line Chart) */}
         <div className="dashboard-asymmetric-grid">
           
-          {/* KOTAK KIRI BAWAH: DONUT CHART */}
+          {/* KOTAK KIRI TENGAH: SEMI-CIRCLE RARITY ARC GAUGE */}
           <section className="widget-box left-box donut-box">
             <div className="widget-header-row">
               <h2 className="section-title">Global Rarity Production</h2>
               <span className="widget-badge-pill">Supabase DB</span>
             </div>
             <p className="widget-intro-desc">
-              Distribusi kelangkaan populasi riil dari 20.617 kartu Pokémon.
+              Distribusi kelangkaan 20.617 kartu Pokémon dalam database.
             </p>
 
-            <div className="donut-wrapper">
-              <div className="donut-label dl-common">Common<br/><strong>48.2%</strong></div>
-              <div className="donut-label dl-uncommon">Uncommon<br/><strong>28.6%</strong></div>
-              <div className="donut-label dl-rare">Rare<br/><strong>16.4%</strong></div>
-              <div className="donut-label dl-ultra">Ultra/Secret<br/><strong>6.8%</strong></div>
+            <div className="rarity-arc-container">
+              {/* Semi-circle Multi-Segment SVG Gauge (Gaya Senada dengan Gauge Kanan Bawah) */}
+              <div className="rarity-arc-visual">
+                <svg viewBox="0 0 220 125" className="rarity-arc-svg">
+                  {/* Track Belakang Halus */}
+                  <path
+                    d="M 30 105 A 80 80 0 0 1 190 105"
+                    fill="none"
+                    stroke="#f1f5f9"
+                    strokeWidth="22"
+                    strokeLinecap="round"
+                  />
+                  {/* Segment 1: Common (48.2%) */}
+                  <path
+                    d="M 30 105 A 80 80 0 0 1 190 105"
+                    fill="none"
+                    stroke="#4b5e94"
+                    strokeWidth="22"
+                    strokeDasharray="120 251.3"
+                    strokeDashoffset="0"
+                  />
+                  {/* Segment 2: Uncommon (28.6%) */}
+                  <path
+                    d="M 30 105 A 80 80 0 0 1 190 105"
+                    fill="none"
+                    stroke="#a0426b"
+                    strokeWidth="22"
+                    strokeDasharray="70.5 251.3"
+                    strokeDashoffset="-122"
+                  />
+                  {/* Segment 3: Rare (16.4%) */}
+                  <path
+                    d="M 30 105 A 80 80 0 0 1 190 105"
+                    fill="none"
+                    stroke="#e54c8c"
+                    strokeWidth="22"
+                    strokeDasharray="39.5 251.3"
+                    strokeDashoffset="-194.5"
+                  />
+                  {/* Segment 4: Ultra / Secret (6.8%) */}
+                  <path
+                    d="M 30 105 A 80 80 0 0 1 190 105"
+                    fill="none"
+                    stroke="#f2cf66"
+                    strokeWidth="22"
+                    strokeDasharray="15.5 251.3"
+                    strokeDashoffset="-235.5"
+                  />
+                </svg>
 
-              <div className="donut-chart">
-                <div className="donut-hole">
-                  <span className="donut-hole-total">20,617</span>
-                  <span className="donut-hole-sub">Cards Total</span>
+                <div className="rarity-arc-overlay">
+                  <span className="rarity-arc-total">20,617</span>
+                  <span className="rarity-arc-sub">TOTAL CARDS</span>
                 </div>
+              </div>
+
+              {/* Sisi Kanan: Mini Progress Bar Card Per Kelangkaan */}
+              <div className="rarity-progress-list">
+                {rarityProduction.map((item, idx) => (
+                  <div key={idx} className="rarity-progress-item">
+                    <div className="rarity-progress-header">
+                      <div className="rarity-name-group">
+                        <span className="legend-color-dot" style={{ backgroundColor: item.color }}></span>
+                        <span className="rarity-title-text">{item.name}</span>
+                      </div>
+                      <div className="rarity-stat-group">
+                        <span className="rarity-count-text">{item.count}</span>
+                        <span className="rarity-pct-badge" style={{ color: item.color }}>{item.percent}%</span>
+                      </div>
+                    </div>
+                    <div className="rarity-bar-track">
+                      <div className="rarity-bar-fill" style={{ width: `${item.percent}%`, backgroundColor: item.color }}></div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
 
-          {/* KOTAK KANAN BAWAH: LINE CHART */}
+          {/* KOTAK KANAN TENGAH: LINE CHART */}
           <section className="widget-box right-box line-box">
             <div className="widget-header-row">
               <h2 className="section-title">Era Release Value Index</h2>
               <span className="widget-badge-pill">Trend Index (USD)</span>
             </div>
             <p className="widget-intro-desc">
-              Fluktuasi rata-rata nilai pasar kartu berdasarkan era rilis (Vintage vs Mid vs Modern).
+              Perbandingan tren rata-rata harga pasar berdasarkan era rilis.
             </p>
 
-            {/* Legend Line Chart */}
+            {/* Legend Line Chart Horizontal */}
             <div className="chart-legend-header">
-              <div className="legend-item"><span className="legend-dot" style={{backgroundColor: "#4b5e94"}}></span> <span className="legend-text">Vintage Era (1998-2003)</span></div>
-              <div className="legend-item"><span className="legend-dot" style={{backgroundColor: "#e54c8c"}}></span> <span className="legend-text">Mid-Gen Era (2004-2015)</span></div>
-              <div className="legend-item"><span className="legend-dot" style={{backgroundColor: "#f2cf66"}}></span> <span className="legend-text">Modern Era (2016-2026)</span></div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: "#4b5e94" }}></span>
+                <span className="legend-text">Vintage (1998-2003)</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: "#e54c8c" }}></span>
+                <span className="legend-text">Mid-Gen (2004-2015)</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot" style={{ backgroundColor: "#f2cf66" }}></span>
+                <span className="legend-text">Modern (2016-2026)</span>
+              </div>
             </div>
 
             {/* SVG Line Chart Builder */}
             <div className="line-chart-container">
               <svg viewBox="0 0 720 250" className="line-chart-svg">
+                <defs>
+                  <linearGradient id="areaVintage" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#4b5e94" stopOpacity="0.16" />
+                    <stop offset="100%" stopColor="#4b5e94" stopOpacity="0.0" />
+                  </linearGradient>
+                  <linearGradient id="areaMidEra" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#e54c8c" stopOpacity="0.14" />
+                    <stop offset="100%" stopColor="#e54c8c" stopOpacity="0.0" />
+                  </linearGradient>
+                  <linearGradient id="areaModern" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#f2cf66" stopOpacity="0.16" />
+                    <stop offset="100%" stopColor="#f2cf66" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+
                 {/* Garis Grid Horizontal (Skala $0, $10, $20, $30, $40) */}
                 {[0, 10, 20, 30, 40].map(val => {
-                  const y = 200 - (val / 40) * 180;
+                  const y = getLineY(val);
                   return (
                     <g key={`grid-${val}`}>
-                      <line x1="45" y1={y} x2="700" y2={y} stroke="#eee" strokeWidth="1" />
-                      <text x="35" y={y + 4} fontSize="12" fill="#888" textAnchor="end" fontFamily="Montserrat">${val}</text>
+                      <line x1="45" y1={y} x2="700" y2={y} stroke="#f1f5f9" strokeWidth="1.2" />
+                      <text x="36" y={y + 4} fontSize="11" fill="#94a3b8" textAnchor="end" fontFamily="Montserrat" fontWeight="500">${val}</text>
                     </g>
                   );
                 })}
 
                 {/* Label Sumbu X (Tahun) */}
                 {eraTrendIndex.map((d, i) => {
-                  const x = 50 + i * (630 / (eraTrendIndex.length - 1));
+                  const x = getLineX(i);
                   return (
-                    <text key={`x-${i}`} x={x} y="230" fontSize="12" fill="#666" textAnchor="middle" fontFamily="Montserrat" fontWeight="600">{d.year}</text>
+                    <text key={`x-${i}`} x={x} y="232" fontSize="12" fill="#64748b" textAnchor="middle" fontFamily="Montserrat" fontWeight="600">{d.year}</text>
                   );
                 })}
 
-                {/* Garis Tren */}
-                <polyline points={getSvgPath('vintage')} fill="none" stroke="#4b5e94" strokeWidth="3" />
-                <polyline points={getSvgPath('midEra')} fill="none" stroke="#e54c8c" strokeWidth="3" />
-                <polyline points={getSvgPath('modern')} fill="none" stroke="#f2cf66" strokeWidth="3" />
+                {/* Area Fills under Spline Curves */}
+                <path d={getAreaPath('vintage')} fill="url(#areaVintage)" />
+                <path d={getAreaPath('midEra')} fill="url(#areaMidEra)" />
+                <path d={getAreaPath('modern')} fill="url(#areaModern)" />
 
-                {/* Titik Lingkaran di setiap Data */}
+                {/* Smooth Spline Lines */}
+                <path d={getSplinePath('vintage')} fill="none" stroke="#4b5e94" strokeWidth="3" strokeLinecap="round" />
+                <path d={getSplinePath('midEra')} fill="none" stroke="#e54c8c" strokeWidth="3" strokeLinecap="round" />
+                <path d={getSplinePath('modern')} fill="none" stroke="#f2cf66" strokeWidth="3" strokeLinecap="round" />
+
+                {/* Titik Lingkaran Tepat di Koordinat Kurva (Zero Misalignment) */}
                 {eraTrendIndex.map((d, i) => {
-                  const x = 50 + i * (630 / (eraTrendIndex.length - 1));
+                  const x = getLineX(i);
                   return (
                     <g key={`dots-${i}`}>
-                      <circle cx={x} cy={200 - (d.vintage / 40) * 180} r="4.5" fill="#4b5e94" />
-                      <circle cx={x} cy={200 - (d.midEra / 40) * 180} r="4.5" fill="#e54c8c" />
-                      <circle cx={x} cy={200 - (d.modern / 40) * 180} r="4.5" fill="#f2cf66" />
+                      <circle cx={x} cy={getLineY(d.vintage)} r="5" fill="#4b5e94" stroke="#ffffff" strokeWidth="2.5" />
+                      <circle cx={x} cy={getLineY(d.midEra)} r="5" fill="#e54c8c" stroke="#ffffff" strokeWidth="2.5" />
+                      <circle cx={x} cy={getLineY(d.modern)} r="5" fill="#f2cf66" stroke="#ffffff" strokeWidth="2.5" />
                     </g>
                   );
                 })}
@@ -437,7 +558,7 @@ function DashboardPage() {
               <span className="widget-badge-pill">Hot Expansions</span>
             </div>
             <p className="widget-intro-desc">
-              Pemetaan kartu incaran dengan nilai tertinggi pada ekspansi resmi terpopuler.
+              Pemetaan ekspansi resmi dan kartu incaran bernilai tertinggi.
             </p>
             
             <div className="treemap-container">
@@ -445,10 +566,10 @@ function DashboardPage() {
               <div className="tm-group tm-yellow">
                 <div className="tm-group-title">Pokemon 151</div>
                 <div className="tm-grid-2x2">
-                  <div className="tm-cell">Mew ex</div>
-                  <div className="tm-cell">Charizard ex</div>
-                  <div className="tm-cell">Erika's Invi</div>
-                  <div className="tm-cell">Zapdos ex</div>
+                  <div className="tm-cell"><span>Mew ex</span><span className="tm-price">$28.50</span></div>
+                  <div className="tm-cell"><span>Charizard ex</span><span className="tm-price">$115.00</span></div>
+                  <div className="tm-cell"><span>Erika's Invi</span><span className="tm-price">$22.40</span></div>
+                  <div className="tm-cell"><span>Zapdos ex</span><span className="tm-price">$38.90</span></div>
                 </div>
               </div>
 
@@ -456,9 +577,9 @@ function DashboardPage() {
               <div className="tm-group tm-blue">
                 <div className="tm-group-title">Paldean Fates</div>
                 <div className="tm-grid-custom-blue">
-                  <div className="tm-cell">Shiny Mew ex</div>
-                  <div className="tm-cell">Iono SIR</div>
-                  <div className="tm-cell tm-span-full">Charizard ex Shiny</div>
+                  <div className="tm-cell"><span>Shiny Mew ex</span><span className="tm-price">$89.00</span></div>
+                  <div className="tm-cell"><span>Iono SIR</span><span className="tm-price">$45.00</span></div>
+                  <div className="tm-cell tm-span-full"><span>Charizard ex Shiny</span><span className="tm-price">$120.00</span></div>
                 </div>
               </div>
 
@@ -466,9 +587,9 @@ function DashboardPage() {
               <div className="tm-group tm-purple">
                 <div className="tm-group-title">Evolving Skies</div>
                 <div className="tm-grid-stack">
-                  <div className="tm-cell">Umbreon VMAX</div>
-                  <div className="tm-cell">Rayquaza VMAX</div>
-                  <div className="tm-cell">Glaceon VMAX</div>
+                  <div className="tm-cell"><span>Umbreon VMAX</span><span className="tm-price">$650.00</span></div>
+                  <div className="tm-cell"><span>Rayquaza VMAX</span><span className="tm-price">$240.00</span></div>
+                  <div className="tm-cell"><span>Glaceon VMAX</span><span className="tm-price">$165.00</span></div>
                 </div>
               </div>
 
@@ -477,14 +598,14 @@ function DashboardPage() {
                 <div className="tm-subgroup tm-pink">
                   <div className="tm-group-title">Base Set 1999</div>
                   <div className="tm-grid-custom-pink">
-                    <div className="tm-cell">Charizard</div>
-                    <div className="tm-cell">Blastoise</div>
-                    <div className="tm-cell tm-span-full">Venusaur</div>
+                    <div className="tm-cell"><span>Charizard</span><span className="tm-price">$340.00</span></div>
+                    <div className="tm-cell"><span>Blastoise</span><span className="tm-price">$82.50</span></div>
+                    <div className="tm-cell tm-span-full"><span>Venusaur</span><span className="tm-price">$65.00</span></div>
                   </div>
                 </div>
                 <div className="tm-subgroup tm-navy">
                   <div className="tm-group-title">Promo Series</div>
-                  <div className="tm-cell">Black Star</div>
+                  <div className="tm-cell"><span>Black Star</span><span className="tm-price">$42.00</span></div>
                 </div>
               </div>
             </div>
@@ -497,19 +618,49 @@ function DashboardPage() {
               <span className="widget-badge-pill">Health Score</span>
             </div>
             <p className="widget-intro-desc">
-              Rasio kartu dalam katalog dengan transaksi aktif dalam 30 hari terakhir.
+              Persentase perputaran transaksi kartu dalam 30 hari terakhir.
             </p>
 
-            <div className="gauge-container">
-              {/* Setengah Lingkaran Background (Navy) */}
-              <div className="gauge-background"></div>
-              {/* Setengah Lingkaran Fill (Pink) yang diputar */}
-              <div className="gauge-fill" style={{ transform: 'rotate(94deg)' }}></div> 
-              {/* Penutup Tengah (Putih) untuk membuat bentuk cincin */}
-              <div className="gauge-center">
-                <span className="gauge-value">52%</span>
-                <span className="gauge-label-status">MODERATE LIQUIDITY</span>
+            <div className="gauge-visual-container">
+              <svg viewBox="0 0 220 125" className="gauge-svg">
+                <defs>
+                  <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#4b5e94" />
+                    <stop offset="50%" stopColor="#a0426b" />
+                    <stop offset="100%" stopColor="#e83e8c" />
+                  </linearGradient>
+                </defs>
+                {/* Background Arc: Center (110, 105), Radius 80 */}
+                <path
+                  d="M 30 105 A 80 80 0 0 1 190 105"
+                  fill="none"
+                  stroke="#f1f5f9"
+                  strokeWidth="22"
+                  strokeLinecap="round"
+                />
+                {/* Active Arc (52% of 251.3 arc length = 130.7 filled, offset = 120.6) */}
+                <path
+                  d="M 30 105 A 80 80 0 0 1 190 105"
+                  fill="none"
+                  stroke="url(#gaugeGradient)"
+                  strokeWidth="22"
+                  strokeLinecap="round"
+                  strokeDasharray="251.3"
+                  strokeDashoffset="120.6"
+                />
+              </svg>
+
+              <div className="gauge-value-overlay">
+                <span className="gauge-big-number">52%</span>
+                <span className="gauge-status-badge">MODERATE LIQUIDITY</span>
               </div>
+            </div>
+
+            <div className="gauge-metric-footer">
+              <div className="gauge-stat-pill">
+                <strong>10.720</strong> / 20.617 Kartu Aktif
+              </div>
+              <span className="gauge-stat-sub">Aktivitas Transaksi Pasar (30 Hari Terakhir)</span>
             </div>
           </section>
 
