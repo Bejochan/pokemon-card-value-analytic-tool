@@ -655,16 +655,11 @@ export default function Marketplace() {
     if (found) {
       completeAuthSuccess(found);
     } else {
-      setAuthError('Akun belum terdaftar. Silakan gunakan tab Daftar Pelapak Baru atau tombol Masuk Akun Demo.');
+      setAuthError('Akun belum terdaftar. Silakan buat akun pada tab Daftar terlebih dahulu.');
     }
   };
 
-  // Handler Login Cepat Akun Demo Pameran
-  const handleQuickDemoLogin = () => {
-    completeAuthSuccess(DEMO_SELLER_ACCOUNT);
-  };
-
-  // Handler Submit Register Pelapak Baru
+  // Handler Submit Register
   const handleRegisterSubmit = (e) => {
     e.preventDefault();
     if (
@@ -1446,7 +1441,6 @@ export default function Marketplace() {
           <div className="mk-modal-card mk-sell-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="mk-modal-header">
               <div>
-                <span className="mk-modal-subtitle">Pasang Iklan Penjualan Kartu Fisik</span>
                 <h2 className="mk-modal-title">Jual Kartu ke Marketplace</h2>
               </div>
               <button
@@ -1485,7 +1479,7 @@ export default function Marketplace() {
                     <div className="mk-upload-placeholder">
                       <UploadPhotoIcon />
                       <strong>Pilih Foto Kartu dari Perangkat</strong>
-                      <span>Format JPG, PNG, atau WEBP (Foto tampak depan kartu fisik)</span>
+                      <span>Format JPG, PNG, atau WEBP</span>
                     </div>
                   )}
                 </div>
@@ -1506,7 +1500,7 @@ export default function Marketplace() {
                 {/* Kartu Identitas Penjual Otomatis dari Akun Login */}
                 <div className="mk-active-seller-banner">
                   <div>
-                    <span className="mk-spec-label">Identitas Pelapak Aktif</span>
+                    <span className="mk-spec-label">Identitas Penjual</span>
                     <strong>{currentUser.storeName} ({currentUser.fullName})</strong>
                     <span>{currentUser.phone} • {currentUser.city}</span>
                   </div>
@@ -1531,7 +1525,6 @@ export default function Marketplace() {
                       id="sell-name"
                       type="text"
                       className="mk-text-input"
-                      placeholder="Contoh: Koraidon"
                       value={sellForm.name}
                       onChange={(e) => setSellForm({ ...sellForm, name: e.target.value })}
                     />
@@ -1542,7 +1535,7 @@ export default function Marketplace() {
                       id="sell-number"
                       type="text"
                       className="mk-text-input"
-                      placeholder="Contoh: 116/191"
+                      placeholder="116/191"
                       value={sellForm.cardNumber}
                       onChange={(e) => setSellForm({ ...sellForm, cardNumber: e.target.value })}
                     />
@@ -1556,7 +1549,7 @@ export default function Marketplace() {
                       id="sell-set"
                       type="text"
                       className="mk-text-input"
-                      placeholder="SSP / PBL / ASC"
+                      placeholder="SSP"
                       value={sellForm.set}
                       onChange={(e) => setSellForm({ ...sellForm, set: e.target.value })}
                     />
@@ -1625,7 +1618,7 @@ export default function Marketplace() {
                       step="0.05"
                       min="0.1"
                       className="mk-text-input"
-                      placeholder="Contoh: 1.25"
+                      placeholder="0.00"
                       value={sellForm.priceUsd}
                       onChange={(e) => setSellForm({ ...sellForm, priceUsd: e.target.value })}
                     />
@@ -1646,7 +1639,6 @@ export default function Marketplace() {
                     id="sell-note"
                     rows={2}
                     className="mk-text-input mk-textarea"
-                    placeholder="Jelaskan detail kondisi sudut, permukaan foil, serta kelengkapan sleeve/toploader..."
                     value={sellForm.sellerNote}
                     onChange={(e) => setSellForm({ ...sellForm, sellerNote: e.target.value })}
                   />
@@ -1671,16 +1663,15 @@ export default function Marketplace() {
       )}
 
       {/* =========================================
-          MODAL 3: LOGIN & REGISTRASI IDENTITAS PELAPAK
+          MODAL 3: LOGIN & REGISTRASI AKUN
           ========================================= */}
       {isAuthModalOpen && (
         <div className="mk-modal-overlay" onClick={() => setIsAuthModalOpen(false)}>
           <div className="mk-modal-card mk-auth-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="mk-modal-header">
               <div>
-                <span className="mk-modal-subtitle">Autentikasi Pengguna & Identitas Pelapak</span>
                 <h2 className="mk-modal-title">
-                  {authTab === 'login' ? 'Masuk ke Marketplace' : 'Daftar Akun Pelapak Baru'}
+                  {authTab === 'login' ? 'Masuk ke Marketplace' : 'Daftar Akun Baru'}
                 </h2>
               </div>
               <button
@@ -1712,7 +1703,7 @@ export default function Marketplace() {
                   setAuthTab('register');
                 }}
               >
-                Daftar Pelapak Baru
+                Daftar Baru
               </button>
             </div>
 
@@ -1727,7 +1718,6 @@ export default function Marketplace() {
                       id="login-id"
                       type="text"
                       className="mk-text-input"
-                      placeholder="Contoh: raka@garudapoke.id atau 081234567890"
                       value={loginForm.identifier}
                       onChange={(e) => setLoginForm({ ...loginForm, identifier: e.target.value })}
                     />
@@ -1738,7 +1728,6 @@ export default function Marketplace() {
                       id="login-pass"
                       type="password"
                       className="mk-text-input"
-                      placeholder="Masukkan kata sandi"
                       value={loginForm.password}
                       onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                     />
@@ -1747,39 +1736,26 @@ export default function Marketplace() {
                   <button type="submit" className="mk-btn-primary mk-full-btn">
                     Masuk Akun
                   </button>
-
-                  <div className="mk-demo-login-box">
-                    <span>Mode Pameran (Simulasi Lokal Browser):</span>
-                    <button
-                      type="button"
-                      className="mk-btn-demo-login"
-                      onClick={handleQuickDemoLogin}
-                    >
-                      Masuk Cepat sebagai {DEMO_SELLER_ACCOUNT.storeName} ({DEMO_SELLER_ACCOUNT.phone})
-                    </button>
-                  </div>
                 </form>
               ) : (
                 <form className="mk-auth-form" onSubmit={handleRegisterSubmit}>
                   <div className="mk-field-row-2">
                     <div className="mk-field-group">
-                      <label className="mk-field-label" htmlFor="reg-fullname">Nama Lengkap Pemilik *</label>
+                      <label className="mk-field-label" htmlFor="reg-fullname">Nama Lengkap *</label>
                       <input
                         id="reg-fullname"
                         type="text"
                         className="mk-text-input"
-                        placeholder="Nama asli Anda"
                         value={registerForm.fullName}
                         onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })}
                       />
                     </div>
                     <div className="mk-field-group">
-                      <label className="mk-field-label" htmlFor="reg-store">Nama Toko / Pelapak *</label>
+                      <label className="mk-field-label" htmlFor="reg-store">Nama Toko *</label>
                       <input
                         id="reg-store"
                         type="text"
                         className="mk-text-input"
-                        placeholder="Contoh: Kanto Card Store"
                         value={registerForm.storeName}
                         onChange={(e) => setRegisterForm({ ...registerForm, storeName: e.target.value })}
                       />
@@ -1788,12 +1764,12 @@ export default function Marketplace() {
 
                   <div className="mk-field-row-2">
                     <div className="mk-field-group">
-                      <label className="mk-field-label" htmlFor="reg-phone">Nomor HP / WhatsApp Aktif *</label>
+                      <label className="mk-field-label" htmlFor="reg-phone">Nomor HP / WhatsApp *</label>
                       <input
                         id="reg-phone"
                         type="tel"
                         className="mk-text-input"
-                        placeholder="Contoh: 081234567890"
+                        placeholder="08xxxxxxxxxx"
                         value={registerForm.phone}
                         onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
                       />
@@ -1804,7 +1780,6 @@ export default function Marketplace() {
                         id="reg-city"
                         type="text"
                         className="mk-text-input"
-                        placeholder="Contoh: Surabaya"
                         value={registerForm.city}
                         onChange={(e) => setRegisterForm({ ...registerForm, city: e.target.value })}
                       />
@@ -1829,7 +1804,6 @@ export default function Marketplace() {
                         id="reg-pass"
                         type="password"
                         className="mk-text-input"
-                        placeholder="Minimal 6 karakter"
                         value={registerForm.password}
                         onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
                       />
@@ -1837,19 +1811,18 @@ export default function Marketplace() {
                   </div>
 
                   <div className="mk-field-group">
-                    <label className="mk-field-label" htmlFor="reg-addr">Alamat Lengkap Toko / Pengiriman</label>
+                    <label className="mk-field-label" htmlFor="reg-addr">Alamat Lengkap</label>
                     <input
                       id="reg-addr"
                       type="text"
                       className="mk-text-input"
-                      placeholder="Nama jalan, nomor rumah, kecamatan..."
                       value={registerForm.address}
                       onChange={(e) => setRegisterForm({ ...registerForm, address: e.target.value })}
                     />
                   </div>
 
                   <button type="submit" className="mk-btn-primary mk-full-btn">
-                    Simpan Identitas & Masuk
+                    Daftar & Masuk
                   </button>
                 </form>
               )}
@@ -1866,7 +1839,6 @@ export default function Marketplace() {
           <div className="mk-modal-card mk-account-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="mk-modal-header">
               <div>
-                <span className="mk-modal-subtitle">Panel Pelapak & Pembeli Terdaftar</span>
                 <h2 className="mk-modal-title">{currentUser.storeName} ({currentUser.fullName})</h2>
               </div>
               <button
@@ -1912,7 +1884,7 @@ export default function Marketplace() {
 
                   <div className="mk-field-row-2">
                     <div className="mk-field-group">
-                      <label className="mk-field-label" htmlFor="prof-fullname">Nama Lengkap Pemilik *</label>
+                      <label className="mk-field-label" htmlFor="prof-fullname">Nama Lengkap *</label>
                       <input
                         id="prof-fullname"
                         type="text"
@@ -1922,7 +1894,7 @@ export default function Marketplace() {
                       />
                     </div>
                     <div className="mk-field-group">
-                      <label className="mk-field-label" htmlFor="prof-store">Nama Toko / Pelapak *</label>
+                      <label className="mk-field-label" htmlFor="prof-store">Nama Toko *</label>
                       <input
                         id="prof-store"
                         type="text"
@@ -1935,7 +1907,7 @@ export default function Marketplace() {
 
                   <div className="mk-field-row-2">
                     <div className="mk-field-group">
-                      <label className="mk-field-label" htmlFor="prof-phone">Nomor WhatsApp / HP *</label>
+                      <label className="mk-field-label" htmlFor="prof-phone">Nomor HP / WhatsApp *</label>
                       <input
                         id="prof-phone"
                         type="tel"
@@ -1968,7 +1940,7 @@ export default function Marketplace() {
                   </div>
 
                   <div className="mk-field-group">
-                    <label className="mk-field-label" htmlFor="prof-addr">Alamat Lengkap Toko & Pengiriman</label>
+                    <label className="mk-field-label" htmlFor="prof-addr">Alamat Lengkap</label>
                     <input
                       id="prof-addr"
                       type="text"
