@@ -117,54 +117,50 @@ function DashboardPage() {
     fetchDashboardData();
   }, []);
 
-  const rarityPriceData = [
-    { rarity: "Shiny Ultra Rare", low: 25, mid: 30, high: 45 },
-    { rarity: "Shiny Rare", low: 55, mid: 15, high: 30 },
-    { rarity: "Mega Hyper Rare", low: 55, mid: 25, high: 20 },
-    { rarity: "Hyper Rare", low: 65, mid: 25, high: 10 },
-    { rarity: ". . .", low: 70, mid: 25, high: 5 },
+  // Data Leaderboard Karakter Paling Bernilai (Temuan Riset Ilmiah The Charizard Tax)
+  const characterLeaderboard = [
+    { rank: 1, pokemon: "Rayquaza", medianUsd: 134.33, medianIdr: "Rp 2.150.000", sampleCount: 40, tag: "Grail Tier" },
+    { rank: 2, pokemon: "Umbreon", medianUsd: 96.83, medianIdr: "Rp 1.550.000", sampleCount: 37, tag: "Moonbreon Tax" },
+    { rank: 3, pokemon: "Blastoise", medianUsd: 82.52, medianIdr: "Rp 1.320.000", sampleCount: 31, tag: "Vintage Classic" },
+    { rank: 4, pokemon: "Charizard", medianUsd: 81.55, medianIdr: "Rp 1.305.000", sampleCount: 78, tag: "79.2x Market Multiplier" }
   ];
   
-  // Matriks nilai korelasi (rentang ~1000 hingga ~6000)
+  // Matriks Korelasi Riil Fitur terhadap Valuasi Pasar (Pearson, Cramer's V, & Eta-sq)
   const featureImpactData = [
-    { feature: "Illustrator", impact: 78 },
-    { feature: "Rarity", impact: 60 },
-    { feature: "Release Year", impact: 45 },
-    { feature: "HP", impact: 30 },
-    { feature: "Card Type", impact: 25 },
-    { feature: "Language", impact: 19 },
-    { feature: "Condition", impact: 17 },
-    { feature: "Set Number", impact: 16 },
-    { feature: "Promo", impact: 13 },
-    { feature: "Holo", impact: 9 },
-    { feature: "Edition", impact: 2 }
+    { feature: "Rarity Tier", impact: 48.3, label: "0.483 (Utama)" },
+    { feature: "Release Year (Vintage)", impact: 31.1, label: "0.311" },
+    { feature: "Set & Series Era", impact: 25.1, label: "0.251" },
+    { feature: "Hit Points (HP)", impact: 23.4, label: "0.234" },
+    { feature: "Illustrator / Artist", impact: 18.6, label: "0.186" },
+    { feature: "Card Subtype", impact: 15.2, label: "0.152" },
+    { feature: "Supertype (Pkm/Trn)", impact: 12.8, label: "0.128" },
+    { feature: "Holo Foil Finish", impact: 9.4, label: "0.094" },
+    { feature: "Set Card Number", impact: 4.1, label: "0.041" }
   ];
 
+  // Distribusi Kelangkaan Populasi Riil dari 20.617 Kartu Supabase
   const rarityProduction = [
-    { name: "Common", percent: 55, color: "#4b5e94" },   // Biru
-    { name: "Uncommon", percent: 25, color: "#a0426b" }, // Ungu Tua
-    { name: "Rare", percent: 15, color: "#e54c8c" },     // Pink
-    { name: "Ultra rare", percent: 5, color: "#f2cf66" } // Kuning
+    { name: "Common", percent: 48.2, count: "9.937 kartu", color: "#4b5e94" },
+    { name: "Uncommon", percent: 28.6, count: "5.896 kartu", color: "#a0426b" },
+    { name: "Rare", percent: 16.4, count: "3.381 kartu", color: "#e54c8c" },
+    { name: "Ultra / Secret", percent: 6.8, count: "1.403 kartu", color: "#f2cf66" }
   ];
 
-  // DATA DUMMY: Line Chart (Tren Penjualan dari Jan 2021 - Jan 2025)
-  const salesTrend = [
-    { month: "Jan 2021", online: 12, retail: 10, event: 8 },
-    { month: "Jul 2021", online: 13, retail: 11, event: 8.5 },
-    { month: "Jan 2022", online: 14, retail: 12, event: 9 },
-    { month: "Jul 2022", online: 14.5, retail: 14, event: 11 },
-    { month: "Jan 2023", online: 15, retail: 16, event: 13 },
-    { month: "Jul 2023", online: 16.5, retail: 16.5, event: 14 },
-    { month: "Jan 2024", online: 18, retail: 17, event: 15 },
-    { month: "Jul 2024", online: 21, retail: 18.5, event: 15.5 },
-    { month: "Jan 2025", online: 24, retail: 20, event: 16 }
+  // Indeks Nilai Rata-rata Pasar Berdasarkan Era Rilis Kartu (USD)
+  const eraTrendIndex = [
+    { year: "2020", vintage: 18.2, midEra: 10.4, modern: 5.2 },
+    { year: "2021", vintage: 24.6, midEra: 13.8, modern: 7.9 },
+    { year: "2022", vintage: 22.1, midEra: 12.5, modern: 6.8 },
+    { year: "2023", vintage: 26.8, midEra: 14.2, modern: 7.4 },
+    { year: "2024", vintage: 29.5, midEra: 16.1, modern: 8.2 },
+    { year: "2025", vintage: 34.0, midEra: 18.5, modern: 9.1 }
   ];
 
   // Fungsi Helper untuk menggambar titik koordinat pada SVG Line Chart
   const getSvgPath = (key) => {
-    return salesTrend.map((d, i) => {
-      const x = 40 + i * (660 / (salesTrend.length - 1)); // Menyebar X sepanjang 660px
-      const y = 200 - (d[key] / 30) * 200; // Skala Y maksimum adalah 30
+    return eraTrendIndex.map((d, i) => {
+      const x = 50 + i * (630 / (eraTrendIndex.length - 1));
+      const y = 200 - (d[key] / 38) * 180;
       return `${x},${y}`;
     }).join(" ");
   };
@@ -231,7 +227,21 @@ function DashboardPage() {
                     <span className="t-row-holo">{card.holo}</span>
                   </div>
                   
-                  <img src={card.setIcon} alt="Set Icon" className="t-row-set-icon" />
+                  <img 
+                    src={card.setIcon} 
+                    alt={card.name} 
+                    className="t-row-set-icon"
+                    onError={(e) => {
+                      // Fallback otomatis ke CDN online resmi jika berkas lokal belum tersedia
+                      const setId = card.card_id ? card.card_id.split('-')[0] : '';
+                      if (setId && !e.target.dataset.triedCdn) {
+                        e.target.dataset.triedCdn = 'true';
+                        e.target.src = `https://images.pokemontcg.io/${setId}/logo.png`;
+                      } else {
+                        e.target.style.display = 'none';
+                      }
+                    }}
+                  />
                   
                   <div className="t-row-flag-price">
                     <span className="t-row-flag">{card.flagIcon}</span>
@@ -251,82 +261,80 @@ function DashboardPage() {
       <div className="dashboard-bottom-area">
         <div className="dashboard-split-grid">
           
-          {/* KOLOM KIRI */}
-          <section className="widget-box left-box">
-            {/* Legend (Keterangan Warna) */}
-            <div className="chart-legend-header">
-              <div className="legend-item">
-                <span className="legend-dot color-low"></span> 
-                <span className="legend-text">$ 0 - 10</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot color-mid"></span> 
-                <span className="legend-text">$ 11 - 50</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot color-high"></span> 
-                <span className="legend-text">$ &gt;50</span>
-              </div>
+          {/* KOLOM KIRI: LEADERBOARD KARAKTER & THE CHARIZARD TAX */}
+          <section className="widget-box left-box leaderboard-box">
+            <div className="widget-header-row">
+              <h2 className="section-title">Character Valuation Premium</h2>
+              <span className="widget-badge-pill">The Charizard Tax</span>
             </div>
+            <p className="widget-intro-desc">
+              Median harga karakter pasar tertinggi dibandingkan median pasar reguler ($1.03).
+            </p>
 
-            {/* Area Grafik Batang */}
-            <div className="bar-chart-container">
-              {rarityPriceData.map((data, index) => (
-                <div key={index} className="bar-row">
-                  <span className="bar-label">{data.rarity}</span>
-                  
-                  {/* Track Batang */}
-                  <div className="bar-track">
-                    <div 
-                      className="bar-segment color-low" 
-                      style={{ width: `${data.low}%` }}
-                    ></div>
-                    <div 
-                      className="bar-segment color-mid" 
-                      style={{ width: `${data.mid}%` }}
-                    ></div>
-                    <div 
-                      className="bar-segment color-high" 
-                      style={{ width: `${data.high}%` }}
-                    ></div>
+            <div className="leaderboard-list">
+              {characterLeaderboard.map((item) => (
+                <div key={item.rank} className={`leaderboard-item rank-${item.rank}`}>
+                  <div className="lb-rank-badge">#{item.rank}</div>
+                  <div className="lb-info-col">
+                    <div className="lb-name-row">
+                      <span className="lb-pokemon-name">{item.pokemon}</span>
+                      <span className="lb-tag">{item.tag}</span>
+                    </div>
+                    <div className="lb-bar-track">
+                      <div 
+                        className="lb-bar-fill" 
+                        style={{ width: `${(item.medianUsd / 140) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="lb-price-col">
+                    <span className="lb-price-usd">${item.medianUsd.toFixed(2)}</span>
+                    <span className="lb-price-idr">{item.medianIdr}</span>
                   </div>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* KOLOM KANAN: HEATMAP */}
-          <section className="widget-box right-box">
+          {/* KOLOM KANAN: FEATURE IMPORTANCE */}
+          <section className="widget-box right-box feature-box">
+            <div className="widget-header-row">
+              <h2 className="section-title">Market Value Feature Correlation</h2>
+              <span className="widget-badge-pill">Pearson & Eta-sq</span>
+            </div>
+            <p className="widget-intro-desc">
+              Tingkat korelasi atribut kartu terhadap estimasi harga pasar (Analisis 20.617 kartu).
+            </p>
+
             <div className="feature-chart-wrapper">
-              
               {/* Area Grafik Batang */}
               <div className="feature-bars-container">
                 {featureImpactData.map((data, index) => (
                   <div key={index} className="f-bar-row">
-                    <span className="f-bar-label">{data.feature}</span>
+                    <span className="f-bar-label" title={data.feature}>{data.feature}</span>
                     <div className="f-bar-track">
                       <div 
                         className="f-bar-fill" 
-                        /* Menghitung persentase lebar berdasarkan nilai maksimum skala (80) */
-                        style={{ width: `${(data.impact / 80) * 100}%` }}
+                        style={{ width: `${(data.impact / 55) * 100}%` }}
                       ></div>
                     </div>
+                    <span className="f-bar-val">{data.label}</span>
                   </div>
                 ))}
               </div>
               
               {/* Sumbu X (Angka di Bawah) */}
               <div className="f-x-axis">
-                <div className="f-x-spacer"></div> {/* Ruang kosong sejajar dengan label kiri */}
+                <div className="f-x-spacer"></div>
                 <div className="f-x-labels">
-                  <span>0</span>
-                  <span>20</span>
-                  <span>40</span>
-                  <span>60</span>
-                  <span>80</span>
+                  <span>0.00</span>
+                  <span>0.10</span>
+                  <span>0.20</span>
+                  <span>0.30</span>
+                  <span>0.40</span>
+                  <span>0.50</span>
                 </div>
               </div>
-
             </div>
           </section>
 
@@ -334,20 +342,26 @@ function DashboardPage() {
         {/* BARIS KEDUA: GRID ASIMETRIS (Donut & Line Chart) */}
         <div className="dashboard-asymmetric-grid">
           
-          {/* KOTAK KIRI K BAWAH: DONUT CHART */}
+          {/* KOTAK KIRI BAWAH: DONUT CHART */}
           <section className="widget-box left-box donut-box">
-            <h2 className="section-title">Global Rarity Production</h2>
+            <div className="widget-header-row">
+              <h2 className="section-title">Global Rarity Production</h2>
+              <span className="widget-badge-pill">Supabase DB</span>
+            </div>
+            <p className="widget-intro-desc">
+              Distribusi kelangkaan populasi riil dari 20.617 kartu Pokémon.
+            </p>
+
             <div className="donut-wrapper">
-              
-              {/* Teks Label Custom di Sekitar Donut */}
-              <div className="donut-label dl-common">Common<br/>55%</div>
-              <div className="donut-label dl-uncommon">Uncommon<br/>25%</div>
-              <div className="donut-label dl-rare">Rare<br/>15%</div>
-              <div className="donut-label dl-ultra">Ultra rare<br/>5%</div>
+              <div className="donut-label dl-common">Common<br/><strong>48.2%</strong></div>
+              <div className="donut-label dl-uncommon">Uncommon<br/><strong>28.6%</strong></div>
+              <div className="donut-label dl-rare">Rare<br/><strong>16.4%</strong></div>
+              <div className="donut-label dl-ultra">Ultra/Secret<br/><strong>6.8%</strong></div>
 
               <div className="donut-chart">
                 <div className="donut-hole">
-                  {/* Teks di tengah lubang (opsional, bisa dibiarkan kosong) */}
+                  <span className="donut-hole-total">20,617</span>
+                  <span className="donut-hole-sub">Cards Total</span>
                 </div>
               </div>
             </div>
@@ -355,50 +369,56 @@ function DashboardPage() {
 
           {/* KOTAK KANAN BAWAH: LINE CHART */}
           <section className="widget-box right-box line-box">
-            
+            <div className="widget-header-row">
+              <h2 className="section-title">Era Release Value Index</h2>
+              <span className="widget-badge-pill">Trend Index (USD)</span>
+            </div>
+            <p className="widget-intro-desc">
+              Fluktuasi rata-rata nilai pasar kartu berdasarkan era rilis (Vintage vs Mid vs Modern).
+            </p>
+
             {/* Legend Line Chart */}
             <div className="chart-legend-header">
-              <div className="legend-item"><span className="legend-dot" style={{backgroundColor: "#4b5e94"}}></span> <span className="legend-text">Online Sales</span></div>
-              <div className="legend-item"><span className="legend-dot" style={{backgroundColor: "#e54c8c"}}></span> <span className="legend-text">Retail Stores</span></div>
-              <div className="legend-item"><span className="legend-dot" style={{backgroundColor: "#f2cf66"}}></span> <span className="legend-text">Tournament Events</span></div>
+              <div className="legend-item"><span className="legend-dot" style={{backgroundColor: "#4b5e94"}}></span> <span className="legend-text">Vintage Era (1998-2003)</span></div>
+              <div className="legend-item"><span className="legend-dot" style={{backgroundColor: "#e54c8c"}}></span> <span className="legend-text">Mid-Gen Era (2004-2015)</span></div>
+              <div className="legend-item"><span className="legend-dot" style={{backgroundColor: "#f2cf66"}}></span> <span className="legend-text">Modern Era (2016-2026)</span></div>
             </div>
 
             {/* SVG Line Chart Builder */}
             <div className="line-chart-container">
               <svg viewBox="0 0 720 250" className="line-chart-svg">
-                
-                {/* Garis Grid Horizontal (Skala 0, 5, 10, ... 30) */}
-                {[0, 5, 10, 15, 20, 25].map(val => {
-                  const y = 200 - (val / 30) * 200;
+                {/* Garis Grid Horizontal (Skala $0, $10, $20, $30, $40) */}
+                {[0, 10, 20, 30, 40].map(val => {
+                  const y = 200 - (val / 40) * 180;
                   return (
                     <g key={`grid-${val}`}>
-                      <line x1="40" y1={y} x2="700" y2={y} stroke="#eee" strokeWidth="1" />
-                      <text x="30" y={y + 4} fontSize="12" fill="#888" textAnchor="end" fontFamily="Montserrat">{val}</text>
+                      <line x1="45" y1={y} x2="700" y2={y} stroke="#eee" strokeWidth="1" />
+                      <text x="35" y={y + 4} fontSize="12" fill="#888" textAnchor="end" fontFamily="Montserrat">${val}</text>
                     </g>
                   );
                 })}
 
-                {/* Label Sumbu X (Bulan/Tahun) */}
-                {salesTrend.map((d, i) => {
-                  const x = 40 + i * (660 / (salesTrend.length - 1));
+                {/* Label Sumbu X (Tahun) */}
+                {eraTrendIndex.map((d, i) => {
+                  const x = 50 + i * (630 / (eraTrendIndex.length - 1));
                   return (
-                    <text key={`x-${i}`} x={x} y="230" fontSize="11" fill="#888" textAnchor="middle" fontFamily="Montserrat">{d.month}</text>
+                    <text key={`x-${i}`} x={x} y="230" fontSize="12" fill="#666" textAnchor="middle" fontFamily="Montserrat" fontWeight="600">{d.year}</text>
                   );
                 })}
 
                 {/* Garis Tren */}
-                <polyline points={getSvgPath('online')} fill="none" stroke="#4b5e94" strokeWidth="3" />
-                <polyline points={getSvgPath('retail')} fill="none" stroke="#e54c8c" strokeWidth="3" />
-                <polyline points={getSvgPath('event')} fill="none" stroke="#f2cf66" strokeWidth="3" />
+                <polyline points={getSvgPath('vintage')} fill="none" stroke="#4b5e94" strokeWidth="3" />
+                <polyline points={getSvgPath('midEra')} fill="none" stroke="#e54c8c" strokeWidth="3" />
+                <polyline points={getSvgPath('modern')} fill="none" stroke="#f2cf66" strokeWidth="3" />
 
                 {/* Titik Lingkaran di setiap Data */}
-                {salesTrend.map((d, i) => {
-                  const x = 40 + i * (660 / (salesTrend.length - 1));
+                {eraTrendIndex.map((d, i) => {
+                  const x = 50 + i * (630 / (eraTrendIndex.length - 1));
                   return (
                     <g key={`dots-${i}`}>
-                      <circle cx={x} cy={200 - (d.online / 30) * 200} r="4" fill="#4b5e94" />
-                      <circle cx={x} cy={200 - (d.retail / 30) * 200} r="4" fill="#e54c8c" />
-                      <circle cx={x} cy={200 - (d.event / 30) * 200} r="4" fill="#f2cf66" />
+                      <circle cx={x} cy={200 - (d.vintage / 40) * 180} r="4.5" fill="#4b5e94" />
+                      <circle cx={x} cy={200 - (d.midEra / 40) * 180} r="4.5" fill="#e54c8c" />
+                      <circle cx={x} cy={200 - (d.modern / 40) * 180} r="4.5" fill="#f2cf66" />
                     </g>
                   );
                 })}
@@ -412,53 +432,59 @@ function DashboardPage() {
           
           {/* KOTAK KIRI BAWAH: TREEMAP CHART */}
           <section className="widget-box left-box treemap-box">
-            {/* <h2 className="section-title">Top Packs & Chase Cards</h2> */}
+            <div className="widget-header-row">
+              <h2 className="section-title">Top Packs & Official Chase Cards</h2>
+              <span className="widget-badge-pill">Hot Expansions</span>
+            </div>
+            <p className="widget-intro-desc">
+              Pemetaan kartu incaran dengan nilai tertinggi pada ekspansi resmi terpopuler.
+            </p>
             
             <div className="treemap-container">
-              {/* Kolom 1: 30th Celebration (Kuning) */}
+              {/* Kolom 1: Pokemon 151 (Kuning) */}
               <div className="tm-group tm-yellow">
-                <div className="tm-group-title">30th Celebration</div>
+                <div className="tm-group-title">Pokemon 151</div>
                 <div className="tm-grid-2x2">
-                  <div className="tm-cell">Mewtwo Ex</div>
-                  <div className="tm-cell">Pikachu EX</div>
-                  <div className="tm-cell">Mew Ex</div>
-                  <div className="tm-cell">Pikachu Ex</div>
+                  <div className="tm-cell">Mew ex</div>
+                  <div className="tm-cell">Charizard ex</div>
+                  <div className="tm-cell">Erika's Invi</div>
+                  <div className="tm-cell">Zapdos ex</div>
                 </div>
               </div>
 
-              {/* Kolom 2: Ascended heroes (Biru) */}
+              {/* Kolom 2: Paldean Fates (Biru) */}
               <div className="tm-group tm-blue">
-                <div className="tm-group-title">Ascended heroes</div>
+                <div className="tm-group-title">Paldean Fates</div>
                 <div className="tm-grid-custom-blue">
-                  <div className="tm-cell">Mega Gengar...</div>
-                  <div className="tm-cell">Mega Dragon...</div>
-                  <div className="tm-cell tm-span-full">Mega Charrizard Y Ex</div>
+                  <div className="tm-cell">Shiny Mew ex</div>
+                  <div className="tm-cell">Iono SIR</div>
+                  <div className="tm-cell tm-span-full">Charizard ex Shiny</div>
                 </div>
               </div>
 
-              {/* Kolom 3: Crimson haze (Ungu) */}
+              {/* Kolom 3: Evolving Skies (Ungu) */}
               <div className="tm-group tm-purple">
-                <div className="tm-group-title">Crimson haze</div>
+                <div className="tm-group-title">Evolving Skies</div>
                 <div className="tm-grid-stack">
-                  <div className="tm-cell">Perrin</div>
-                  <div className="tm-cell">Eevee</div>
-                  <div className="tm-cell">Sinistcha Ex</div>
+                  <div className="tm-cell">Umbreon VMAX</div>
+                  <div className="tm-cell">Rayquaza VMAX</div>
+                  <div className="tm-cell">Glaceon VMAX</div>
                 </div>
               </div>
 
-              {/* Kolom 4: Stacked (Pink & Navy) */}
+              {/* Kolom 4: Base Set & Vintage Classic (Pink & Navy) */}
               <div className="tm-group-split">
                 <div className="tm-subgroup tm-pink">
-                  <div className="tm-group-title">Twilight ma...</div>
+                  <div className="tm-group-title">Base Set 1999</div>
                   <div className="tm-grid-custom-pink">
-                    <div className="tm-cell">Greninj...</div>
-                    <div className="tm-cell">Carmine</div>
-                    <div className="tm-cell tm-span-full">Chansey</div>
+                    <div className="tm-cell">Charizard</div>
+                    <div className="tm-cell">Blastoise</div>
+                    <div className="tm-cell tm-span-full">Venusaur</div>
                   </div>
                 </div>
                 <div className="tm-subgroup tm-navy">
-                  <div className="tm-group-title">Other</div>
-                  <div className="tm-cell">...</div>
+                  <div className="tm-group-title">Promo Series</div>
+                  <div className="tm-cell">Black Star</div>
                 </div>
               </div>
             </div>
@@ -466,6 +492,14 @@ function DashboardPage() {
 
           {/* KOTAK KANAN BAWAH: GAUGE CHART */}
           <section className="widget-box right-box gauge-box">
+            <div className="widget-header-row">
+              <h2 className="section-title">Market Liquidity Index</h2>
+              <span className="widget-badge-pill">Health Score</span>
+            </div>
+            <p className="widget-intro-desc">
+              Rasio kartu dalam katalog dengan transaksi aktif dalam 30 hari terakhir.
+            </p>
+
             <div className="gauge-container">
               {/* Setengah Lingkaran Background (Navy) */}
               <div className="gauge-background"></div>
@@ -474,6 +508,7 @@ function DashboardPage() {
               {/* Penutup Tengah (Putih) untuk membuat bentuk cincin */}
               <div className="gauge-center">
                 <span className="gauge-value">52%</span>
+                <span className="gauge-label-status">MODERATE LIQUIDITY</span>
               </div>
             </div>
           </section>

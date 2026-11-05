@@ -77,7 +77,8 @@
 
 /* Gaya saat teks berhenti di kata Bullish */
 .text-bullish {
-  color: #1e1b4b; /* Warna gelap stabil, atau bisa ubah ke #00d26a (hijau) jika ingin menyala */
+  color: #1e1b4b;
+  /* Warna gelap stabil, atau bisa ubah ke #00d26a (hijau) jika ingin menyala */
   font-weight: 800;
   transition: color 0.3s ease;
 }
@@ -136,21 +137,24 @@
   width: 150px;
   height: auto;
   border-radius: 6px;
-  box-shadow: 0 0px 0px rgba(0,0,0,0.15);
+  box-shadow: 0 0px 0px rgba(0, 0, 0, 0.15);
 }
 
 .t-row-info {
   display: flex;
   flex-direction: column;
-  gap: 12px; /* Jarak antar grup elemen (Nama -> Rarity -> Set -> Bendera/Harga) */
+  gap: 12px;
+  /* Jarak antar grup elemen (Nama -> Rarity -> Set -> Bendera/Harga) */
   padding-top: 5px;
 }
 
-.t-row-name { 
+.t-row-name {
   font-family: 'Montserrat', sans-serif;
-  font-weight: 500; /* Sedikit lebih tipis dari font-weight: 700 */
-  font-size: 18px; 
-  color: #1e1b4b; /* Warna gelap */
+  font-weight: 500;
+  /* Sedikit lebih tipis dari font-weight: 700 */
+  font-size: 18px;
+  color: #1e1b4b;
+  /* Warna gelap */
   letter-spacing: -0.5px;
 }
 
@@ -161,37 +165,43 @@
   padding: 15px 0px 0px 0px;
 }
 
-.t-row-rarity { 
-  font-size: 12px; 
-  color: #a0426b; /* Warna ungu/pink kemerahan */
+.t-row-rarity {
+  font-size: 12px;
+  color: #a0426b;
+  /* Warna ungu/pink kemerahan */
   font-weight: 500;
 }
 
-.t-row-holo { 
-  font-size: 12px; 
-  color: #d4af37; /* Warna emas/kuning */
+.t-row-holo {
+  font-size: 12px;
+  color: #d4af37;
+  /* Warna emas/kuning */
   font-weight: 500;
 }
 
 /* LOGO SET */
 .t-row-set-icon {
-  height: 20px; /* Tinggi logo set */
-  width: auto;
-  align-self: flex-start; /* Memastikan logo tetap di kiri */
-  padding: 15px 0px 0px 0px;
+  height: 22px;
+  max-width: 80px;
+  object-fit: contain;
+  align-self: flex-start;
+  margin: 6px 0;
+  display: block;
 }
 
 /* BENDERA (Jika menggunakan gambar nanti, ubah tag span menjadi img) */
 .t-row-flag {
-  font-size: 15px; /* Ukuran emoji bendera */
+  font-size: 15px;
+  /* Ukuran emoji bendera */
   line-height: 1;
 }
 
 /* HARGA */
-.t-row-price { 
-  font-weight: 800; 
-  color: #00d26a; 
-  font-size: 18px; /* Harga dibuat sangat besar dan menonjol */
+.t-row-price {
+  font-weight: 800;
+  color: #00d26a;
+  font-size: 18px;
+  /* Harga dibuat sangat besar dan menonjol */
   font-family: 'Montserrat', sans-serif;
 }
 
@@ -223,21 +233,21 @@
   background: white;
   border-radius: 20px;
   padding: 30px;
-  box-shadow: 0 15px 30px rgba(0,0,0,0.08);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
 }
 
 .left-box {
   /* Urutan border-radius: Kiri-Atas, Kanan-Atas, Kanan-Bawah, Kiri-Bawah */
   /* Sisi kiri (menempel layar) bersudut 0 (lancip). 
      Sisi kanan (tengah layar) bersudut 30px (tumpul). */
-  border-radius: 0 15px 15px 0; 
+  border-radius: 0 15px 15px 0;
 }
 
 /* PERBAIKAN: Sudut Kotak KANAN */
 .right-box {
   /* Sisi kiri (tengah layar) bersudut 30px (tumpul). 
      Sisi kanan (menempel layar) bersudut 0 (lancip). */
-  border-radius: 15px 0 0 15px; 
+  border-radius: 15px 0 0 15px;
 }
 
 .list-container {
@@ -270,9 +280,22 @@
   flex-direction: column;
 }
 
-.item-name { font-weight: 700; color: #333; font-size: 15px; margin-bottom: 4px;}
-.item-prices, .item-sub { font-size: 12px; color: #666; }
-.item-prices strong { color: #1e1b4b; }
+.item-name {
+  font-weight: 700;
+  color: #333;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.item-prices,
+.item-sub {
+  font-size: 12px;
+  color: #666;
+}
+
+.item-prices strong {
+  color: #1e1b4b;
+}
 
 .up-badge {
   background-color: #e6f9f0;
@@ -284,83 +307,173 @@
 }
 
 /* =========================================
-   STACKED BAR CHART (KOTAK KIRI)
+   COMMON WIDGET HEADERS & BADGES
    ========================================= */
 
-/* Legend (Keterangan Warna di Atas) */
-.chart-legend-header {
-  display: flex;
-  justify-content: center;
-  gap: 25px;
-  margin-bottom: 35px;
-}
-
-.legend-item {
+.widget-header-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 12px;
 }
 
-.legend-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: inline-block;
+.widget-badge-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #e54c8c;
+  background-color: #fce8f3;
+  padding: 4px 10px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
-.legend-text {
-  font-size: 13px;
-  color: #333;
-  font-family: 'Montserrat', sans-serif;
-  font-weight: 500;
+.widget-intro-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 16px 0;
+  line-height: 1.4;
 }
 
-/* Palet Warna Batang */
-.color-low { background-color: #4b5e94; } /* Biru Tua */
-.color-mid { background-color: #f2cf66; } /* Kuning Keemasan */
-.color-high { background-color: #e54c8c; } /* Merah Muda / Pink */
+/* =========================================
+   LEADERBOARD & THE CHARIZARD TAX (KOTAK KIRI)
+   ========================================= */
 
-/* Kontainer Utama Grafik */
-.bar-chart-container {
+.leaderboard-list {
   display: flex;
   flex-direction: column;
-  gap: 20px; /* Jarak vertikal antar batang */
+  gap: 10px;
+  margin-top: 4px;
 }
 
-/* Baris Tunggal (Teks + Batang) */
-.bar-row {
+.leaderboard-item {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: #f8fafc;
+  border: 1px solid #f1f5f9;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Label Teks di Kiri */
-.bar-label {
-  width: 130px; /* Memastikan teks memiliki ruang yang sejajar vertikal */
-  text-align: right;
-  font-size: 13px;
-  color: #333;
-  flex-shrink: 0;
-  font-family: 'Montserrat', sans-serif;
+.leaderboard-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-/* Track Batang Keseluruhan */
-.bar-track {
-  flex-grow: 1; /* Mengisi sisa ruang ke kanan */
-  height: 10px; /* Ketebalan batang */
+.lb-rank-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
   display: flex;
-  
-  /* Sisi kiri lurus (0), sisi kanan melengkung (12px) */
-  border-radius: 0 2px 2px 0; 
-  overflow: hidden; /* Memotong segmen di dalamnya agar ikut melengkung di ujung */
-  background-color: #f9f9f9; 
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 11px;
+  flex-shrink: 0;
+  background-color: #e2e8f0;
+  color: #475569;
 }
 
-/* Segmen Warna di Dalam Batang */
-.bar-segment {
+.leaderboard-item.rank-1 .lb-rank-badge {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+}
+
+.leaderboard-item.rank-2 .lb-rank-badge {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  color: white;
+}
+
+.leaderboard-item.rank-3 .lb-rank-badge {
+  background: linear-gradient(135deg, #b45309, #78350f);
+  color: white;
+}
+
+.leaderboard-item.rank-4 .lb-rank-badge {
+  background: linear-gradient(135deg, #e54c8c, #be185d);
+  color: white;
+  box-shadow: 0 2px 6px rgba(229, 76, 140, 0.4);
+}
+
+.lb-info-col {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lb-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lb-pokemon-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: #1e1b4b;
+}
+
+.lb-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.leaderboard-item.rank-4 .lb-tag {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+.lb-bar-track {
+  width: 100%;
+  height: 6px;
+  background-color: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.lb-bar-fill {
   height: 100%;
-  /* Efek animasi saat lebar batang diisi dari state awal */
-  transition: width 1.2s cubic-bezier(0.1, 0.7, 0.1, 1); 
+  border-radius: 3px;
+  background: linear-gradient(90deg, #4b5e94, #e54c8c);
+  transition: width 1s ease-out;
+}
+
+.leaderboard-item.rank-1 .lb-bar-fill {
+  background: linear-gradient(90deg, #f59e0b, #e54c8c);
+}
+
+.leaderboard-item.rank-4 .lb-bar-fill {
+  background: linear-gradient(90deg, #e54c8c, #ef4444);
+}
+
+.lb-price-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  min-width: 75px;
+}
+
+.lb-price-usd {
+  font-weight: 800;
+  font-size: 13.5px;
+  color: #0f172a;
+}
+
+.lb-price-idr {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #00d26a;
 }
 
 /* =========================================
@@ -379,21 +492,23 @@
 .feature-bars-container {
   display: flex;
   flex-direction: column;
-  gap: 8px; /* Jarak yang cukup rapat antar batang */
+  gap: 8px;
+  /* Jarak yang cukup rapat antar batang */
   position: relative;
-  
+
   /* Membuat 4 garis panduan vertikal (di 25%, 50%, dan 75%) */
-  background-image: linear-gradient(to right, 
-    transparent 24.8%, #f0f0f0 25%, transparent 25.2%,
-    transparent 49.8%, #f0f0f0 50%, transparent 50.2%,
-    transparent 74.8%, #f0f0f0 75%, transparent 75.2%
-  );
-  
+  background-image: linear-gradient(to right,
+      transparent 24.8%, #f0f0f0 25%, transparent 25.2%,
+      transparent 49.8%, #f0f0f0 50%, transparent 50.2%,
+      transparent 74.8%, #f0f0f0 75%, transparent 75.2%);
+
   /* Mulai garis panduan sejajar dengan baris track (mengabaikan lebar label) */
-  background-position: left 100px top 0; /* 100px = lebar label (90px) + gap (10px) */
-  background-size: calc(100% - 100px) 100%;
+  background-position: left 150px top 0;
+  /* 150px = lebar label (140px) + gap (10px) */
+  background-size: calc(100% - 235px) 100%;
   background-repeat: no-repeat;
-  padding-bottom: 12px; /* Ruang antara batang terakhir dan sumbu X */
+  padding-bottom: 12px;
+  /* Ruang antara batang terakhir dan sumbu X */
 }
 
 /* Baris Tunggal */
@@ -402,17 +517,18 @@
   align-items: center;
   gap: 10px;
   position: relative;
-  z-index: 1; /* Pastikan batang berada di atas garis panduan */
+  z-index: 1;
+  /* Pastikan batang berada di atas garis panduan */
 }
 
 /* Label Fitur (Kiri) */
 .f-bar-label {
-  width: 90px;
+  width: 140px;
   text-align: right;
-  font-size: 12px;
-  color: #333;
+  font-size: 11.5px;
+  color: #1e1b4b;
   flex-shrink: 0;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -421,17 +537,30 @@
 /* Track Batang Keseluruhan */
 .f-bar-track {
   flex-grow: 1;
-  height: 16px; /* Ketebalan batang */
+  height: 14px;
+  /* Ketebalan batang */
   display: flex;
-  background-color: transparent;
+  background-color: #f1f5f9;
+  border-radius: 3px;
+  overflow: hidden;
 }
 
 /* Isi Batang Pink */
 .f-bar-fill {
   height: 100%;
-  background-color: #e54c8c; /* Warna pink seragam */
-  border-radius: 0 4px 4px 0; /* Ujung kanan sedikit melengkung */
+  background: linear-gradient(90deg, #e54c8c, #be185d);
+  border-radius: 0 3px 3px 0;
   transition: width 1.2s cubic-bezier(0.1, 0.7, 0.1, 1);
+}
+
+/* Nilai Korelasi (Kanan) */
+.f-bar-val {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #475569;
+  width: 75px;
+  flex-shrink: 0;
+  text-align: left;
 }
 
 /* Area Sumbu X di Bawah */
@@ -442,14 +571,16 @@
 }
 
 .f-x-spacer {
-  width: 90px; /* Harus sama dengan lebar .f-bar-label */
+  width: 140px;
+  /* Harus sama dengan lebar .f-bar-label */
   flex-shrink: 0;
 }
 
 .f-x-labels {
   flex-grow: 1;
   display: flex;
-  justify-content: space-between; /* Menyebarkan angka 0, 20, 40, 60, 80 secara merata */
+  justify-content: space-between;
+  /* Menyebarkan angka 0, 20, 40, 60, 80 secara merata */
   font-size: 12px;
   color: #888;
   font-weight: 500;
@@ -462,7 +593,7 @@
 .dashboard-asymmetric-grid {
   display: grid;
   /* Kiri 35%, Kanan 65% (Kanan lebih menjorok ke kiri) */
-  grid-template-columns: 0.9fr 1.5fr; 
+  grid-template-columns: 0.9fr 1.5fr;
   gap: 40px;
   margin-top: 30px;
 }
@@ -485,15 +616,13 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  
-  /* Gradasi melingkar (Conic) sesuai persentase */
-  background: conic-gradient(
-    #4b5e94 0% 55%,
-    #a0426b 55% 80%,
-    #e54c8c 80% 95%,
-    #f2cf66 95% 100%
-  );
-  
+
+  /* Gradasi melingkar (Conic) sesuai persentase riil Supabase 20.617 kartu */
+  background: conic-gradient(#4b5e94 0% 48.2%,
+      #a0426b 48.2% 76.8%,
+      #e54c8c 76.8% 93.2%,
+      #f2cf66 93.2% 100%);
+
   display: flex;
   align-items: center;
   justify-content: center;
@@ -502,8 +631,31 @@
 .donut-hole {
   width: 110px;
   height: 110px;
-  background-color: white; /* Memberi ilusi lubang donut */
+  background-color: white;
+  /* Memberi ilusi lubang donut */
   border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.donut-hole-total {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: #1e1b4b;
+  line-height: 1;
+}
+
+.donut-hole-sub {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Label Posisi Absolut di Luar Donut */
@@ -516,10 +668,27 @@
   line-height: 1.2;
 }
 
-.dl-common { top: 50%; right: -65px; transform: translateY(-50%); }
-.dl-uncommon { bottom: -10px; left: -10px; }
-.dl-rare { top: 20px; left: -20px; }
-.dl-ultra { top: -25px; left: 50%; transform: translateX(-50%); }
+.dl-common {
+  top: 50%;
+  right: -65px;
+  transform: translateY(-50%);
+}
+
+.dl-uncommon {
+  bottom: -10px;
+  left: -10px;
+}
+
+.dl-rare {
+  top: 20px;
+  left: -20px;
+}
+
+.dl-ultra {
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+}
 
 /* --- LINE CHART (KANAN) --- */
 .line-box {
@@ -545,7 +714,7 @@
 .dashboard-asymmetric-grid-reverse {
   display: grid;
   /* Kiri 65%, Kanan 35% (Kotak Kiri lebih menjorok ke kanan) */
-  grid-template-columns: 1.5fr 0.8fr; 
+  grid-template-columns: 1.5fr 0.8fr;
   gap: 40px;
   margin-top: 40px;
 }
@@ -572,7 +741,8 @@
 }
 
 /* Base Group Styling */
-.tm-group, .tm-subgroup {
+.tm-group,
+.tm-subgroup {
   display: flex;
   flex-direction: column;
   padding: 8px;
@@ -590,7 +760,8 @@
 }
 
 .tm-cell {
-  background-color: rgba(255,255,255, 0.4); /* Transparan putih */
+  background-color: rgba(255, 255, 255, 0.4);
+  /* Transparan putih */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -602,11 +773,25 @@
 }
 
 /* Warna Background Kolom */
-.tm-yellow { background-color: #f2cf66; }
-.tm-blue { background-color: #5c8cf2; }
-.tm-purple { background-color: #b193f2; }
-.tm-pink { background-color: #e54c8c; }
-.tm-navy { background-color: #4b5e94; }
+.tm-yellow {
+  background-color: #f2cf66;
+}
+
+.tm-blue {
+  background-color: #5c8cf2;
+}
+
+.tm-purple {
+  background-color: #b193f2;
+}
+
+.tm-pink {
+  background-color: #e54c8c;
+}
+
+.tm-navy {
+  background-color: #4b5e94;
+}
 
 /* Grid Spesifik Kolom */
 .tm-grid-2x2 {
@@ -620,7 +805,8 @@
 .tm-grid-custom-blue {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 2fr 1fr; /* Baris bawah lebih pendek */
+  grid-template-rows: 2fr 1fr;
+  /* Baris bawah lebih pendek */
   gap: 3px;
   flex-grow: 1;
 }
@@ -631,7 +817,12 @@
   gap: 3px;
   flex-grow: 1;
 }
-.tm-grid-stack .tm-cell { flex-grow: 1; } /* Tinggi merata */
+
+.tm-grid-stack .tm-cell {
+  flex-grow: 1;
+}
+
+/* Tinggi merata */
 
 /* Kolom Terakhir (Split Pink & Navy) */
 .tm-group-split {
@@ -640,10 +831,24 @@
   gap: 5px;
 }
 
-.tm-group-split .tm-pink { flex-grow: 2; }
-.tm-group-split .tm-navy { flex-grow: 1; }
-.tm-group-split .tm-navy .tm-group-title { color: white; margin-bottom: 4px;}
-.tm-group-split .tm-navy .tm-cell { color: white; background-color: rgba(255,255,255,0.2); flex-grow: 1;}
+.tm-group-split .tm-pink {
+  flex-grow: 2;
+}
+
+.tm-group-split .tm-navy {
+  flex-grow: 1;
+}
+
+.tm-group-split .tm-navy .tm-group-title {
+  color: white;
+  margin-bottom: 4px;
+}
+
+.tm-group-split .tm-navy .tm-cell {
+  color: white;
+  background-color: rgba(255, 255, 255, 0.2);
+  flex-grow: 1;
+}
 
 .tm-grid-custom-pink {
   display: grid;
@@ -653,7 +858,11 @@
   flex-grow: 1;
 }
 
-.tm-span-full { grid-column: 1 / -1; } /* Membentang penuh 2 kolom */
+.tm-span-full {
+  grid-column: 1 / -1;
+}
+
+/* Membentang penuh 2 kolom */
 
 
 /* --- GAUGE CHART (KANAN) --- */
@@ -666,8 +875,10 @@
 .gauge-container {
   position: relative;
   width: 250px;
-  height: 125px; /* Setengah lingkaran */
-  overflow: hidden; /* Potong bagian bawah agar bentuknya separuh */
+  height: 125px;
+  /* Setengah lingkaran */
+  overflow: hidden;
+  /* Potong bagian bawah agar bentuknya separuh */
   margin-top: 10px;
 }
 
@@ -681,9 +892,12 @@
   border-radius: 50%;
   box-sizing: border-box;
   border: 40px solid #4b5e94;
-  border-bottom-color: transparent; /* Hilangkan batas bawah */
-  border-left-color: transparent; /* Hilangkan batas kiri */
-  transform: rotate(-45deg); /* Putar agar bagian yang ada di atas */
+  border-bottom-color: transparent;
+  /* Hilangkan batas bawah */
+  border-left-color: transparent;
+  /* Hilangkan batas kiri */
+  transform: rotate(-45deg);
+  /* Putar agar bagian yang ada di atas */
 }
 
 /* Lingkaran Penuh Fill (Pink) - Akan berotasi sesuai persentase */
@@ -695,47 +909,72 @@
   height: 250px;
   border-radius: 50%;
   box-sizing: border-box;
-  border: 40px solid #a0426b; /* Warna Pink/Ungu Tua */
+  border: 40px solid #a0426b;
+  /* Warna Pink/Ungu Tua */
   border-bottom-color: transparent;
-  border-right-color: transparent; /* Sisi yang berbeda agar menutupi */
+  border-right-color: transparent;
+  /* Sisi yang berbeda agar menutupi */
   /* Putaran dikendalikan lewat properti style di JSX (rotate 94deg = 52%) */
   transform-origin: center;
   border-radius: 50%;
 }
 
 /* Lingkaran Penutup di Tengah (Ujung melengkung buatan) */
-.gauge-background::before, .gauge-fill::before {
+.gauge-background::before,
+.gauge-fill::before {
   content: "";
   position: absolute;
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: inherit; /* Mewarisi warna garis */
+  background-color: inherit;
+  /* Mewarisi warna garis */
 }
+
 /* Posisi ujung lengkung navy */
-.gauge-background::before { bottom: 15px; left: 15px; background-color: #4b5e94; }
+.gauge-background::before {
+  bottom: 15px;
+  left: 15px;
+  background-color: #4b5e94;
+}
+
 /* Posisi ujung lengkung pink */
-.gauge-fill::before { top: 15px; left: 15px; background-color: #a0426b; }
+.gauge-fill::before {
+  top: 15px;
+  left: 15px;
+  background-color: #a0426b;
+}
 
 
 /* Teks Nilai di Tengah */
 .gauge-center {
   position: absolute;
-  bottom: 0; /* Berada tepat di dasar batas potong setengah lingkaran */
+  bottom: 0;
+  /* Berada tepat di dasar batas potong setengah lingkaran */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   justify-content: center;
-  align-items: flex-end;
+  align-items: center;
   padding-bottom: 5px;
 }
 
 .gauge-value {
   font-family: 'Montserrat', sans-serif;
-  font-size: 54px;
+  font-size: 50px;
   font-weight: 800;
   color: #a0426b;
   line-height: 1;
+}
+
+.gauge-label-status {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #4b5e94;
+  letter-spacing: 0.8px;
+  margin-top: 4px;
+  white-space: nowrap;
 }
 
 /* Breakpoint Responsif Dashboard */
@@ -762,4 +1001,4 @@
   .dashboard-grid-charts {
     grid-template-columns: 1fr !important;
   }
-}
+}
