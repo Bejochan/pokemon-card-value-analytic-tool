@@ -1,19 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './Marketplace.css';
 
 // ==========================================
-// 1. DATA DUMMY (Menggunakan gambar default)
-// ==========================================
-const mockCards = [
-  { id: 1, name: 'Deoxys VSTAR', price: 12.00, rarityName: 'Common', language: 'UK', raritySymbol: 'circle', rarityAbbr: 'C', setTag: 'M2a', saved: true, imgUrl: '/card-result.png' },
-  { id: 2, name: 'Deoxys VSTAR', price: 12.00, rarityName: 'Special Illustration Rare', language: 'UK', raritySymbol: 'double-star', rarityAbbr: 'SAR', setTag: 'V2a', saved: true, imgUrl: '/card-result.png' },
-  { id: 3, name: 'Deoxys VSTAR', price: 10.00, rarityName: 'Illustration Rare', language: 'JP', raritySymbol: 'star', rarityAbbr: 'AR', setTag: 'N2a', saved: true, imgUrl: '/card-result.png' },
-  { id: 4, name: 'Deoxys VSTAR', price: 11.00, rarityName: 'Common', language: 'UK', raritySymbol: 'circle', rarityAbbr: 'C', setTag: 'N2a', saved: true, imgUrl: '/card-result.png' },
-  { id: 5, name: 'Deoxys VSTAR', price: 9.00, rarityName: 'Double Rare', language: 'ID', raritySymbol: 'double-star', rarityAbbr: 'RR', setTag: 'N2a', saved: true, imgUrl: '/card-result.png' },
-];
-
-// ==========================================
-// 2. KOMPONEN IKON SVG
+// 1. KOMPONEN IKON SVG (BEBAS EMOTIKON)
 // ==========================================
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#475086" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -34,7 +23,6 @@ const ChevronDownIcon = () => (
   </svg>
 );
 
-// Ikon Baru untuk Drawer
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -49,9 +37,8 @@ const TrashIcon = () => (
   </svg>
 );
 
-const FlagIcon = ({ lang }) => {
-  const flags = { 'UK': '🇬🇧', 'ID': '🇮🇩', 'JP': '🇯🇵' };
-  return <span className="mk-flag-emoji" title={lang}>{flags[lang]}</span>;
+const FlagBadge = ({ lang }) => {
+  return <span className="mk-flag-label" title={`Wilayah Rilis: ${lang}`}>{lang}</span>;
 };
 
 const RarityIcon = ({ type }) => {
@@ -74,17 +61,142 @@ const RarityIcon = ({ type }) => {
   return null;
 };
 
+// Helper: Memetakan nama kelangkaan ke simbol visual & singkatan
+function getRarityMeta(rarityStr) {
+  const r = (rarityStr || '').toLowerCase();
+  if (r.includes('special') || r.includes('hyper') || r.includes('secret')) {
+    return { symbol: 'double-star', abbr: 'SAR' };
+  }
+  if (r.includes('ultra') || r.includes('illustration') || r.includes('double')) {
+    return { symbol: 'star', abbr: 'AR' };
+  }
+  if (r.includes('rare') || r.includes('holo')) {
+    return { symbol: 'star', abbr: 'R' };
+  }
+  if (r.includes('uncommon')) {
+    return { symbol: 'circle', abbr: 'U' };
+  }
+  return { symbol: 'circle', abbr: 'C' };
+}
+
 // ==========================================
-// 3. KOMPONEN UTAMA MARKETPLACE
+// 2. KOMPONEN UTAMA MARKETPLACE
 // ==========================================
 export default function Marketplace() {
-  const [searchQuery, setSearchQuery] = useState('Deaoxys VSTAR');
-  
-  // STATE BARU: Mengontrol buka/tutup panel Saved Items
+  // State Data Kartu dari Backend
+  const [cards, setCards] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalCards, setTotalCards] = useState(0);
+
+  // State Filter & Pencarian
+  const [searchInput, setSearchInput] = useState('');
+  const [activeSearch, setActiveSearch] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
+  const [selectedRarity, setSelectedRarity] = useState('all');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+
+  // State Saved Items (Tersinkronisasi ke LocalStorage)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  
-  // Ambil hanya item yang tersimpan untuk ditampilkan di panel
-  const savedItemsList = mockCards.filter(card => card.saved);
+  const [savedCards, setSavedCards] = useState(() => {
+    try {
+      const saved = localStorage.getItem('regokemon_saved_cards');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Fungsi Toggle Simpan / Hapus Kartu
+  const toggleSaveCard = (card) => {
+    setSavedCards((prev) => {
+      const isAlreadySaved = prev.some((item) => item.id === card.id);
+      let updated;
+      if (isAlreadySaved) {
+        updated = prev.filter((item) => item.id !== card.id);
+      } else {
+        updated = [...prev, card];
+      }
+      try {
+        localStorage.setItem('regokemon_saved_cards', JSON.stringify(updated));
+      } catch (err) {
+        console.error('Gagal menyimpan ke localStorage:', err);
+      }
+      return updated;
+    });
+  };
+
+  const removeSavedCard = (cardId) => {
+    setSavedCards((prev) => {
+      const updated = prev.filter((item) => item.id !== cardId);
+      try {
+        localStorage.setItem('regokemon_saved_cards', JSON.stringify(updated));
+      } catch (err) {
+        console.error('Gagal menghapus dari localStorage:', err);
+      }
+      return updated;
+    });
+  };
+
+  const isCardSaved = (cardId) => savedCards.some((item) => item.id === cardId);
+
+  // 3. Panggilan API ke Backend (GET /cards)
+  const fetchMarketCards = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        limit: '30',
+        page: '1'
+      });
+
+      if (activeSearch.trim()) {
+        params.append('search', activeSearch.trim());
+      }
+      if (selectedRarity !== 'all') {
+        params.append('rarity', selectedRarity);
+      }
+      if (sortBy) {
+        params.append('sort_by', sortBy);
+      }
+
+      const response = await fetch(`http://127.0.0.1:8000/cards?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Gagal mengambil data katalog dari backend.');
+      }
+      const data = await response.json();
+      
+      const rawCards = data.cards || (Array.isArray(data) ? data : []);
+      setCards(rawCards);
+      setTotalCards(data.total || rawCards.length);
+    } catch (err) {
+      console.error('Error fetching marketplace cards:', err);
+      setCards([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeSearch, selectedRarity, sortBy]);
+
+  useEffect(() => {
+    fetchMarketCards();
+  }, [fetchMarketCards]);
+
+  // Handler Kirim Pencarian
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    setActiveSearch(searchInput);
+  };
+
+  // Filter Harga Klien (Jika diisi rentang)
+  const filteredCards = cards.filter((card) => {
+    const price = card.price_num || 0;
+    if (minPrice && !isNaN(parseFloat(minPrice)) && price < parseFloat(minPrice)) {
+      return false;
+    }
+    if (maxPrice && !isNaN(parseFloat(maxPrice)) && price > parseFloat(maxPrice)) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="mk-wrapper">
@@ -92,22 +204,22 @@ export default function Marketplace() {
       {/* AREA CHECKERBOARD KUNING (PENCARIAN) */}
       <div className="mk-search-section">
         <div className="mk-search-container">
-          <div className="mk-search-box">
+          <form className="mk-search-box" onSubmit={handleSearchSubmit}>
             <input 
               type="text" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari kartu (misal: Charizard, Pikachu)..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Cari kartu pasar (misal: Charizard, Pikachu, Mew)..."
               className="mk-search-input"
             />
-            <div className="mk-search-icon">
+            <button type="submit" className="mk-search-icon" title="Cari">
               <SearchIcon />
-            </div>
-          </div>
+            </button>
+          </form>
 
-          {/* PERBAIKAN: Tambahkan event onClick untuk membuka panel */}
+          {/* Tombol Buka Panel Saved Items */}
           <button className="mk-saved-btn" onClick={() => setIsDrawerOpen(true)}>
-            <span>Saved Items</span>
+            <span>Saved Items ({savedCards.length})</span>
             <div className="mk-bookmark-icon-wrapper">
               <BookmarkIcon className="mk-bookmark-svg" />
             </div>
@@ -120,82 +232,175 @@ export default function Marketplace() {
         
         {/* Baris Filter */}
         <div className="mk-filter-bar">
+          
+          {/* SORT BY DROPDOWN */}
           <div className="mk-filter-item">
             <span className="mk-filter-label">Sort by</span>
             <div className="mk-dropdown">
-              <span>A - Z</span>
-              <ChevronDownIcon />
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value)}
+                className="mk-native-select"
+                title="Urutkan Kartu"
+              >
+                <option value="name_asc">A - Z</option>
+                <option value="name_desc">Z - A</option>
+                <option value="price_asc">Termurah</option>
+                <option value="price_desc">Termahal</option>
+                <option value="newest">Rilis Terbaru</option>
+              </select>
+              <div className="mk-dropdown-icon">
+                <ChevronDownIcon />
+              </div>
             </div>
           </div>
 
+          {/* RARITY DROPDOWN */}
           <div className="mk-filter-item">
             <span className="mk-filter-label">Rarity</span>
             <div className="mk-dropdown">
-              <span>Ultra Rare</span>
-              <ChevronDownIcon />
+              <select 
+                value={selectedRarity} 
+                onChange={(e) => setSelectedRarity(e.target.value)}
+                className="mk-native-select"
+                title="Filter Kelangkaan"
+              >
+                <option value="all">Semua Rarity</option>
+                <option value="Common">Common</option>
+                <option value="Uncommon">Uncommon</option>
+                <option value="Rare">Rare</option>
+                <option value="Ultra Rare">Ultra Rare</option>
+                <option value="Special Illustration Rare">Special Illustration</option>
+              </select>
+              <div className="mk-dropdown-icon">
+                <ChevronDownIcon />
+              </div>
             </div>
           </div>
 
+          {/* LANGUAGE (DIRESERVASI UNTUK PENGEMBANGAN SELANJUTNYA) */}
           <div className="mk-filter-item">
             <span className="mk-filter-label">Language</span>
             <div className="mk-flags-container">
-              <div className="mk-flag-circle"><FlagIcon lang="UK" /></div>
-              <div className="mk-flag-circle"><FlagIcon lang="ID" /></div>
-              <div className="mk-flag-circle"><FlagIcon lang="JP" /></div>
+              <div className="mk-flag-circle active-flag"><FlagBadge lang="EN" /></div>
+              <div className="mk-flag-circle"><FlagBadge lang="ID" /></div>
+              <div className="mk-flag-circle"><FlagBadge lang="JP" /></div>
             </div>
           </div>
 
+          {/* INPUT RENTANG HARGA USD */}
           <div className="mk-price-inputs">
-            <input type="text" placeholder="$ lowest" className="mk-price-input" />
-            <span className="mk-price-separator">—</span>
-            <input type="text" placeholder="$ highest" className="mk-price-input" />
+            <input 
+              type="number" 
+              step="any"
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+              placeholder="$ min" 
+              className="mk-price-input" 
+              title="Harga minimum (USD)"
+            />
+            <span className="mk-price-separator">-</span>
+            <input 
+              type="number" 
+              step="any"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+              placeholder="$ max" 
+              className="mk-price-input" 
+              title="Harga maksimum (USD)"
+            />
+            {(minPrice || maxPrice || activeSearch || selectedRarity !== 'all') && (
+              <button 
+                type="button" 
+                className="mk-reset-btn"
+                onClick={() => {
+                  setSearchInput('');
+                  setActiveSearch('');
+                  setSelectedRarity('all');
+                  setSortBy('name_asc');
+                  setMinPrice('');
+                  setMaxPrice('');
+                }}
+                title="Reset Semua Filter"
+              >
+                Reset
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Grid Kartu Produk */}
-        <div className="mk-grid">
-          {mockCards.map((card) => (
-            <div key={card.id} className="mk-card">
-              
-              {/* Pita Bookmark Pink */}
-              {card.saved && (
-                <div className="mk-bookmark-ribbon">
-                  <BookmarkIcon className="mk-bookmark-svg-white" />
-                </div>
-              )}
+        {/* STATUS LOADING ATAU KOSONG */}
+        {isLoading ? (
+          <div className="mk-loading-state">
+            <div className="mk-loading-spinner"></div>
+            <p>Memuat katalog pasar Supabase...</p>
+          </div>
+        ) : filteredCards.length === 0 ? (
+          <div className="mk-empty-state">
+            <p className="mk-empty-title">Tidak ada kartu yang cocok</p>
+            <p className="mk-empty-desc">Coba gunakan kata kunci pencarian lain atau ubah pengaturan filter.</p>
+          </div>
+        ) : (
+          /* Grid Kartu Produk Riil */
+          <div className="mk-grid">
+            {filteredCards.map((card) => {
+              const rarityMeta = getRarityMeta(card.rarityText);
+              const saved = isCardSaved(card.id);
+              const displayPrice = card.price_num && card.price_num > 0 
+                ? `$ ${card.price_num.toFixed(2)}` 
+                : (card.price || 'Unlisted');
 
-              {/* Gambar Kartu */}
-              <div className="mk-card-img-box">
-                <img src={card.imgUrl} alt={card.name} className="mk-card-img" />
-              </div>
+              return (
+                <div key={card.id} className="mk-card">
+                  
+                  {/* Pita / Tombol Bookmark Interaktif */}
+                  <button 
+                    type="button"
+                    className={`mk-bookmark-ribbon ${saved ? 'is-saved' : 'not-saved'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSaveCard(card);
+                    }}
+                    title={saved ? "Hapus dari koleksi tersimpan" : "Simpan kartu ini"}
+                  >
+                    <BookmarkIcon className="mk-bookmark-svg-white" />
+                  </button>
 
-              {/* Informasi Kartu */}
-              <div className="mk-card-content">
-                <div className="mk-card-row-1">
-                  <span className="mk-card-title">{card.name}</span>
-                  <span className="mk-card-price">$ {card.price.toFixed(2)}</span>
-                </div>
-                <div className="mk-card-row-2">
-                  <span className="mk-card-rarity">{card.rarityName}</span>
-                  <div className="mk-dotted-line"></div>
-                  <FlagIcon lang={card.language} />
-                </div>
-                <div className="mk-card-row-3">
-                  <div className="mk-symbol-group">
-                    <RarityIcon type={card.raritySymbol} />
-                    <span className="mk-card-abbr">{card.rarityAbbr}</span>
+                  {/* Gambar Kartu Riil dari Supabase */}
+                  <div className="mk-card-img-box">
+                    <img 
+                      src={card.image || '/card-result.png'} 
+                      alt={card.name} 
+                      className="mk-card-img" 
+                      loading="lazy"
+                    />
                   </div>
-                  <span className="mk-card-set">{card.setTag}</span>
+
+                  {/* Informasi Kartu */}
+                  <div className="mk-card-content">
+                    <div className="mk-card-row-1">
+                      <span className="mk-card-title" title={card.name}>{card.name}</span>
+                      <span className="mk-card-price">{displayPrice}</span>
+                    </div>
+                    <div className="mk-card-row-2">
+                      <span className="mk-card-rarity">{card.rarityText || 'Standard'}</span>
+                      <div className="mk-dotted-line"></div>
+                      <FlagBadge lang="EN" />
+                    </div>
+                    <div className="mk-card-row-3">
+                      <div className="mk-symbol-group">
+                        <RarityIcon type={rarityMeta.symbol} />
+                        <span className="mk-card-abbr">{rarityMeta.abbr}</span>
+                      </div>
+                      <span className="mk-card-set">{card.set || 'PROMO'}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-          
-          {/* Kartu Kosong (Placeholder) */}
-          <div className="mk-empty-card"></div>
-          <div className="mk-empty-card"></div>
-          <div className="mk-empty-card"></div>
-        </div>
+              );
+            })}
+          </div>
+        )}
+
       </div>
 
       {/* =========================================
@@ -218,42 +423,67 @@ export default function Marketplace() {
               <BookmarkIcon className="w-full h-full" />
             </div>
             <h2>Saved Items</h2>
-            <span className="mk-drawer-count">{savedItemsList.length}</span>
+            <span className="mk-drawer-count">{savedCards.length}</span>
           </div>
-          <button className="mk-drawer-close-btn" onClick={() => setIsDrawerOpen(false)}>
+          <button 
+            type="button" 
+            className="mk-drawer-close-btn" 
+            onClick={() => setIsDrawerOpen(false)}
+            title="Tutup Panel"
+          >
             <CloseIcon />
           </button>
         </div>
 
         {/* Daftar Kartu yang Disimpan */}
         <div className="mk-drawer-content">
-          {savedItemsList.length > 0 ? (
-            savedItemsList.map((item) => (
-              <div key={item.id} className="mk-drawer-item">
-                <div className="mk-drawer-item-img-box">
-                  <img src={item.imgUrl} alt={item.name} className="mk-drawer-item-img" />
+          {savedCards.length > 0 ? (
+            savedCards.map((item) => {
+              const displayItemPrice = item.price_num && item.price_num > 0 
+                ? `$ ${item.price_num.toFixed(2)}` 
+                : (item.price || 'Unlisted');
+
+              return (
+                <div key={item.id} className="mk-drawer-item">
+                  <div className="mk-drawer-item-img-box">
+                    <img 
+                      src={item.image || '/card-result.png'} 
+                      alt={item.name} 
+                      className="mk-drawer-item-img" 
+                    />
+                  </div>
+                  <div className="mk-drawer-item-info">
+                    <span className="mk-drawer-item-name" title={item.name}>{item.name}</span>
+                    <span className="mk-drawer-item-desc">{item.rarityText || 'Standard'} • {item.set || 'SET'}</span>
+                    <span className="mk-drawer-item-price">{displayItemPrice}</span>
+                  </div>
+                  <button 
+                    type="button"
+                    className="mk-drawer-remove-btn" 
+                    onClick={() => removeSavedCard(item.id)}
+                    title="Hapus dari tersimpan"
+                  >
+                    <TrashIcon />
+                  </button>
                 </div>
-                <div className="mk-drawer-item-info">
-                  <span className="mk-drawer-item-name">{item.name}</span>
-                  <span className="mk-drawer-item-desc">{item.rarityName} • {item.rarityAbbr}</span>
-                  <span className="mk-drawer-item-price">$ {item.price.toFixed(2)}</span>
-                </div>
-                <button className="mk-drawer-remove-btn" title="Hapus dari tersimpan">
-                  <TrashIcon />
-                </button>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="mk-drawer-empty">
               <p>Belum ada kartu yang disimpan.</p>
+              <span>Klik ikon pita bookmark pada kartu untuk menyimpannya di sini.</span>
             </div>
           )}
         </div>
 
         {/* Footer Panel */}
         <div className="mk-drawer-footer">
-          <button className="mk-drawer-action-btn">
-            Lihat Semua Koleksi
+          <button 
+            type="button" 
+            className="mk-drawer-action-btn"
+            onClick={() => setIsDrawerOpen(false)}
+          >
+            Tutup Panel
           </button>
         </div>
 
