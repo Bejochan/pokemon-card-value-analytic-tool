@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './CatalogPage.css';
 
 function CatalogPage() {
@@ -19,6 +19,33 @@ function CatalogPage() {
 
   // Set Selector
   const [isSetMenuOpen, setIsSetMenuOpen] = useState(false);
+  const setSelectorRef = useRef(null);
+
+  // Menutup dropdown menu otomatis saat pengguna mengeklik di luar area menu atau menekan tombol Escape
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (setSelectorRef.current && !setSelectorRef.current.contains(event.target)) {
+        setIsSetMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsSetMenuOpen(false);
+      }
+    };
+
+    if (isSetMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSetMenuOpen]);
+
   const [availableSets, setAvailableSets] = useState([
     { set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' }
   ]);
@@ -156,7 +183,7 @@ function CatalogPage() {
       
       {/* HEADER PENCARIAN */}
       <div className="catalog-header">
-        <div className="set-selector-container">
+        <div className="set-selector-container" ref={setSelectorRef}>
           <button 
             className="set-selector-btn" 
             onClick={() => setIsSetMenuOpen(!isSetMenuOpen)}
@@ -182,31 +209,33 @@ function CatalogPage() {
           {/* MENU SET (Dropdown) */}
           {isSetMenuOpen && (
             <div className="set-dropdown-menu">
-              {availableSets.map((setObj) => (
-                <div 
-                  key={setObj.set_id} 
-                  className={`set-dropdown-item ${activeSet.set_id === setObj.set_id ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveSet(setObj);
-                    setPage(1);
-                    setIsSetMenuOpen(false); 
-                  }}
-                  title={setObj.name}
-                >
-                  <img 
-                    src={setObj.logo} 
-                    alt="" 
-                    className="set-dropdown-icon"
-                    onError={(e) => {
-                      if (!e.target.dataset.triedFallback) {
-                        e.target.dataset.triedFallback = 'true';
-                        e.target.src = '/pokemon-logo.png';
-                      }
+              <div className="set-dropdown-list">
+                {availableSets.map((setObj) => (
+                  <div 
+                    key={setObj.set_id} 
+                    className={`set-dropdown-item ${activeSet.set_id === setObj.set_id ? 'active' : ''}`}
+                    onClick={() => {
+                      setActiveSet(setObj);
+                      setPage(1);
+                      setIsSetMenuOpen(false); 
                     }}
-                  />
-                  <span className="set-dropdown-label">{setObj.name}</span>
-                </div>
-              ))}
+                    title={setObj.name}
+                  >
+                    <img 
+                      src={setObj.logo} 
+                      alt="" 
+                      className="set-dropdown-icon"
+                      onError={(e) => {
+                        if (!e.target.dataset.triedFallback) {
+                          e.target.dataset.triedFallback = 'true';
+                          e.target.src = '/pokemon-logo.png';
+                        }
+                      }}
+                    />
+                    <span className="set-dropdown-label">{setObj.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

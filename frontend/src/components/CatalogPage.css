@@ -102,30 +102,36 @@
   top: calc(100% + 10px); /* Jarak dari tombol utama */
   left: 0;
   width: 320px;
-  max-height: 340px; /* Batas tinggi agar tidak menjulur */
   background-color: #ffffff;
   border-radius: 16px; /* Melengkung rapi */
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
-  overflow-y: auto; /* Aktifkan scroll di dalam menu ini */
-  overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.16);
+  overflow: hidden; /* Mengunci konten agar scrollbar terpotong rapi di dalam lengkungan */
   z-index: 100;
 }
 
+.set-dropdown-list {
+  max-height: 330px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Custom Scrollbar yang Halus untuk Menu Set */
-.set-dropdown-menu::-webkit-scrollbar {
+.set-dropdown-list::-webkit-scrollbar {
   width: 6px;
 }
-.set-dropdown-menu::-webkit-scrollbar-track {
+.set-dropdown-list::-webkit-scrollbar-track {
   background: #fdf2f8;
-  border-radius: 8px;
+  border-radius: 6px;
+  margin: 8px 0; /* Menjauhkan jempol scrollbar dari sudut lengkungan atas & bawah */
 }
-.set-dropdown-menu::-webkit-scrollbar-thumb {
+.set-dropdown-list::-webkit-scrollbar-thumb {
   background: #f472b6;
-  border-radius: 8px;
+  border-radius: 6px;
 }
-.set-dropdown-menu::-webkit-scrollbar-thumb:hover {
+.set-dropdown-list::-webkit-scrollbar-thumb:hover {
   background: #e83e8c;
 }
 
