@@ -40,43 +40,55 @@
 /* --- SET SELECTOR (KIRI HEADER) --- */
 .set-selector-container {
   position: absolute;
-  left: 20px;
+  left: 24px;
   z-index: 50; /* Memastikan dropdown jatuh menutupi elemen di bawahnya */
 }
 
 .set-selector-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.7); /* Putih transparan */
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.85); /* Putih transparan lembut */
   border: 2px solid #ffffff;
-  padding: 8px 20px 8px 12px; /* Padding kiri lebih kecil karena ada gambar */
+  padding: 6px 14px 6px 10px;
   border-radius: 30px;
   cursor: pointer;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   transition: all 0.2s ease;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+  max-width: 250px; /* Batasi lebar tombol agar tidak menembus search bar */
+  box-sizing: border-box;
 }
 
 .set-selector-btn:hover {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.98);
   transform: translateY(-2px); /* Efek terangkat saat disorot mouse */
 }
 
 .celebration-icon {
-  height: 30px;
+  height: 24px;
+  max-width: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
 }
 
 .celebration-text {
   font-family: 'Montserrat', sans-serif;
   font-weight: 800;
   color: #1e1b4b;
-  font-size: 14px;
+  font-size: 13.5px;
+  max-width: 145px; /* Batas lebar teks agar elipsis berfungsi saat nama set panjang */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
 }
 
 .set-arrow {
-  margin-left: 5px;
+  margin-left: 2px;
+  flex-shrink: 0;
   transition: transform 0.2s ease;
 }
 
@@ -87,10 +99,10 @@
 /* MENU DROPDOWN PILIHAN SET */
 .set-dropdown-menu {
   position: absolute;
-  top: calc(100% + 12px); /* Jarak dari tombol utama */
+  top: calc(100% + 10px); /* Jarak dari tombol utama */
   left: 0;
-  width: 270px;
-  max-height: 320px; /* Batas tinggi setara ~6-7 item agar tidak menjulur */
+  width: 320px;
+  max-height: 340px; /* Batas tinggi agar tidak menjulur */
   background-color: #ffffff;
   border-radius: 16px; /* Melengkung rapi */
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
@@ -118,14 +130,32 @@
 }
 
 .set-dropdown-item {
-  padding: 12px 18px; /* Lebih proporsional dan nyaman diklik */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px; /* Lebih proporsional dan nyaman diklik */
   font-family: 'Montserrat', sans-serif;
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 13px;
   color: #4b5563;
   cursor: pointer;
   border-bottom: 1px solid #f3f4f6;
   transition: background-color 0.15s, color 0.15s, padding-left 0.15s;
+}
+
+.set-dropdown-icon {
+  height: 20px;
+  max-width: 38px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+}
+
+.set-dropdown-label {
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .set-dropdown-item:last-child {
@@ -133,7 +163,7 @@
 }
 
 .set-dropdown-item:hover {
-  padding-left: 22px; /* Micro-animation saat kursor diarahkan */
+  padding-left: 20px; /* Micro-animation saat kursor diarahkan */
 }
 
 .set-dropdown-item:hover,
@@ -142,18 +172,16 @@
   color: #ffffff;
 }
 
-.celebration-icon {
-  height: 30px;
-}
-
 .search-bar-wrapper {
   background-color: white;
   border-radius: 30px;
   border: 3px solid #e83e8c; /* Border pink */
   display: flex;
   align-items: center;
-  width: 600px;
+  width: 100%;
+  max-width: 580px;
   padding: 5px 20px;
+  box-sizing: border-box;
 }
 
 .search-input {
@@ -603,6 +631,19 @@
 }
 
 /* Breakpoint Responsif Header Katalog */
+@media (max-width: 1180px) and (min-width: 769px) {
+  .set-selector-btn {
+    max-width: 190px;
+  }
+  .celebration-text {
+    max-width: 95px;
+  }
+  .search-bar-wrapper {
+    max-width: 460px;
+    margin-left: 140px;
+  }
+}
+
 @media (max-width: 768px) {
   .catalog-header {
     flex-direction: column !important;
@@ -613,6 +654,20 @@
 
   .set-selector-container {
     position: static !important;
+    width: 100% !important;
+  }
+
+  .set-selector-btn {
+    max-width: 100% !important;
+    justify-content: space-between;
+  }
+
+  .celebration-text {
+    max-width: none !important;
+    flex-grow: 1;
+  }
+
+  .set-dropdown-menu {
     width: 100% !important;
   }
 

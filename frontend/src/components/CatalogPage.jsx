@@ -24,6 +24,27 @@ function CatalogPage() {
   ]);
   const [activeSet, setActiveSet] = useState({ set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' });
 
+  // Helper untuk menentukan logo set (prioritas aset lokal resmi, lalu CDN resmi Pokemon TCG API)
+  const getSetLogoUrl = (s) => {
+    if (!s || s.set_id === 'all') return '/pokemon-logo.png';
+    const sId = (s.set_id || '').toLowerCase();
+    const sNameLower = (s.name || '').toLowerCase();
+
+    // 1. Cek aset lokal tersimpan
+    if (sId === 'hgss1') return '/hgss1-logo.png';
+    if (sId === 'sma') return '/sma-logo.png';
+    if (sId === 'base3') return '/base3-logo.png';
+    if (sId === 'sm75') return '/sm75-logo.png';
+    if (sNameLower.includes('30th')) return '/30th-celebration-logo.png';
+    if (sNameLower.includes('ascended')) return '/ascended-heroes-logo.png';
+
+    // 2. Set masa depan atau belum berlogo di CDN resmi -> gunakan logo Regokemon
+    if (sId === 'me3' || sId === 'me4' || sId === 'me5') return '/pokemon-logo.png';
+
+    // 3. Default ke CDN resmi Pokemon TCG API
+    return `https://images.pokemontcg.io/${s.set_id}/logo.png`;
+  };
+
   // 1. Ambil daftar Sets secara dinamis dari backend (kronologis rilis terbaru ke lama)
   useEffect(() => {
     const fetchSets = async () => {
@@ -35,20 +56,13 @@ function CatalogPage() {
             const formatted = [
               { set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' },
               ...sets.map(s => {
-                let logoPath = '/pokemon-logo.png'; // Default logo Regokemon
-                const sNameLower = (s.name || '').toLowerCase();
-                if (sNameLower.includes('30th')) {
-                  logoPath = '/30th-celebration-logo.png';
-                } else if (sNameLower.includes('ascended')) {
-                  logoPath = '/ascended-heroes-logo.png';
-                }
                 const yearStr = s.release_year ? ` (${s.release_year})` : '';
                 return {
                   set_id: s.set_id,
                   name: `${s.name}${yearStr}`,
                   raw_name: s.name,
                   release_date: s.release_date,
-                  logo: logoPath
+                  logo: getSetLogoUrl(s)
                 };
               })
             ];
@@ -143,8 +157,22 @@ function CatalogPage() {
       {/* HEADER PENCARIAN */}
       <div className="catalog-header">
         <div className="set-selector-container">
-          <button className="set-selector-btn" onClick={() => setIsSetMenuOpen(!isSetMenuOpen)}>
-            <img src={activeSet.logo} alt={`${activeSet.name} Icon`} className="celebration-icon" /> 
+          <button 
+            className="set-selector-btn" 
+            onClick={() => setIsSetMenuOpen(!isSetMenuOpen)}
+            title={activeSet.name}
+          >
+            <img 
+              src={activeSet.logo} 
+              alt={activeSet.name} 
+              className="celebration-icon" 
+              onError={(e) => {
+                if (!e.target.dataset.triedFallback) {
+                  e.target.dataset.triedFallback = 'true';
+                  e.target.src = '/pokemon-logo.png';
+                }
+              }}
+            /> 
             <span className="celebration-text">{activeSet.name}</span>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1e1b4b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`set-arrow ${isSetMenuOpen ? 'open' : ''}`}>
               <polyline points="6 9 12 15 18 9"></polyline>
@@ -163,8 +191,20 @@ function CatalogPage() {
                     setPage(1);
                     setIsSetMenuOpen(false); 
                   }}
+                  title={setObj.name}
                 >
-                  {setObj.name}
+                  <img 
+                    src={setObj.logo} 
+                    alt="" 
+                    className="set-dropdown-icon"
+                    onError={(e) => {
+                      if (!e.target.dataset.triedFallback) {
+                        e.target.dataset.triedFallback = 'true';
+                        e.target.src = '/pokemon-logo.png';
+                      }
+                    }}
+                  />
+                  <span className="set-dropdown-label">{setObj.name}</span>
                 </div>
               ))}
             </div>
