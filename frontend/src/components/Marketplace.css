@@ -6,14 +6,10 @@
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 70px);
-  /* PERBAIKAN: Gunakan properti individual untuk kejelasan */
   background-image: url('/bg-basic.png'); 
   background-repeat: repeat; 
   background-position: center -30px;
-  /* PENTING: Gunakan 'auto' agar pola tidak ditarik membesar, 
-     atau spesifikasikan ukurannya (misal: 100px 100px) */
   background-size: auto; 
-  /* Bonus: Efek parallax seperti di ScannerDashboard */
   background-attachment: fixed;
 }
 
@@ -23,31 +19,26 @@
   display: flex;
   justify-content: center;
   box-sizing: border-box;
-  /* Kosongkan background di sini karena sudah diurus oleh .mk-wrapper */
   background: transparent; 
 }
 
 /* =========================================
-   2. PENCARIAN & TOMBOL SAVED
+   2. PENCARIAN & TOMBOL AKSI PASAR (ATAS)
    ========================================= */
 .mk-search-container {
-  position: relative; 
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
+  gap: 20px;
   width: 100%;
-  /* PERBAIKAN: Hapus max-width: 1100px.
-     Ganti dengan padding-kiri-kanan 40px (atau 50px) agar sama dengan kotak biru di bawahnya */
   padding: 0 50px; 
   box-sizing: border-box;
 }
 
 .mk-search-box {
   position: relative;
-  width: 100%;
-  /* PERBAIKAN: Sesuai gambar Catalog, buat bar pencarian tidak terlalu panjang.
-     Ubah max-width dari 700px menjadi sekitar 500px atau 600px */
-  max-width: 650px; 
+  flex: 1;
+  max-width: 540px; 
 }
 
 .mk-search-input {
@@ -58,15 +49,16 @@
   padding: 0 50px 0 25px;
   font-size: 14px;
   font-family: 'Montserrat', sans-serif;
-  font-weight: 400;
+  font-weight: 500;
   color: #333;
+  background-color: #ffffff;
   outline: none;
   box-sizing: border-box;
   transition: border-color 0.2s;
 }
 
 .mk-search-input:focus {
-  border-color: #555c8f;
+  border-color: #e83e8c;
 }
 
 .mk-search-icon {
@@ -81,30 +73,83 @@
   background: none;
   border: none;
   padding: 6px;
-  stroke: #555c8f; 
-  stroke-width: 2.5px;
+}
+
+.mk-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.mk-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  background-color: #ffffff;
+  color: #555c8f;
+  border: 2px solid #555c8f;
+  border-radius: 40px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.08);
+  transition: transform 0.2s, background-color 0.2s, color 0.2s;
+}
+
+.mk-user-btn:hover {
+  transform: translateY(-2px);
+  background-color: #f8fafc;
+}
+
+.mk-user-btn.logged-in {
+  background-color: #1e293b;
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+.mk-sell-listing-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  background-color: #555c8f;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  border-radius: 40px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.mk-sell-listing-btn:hover {
+  transform: translateY(-2px);
+  background-color: #444a75;
 }
 
 .mk-saved-btn {
-  /* PERBAIKAN: Kunci posisi absolut di ujung KANAN DALAM dari kontainer ber-padding */
-  position: absolute;
-  right: 50px; /* Samakan dengan padding-right .mk-search-container */
-  
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   height: 40px;
-  padding: 0 25px;
-  background-color: white;
+  padding: 0 18px;
+  background-color: #ffffff;
   border: 2px solid transparent;
   border-radius: 40px;
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
   color: #e83e8c;
-  font-size: 15px;
+  font-size: 13px;
   cursor: pointer;
   box-shadow: 0 6px 15px rgba(0,0,0,0.1);
-  transition: all 0.2s;
+  transition: transform 0.2s, border-color 0.2s;
 }
 
 .mk-saved-btn:hover { 
@@ -113,19 +158,47 @@
 }
 
 .mk-bookmark-icon-wrapper {
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
   color: #e83e8c;
 }
 
-/* Responsif: Di layar kecil, tombol saved akan turun ke bawah bar pencarian */
-@media (max-width: 900px) {
+.mk-cart-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  background-color: #e83e8c;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  border-radius: 40px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.mk-cart-btn:hover {
+  transform: translateY(-2px);
+  background-color: #d83680;
+}
+
+@media (max-width: 1080px) {
   .mk-search-container {
     flex-direction: column;
-    gap: 20px;
+    align-items: stretch;
+    padding: 0 24px;
+    gap: 14px;
   }
-  .mk-saved-btn {
-    position: static; /* Kembalikan ke posisi normal di layar HP */
+  .mk-search-box {
+    max-width: 100%;
+  }
+  .mk-header-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 }
 
@@ -134,12 +207,9 @@
    ========================================= */
 .mk-main-board {
   flex-grow: 1;
-  
-  /* PERBAIKAN: Paksa kotak biru mengambil 100% lebar tanpa sisa margin putih */
   width: 100%;
   margin: 0;
   box-sizing: border-box;
-  
   background-color: #555c8f;
   border-radius: 30px 30px 0 0;
   padding: 30px 50px 60px 50px;
@@ -154,8 +224,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 30px;
-  margin-bottom: 30px;
+  gap: 28px;
+  margin-bottom: 26px;
   margin-top: -10px;
 }
 
@@ -241,30 +311,36 @@
 
 .mk-flag-circle {
   background-color: white;
+  border: none;
+  padding: 0;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, background-color 0.2s;
 }
 
 .mk-flag-circle:hover {
   box-shadow: 0 0 0 2px #e83e8c;
 }
 
-.mk-flag-emoji {
-  font-size: 12px;
-  line-height: 1;
+.mk-flag-circle.active-flag {
+  background-color: #e83e8c;
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
+.mk-flag-circle.active-flag .mk-flag-label {
+  color: #ffffff;
 }
 
 .mk-price-inputs {
-  margin-left: auto; /* Mendorong input harga mentok ke sisi paling kanan */
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
 }
 
 .mk-price-input {
@@ -286,12 +362,38 @@
   color: rgba(255,255,255,0.6);
 }
 
+.mk-wishlist-filter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 10px 18px;
+  border-radius: 10px;
+  margin-bottom: 22px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mk-wishlist-filter-banner button {
+  background-color: #ffffff;
+  color: #555c8f;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 /* =========================================
    5. GRID KARTU PRODUK
    ========================================= */
 .mk-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
   gap: 20px;
 }
 
@@ -356,8 +458,8 @@
   letter-spacing: 0.5px;
 }
 
-/* STATUS LOADING & KOSONG */
-.mk-loading-state, .mk-empty-state {
+/* STATUS KOSONG */
+.mk-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -369,16 +471,6 @@
   width: 100%;
 }
 
-.mk-loading-spinner {
-  width: 44px;
-  height: 44px;
-  border: 4px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #ffffff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 16px;
-}
-
 .mk-empty-title {
   font-size: 18px;
   font-weight: 800;
@@ -387,14 +479,19 @@
 
 .mk-empty-desc {
   font-size: 13px;
-  opacity: 0.8;
-  max-width: 360px;
+  opacity: 0.85;
+  max-width: 400px;
+}
+
+.mk-empty-reset {
+  margin-top: 16px;
+  margin-left: 0;
 }
 
 /* GAMBAR KARTU */
 .mk-card-img-box {
   width: 100%;
-  aspect-ratio: 63 / 88; /* Rasio kartu Pokemon asli */
+  aspect-ratio: 63 / 88;
   background-color: #f1f5f9;
   border-radius: 8px;
   overflow: hidden;
@@ -409,12 +506,7 @@
   width: 100%; 
   height: 100%; 
   object-fit: cover; 
-  transition: transform 0.3s ease;
 }
-
-/* .mk-card:hover .mk-card-img {
-  transform: scale(1.05);
-} */
 
 /* ISI BAWAH KARTU */
 .mk-card-content { 
@@ -424,7 +516,6 @@
   padding: 0 4px; 
 }
 
-/* Baris 1: Judul dan Harga */
 .mk-card-row-1 {
   display: flex;
   justify-content: space-between;
@@ -449,7 +540,6 @@
   white-space: nowrap;
 }
 
-/* Baris 2: Nama Rarity dan Garis Putus */
 .mk-card-row-2 { 
   display: flex; 
   align-items: center; 
@@ -460,7 +550,7 @@
   font-size: 10px;
   font-weight: 600;
   color: #64748b;
-  max-width: 60%;
+  max-width: 72%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -474,11 +564,10 @@
   top: -2px;
 }
 
-/* Baris 3: Ikon Kelangkaan dan Logo Set */
 .mk-card-row-3 {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   margin-top: auto;
 }
 
@@ -496,6 +585,15 @@
   border-radius: 50%; 
 }
 
+.mk-symbol-diamond {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background-color: #000;
+  transform: rotate(45deg);
+  margin: 0 2px;
+}
+
 .mk-symbol-star { margin-right: 2px; }
 .mk-symbol-double { display: inline-flex; align-items: center; }
 
@@ -511,23 +609,52 @@
   color: #fff;
   font-size: 9px;
   font-weight: 800;
-  padding: 3px 6px;
+  padding: 2px 5px;
   border-radius: 4px;
+  margin-left: 2px;
 }
 
-/* KARTU KOSONG (PLACEHOLDER) */
-.mk-empty-card {
-  background-color: rgba(255,255,255,0.7);
-  border-radius: 12px;
-  min-height: 320px;
+.mk-card-cart-btn {
+  background-color: #f1f5f9;
+  color: #555c8f;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.mk-card-cart-btn:hover {
+  background-color: #e83e8c;
+  color: #ffffff;
+  border-color: #e83e8c;
+}
+
+.mk-card-cart-btn.in-cart {
+  background-color: #555c8f;
+  color: #ffffff;
+  border-color: #555c8f;
+}
+
+.mk-own-badge {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: 1px solid #cbd5e1;
 }
 
 /* =========================================
    6. RESPONSIVE MEDIA QUERIES
    ========================================= */
 @media (max-width: 768px) {
-  .mk-search-section { padding: 20px; }
-  .mk-main-board { padding: 30px 20px; border-radius: 30px 30px 0 0; }
+  .mk-search-section { padding: 16px 0; }
+  .mk-main-board { padding: 26px 18px 40px 18px; border-radius: 26px 26px 0 0; }
   .mk-filter-bar { flex-direction: column; align-items: flex-start; gap: 15px; }
   .mk-price-inputs { margin-left: 0; width: 100%; justify-content: space-between; }
   .mk-price-input { flex-grow: 1; }
@@ -535,17 +662,15 @@
 }
 
 /* =========================================
-   7. UI SIDE DRAWER (SAVED ITEMS PANEL)
+   7. UI SIDE DRAWER (SAVED ITEMS & CART)
    ========================================= */
-
-/* Latar Gelap (Overlay) */
 .mk-drawer-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(30, 27, 75, 0.4); /* Biru sangat gelap yang transparan */
+  background-color: rgba(30, 27, 75, 0.45);
   backdrop-filter: blur(2px);
   z-index: 1000;
   opacity: 0;
@@ -558,33 +683,31 @@
   visibility: visible;
 }
 
-/* Kotak Utama Drawer */
 .mk-saved-drawer {
   position: fixed;
   top: 0;
   right: 0;
   width: 100%;
-  max-width: 400px; /* Lebar maksimal panel */
+  max-width: 410px;
   height: 100vh;
   background-color: #ffffff;
   z-index: 1001;
   box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
-  transform: translateX(100%); /* Sembunyikan panel di luar layar sebelah kanan */
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .mk-saved-drawer.open {
-  transform: translateX(0); /* Geser masuk ke dalam layar */
+  transform: translateX(0);
 }
 
-/* Bagian Header Drawer */
 .mk-drawer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px;
+  padding: 22px 24px;
   background-color: #555c8f;
   color: #ffffff;
 }
@@ -596,26 +719,24 @@
 }
 
 .mk-drawer-icon {
-  width: 24px;
-  height: 24px;
-  color: #e83e8c; /* Kuning khas Regokemon */
+  width: 22px;
+  height: 22px;
+  color: #ffffff;
 }
 
 .mk-drawer-header h2 {
   font-family: 'Montserrat', sans-serif;
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
   margin: 0;
-  letter-spacing: 0.5px;
 }
 
 .mk-drawer-count {
   background-color: #e83e8c;
   color: white;
-  font-family: 'Montserrat', sans-serif;
   font-size: 12px;
   font-weight: 800;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 12px;
 }
 
@@ -637,18 +758,16 @@
   transform: rotate(90deg);
 }
 
-/* Bagian Daftar Konten */
 .mk-drawer-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 18px;
   background-color: #f8fafc;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
-/* Aturan untuk menyembunyikan scrollbar di dalam drawer */
 .mk-drawer-content::-webkit-scrollbar {
   width: 6px;
 }
@@ -660,12 +779,13 @@
 .mk-drawer-item {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   background-color: #ffffff;
   padding: 12px;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+  cursor: pointer;
   transition: transform 0.2s, border-color 0.2s;
 }
 
@@ -693,85 +813,1167 @@
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  min-width: 0; /* Mencegah overflow horizontal */
+  min-width: 0;
 }
 
 .mk-drawer-item-name {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #1e293b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .mk-drawer-item-desc {
-  font-family: 'Montserrat', sans-serif;
   font-size: 11px;
   font-weight: 600;
   color: #64748b;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
+}
+
+.mk-drawer-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .mk-drawer-item-price {
-  font-family: 'Montserrat', sans-serif;
   font-size: 14px;
   font-weight: 800;
-  color: #00d26a; /* Hijau terang */
+  color: #00d26a;
+}
+
+.mk-drawer-item-idr {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.mk-drawer-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mk-drawer-move-cart-btn {
+  background-color: #f1f5f9;
+  color: #555c8f;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mk-drawer-move-cart-btn:hover {
+  background-color: #555c8f;
+  color: #ffffff;
 }
 
 .mk-drawer-remove-btn {
   background: none;
   border: none;
-  color: #cbd5e1;
+  color: #94a3b8;
   cursor: pointer;
-  padding: 8px;
+  padding: 6px;
   border-radius: 8px;
   transition: color 0.2s, background-color 0.2s;
 }
 
 .mk-drawer-remove-btn:hover {
-  color: #ef4444; /* Merah untuk tanda hapus */
+  color: #ef4444;
   background-color: #fee2e2;
 }
 
-/* Jika kosong */
 .mk-drawer-empty {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
   color: #94a3b8;
-  font-family: 'Montserrat', sans-serif;
   font-size: 14px;
   font-weight: 600;
   text-align: center;
+  padding: 0 20px;
 }
 
-/* Bagian Footer Panel */
+.mk-drawer-empty span {
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
 .mk-drawer-footer {
-  padding: 24px;
+  padding: 20px 24px;
   background-color: #ffffff;
   border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mk-drawer-summary-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.mk-drawer-summary-Right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.mk-drawer-summary-Right strong {
+  font-size: 15px;
+  color: #00d26a;
+}
+
+.mk-drawer-summary-Right span {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.mk-drawer-footer-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .mk-drawer-action-btn {
   width: 100%;
-  padding: 16px;
-  background-color: #e83e8c; /* Pink utama */
+  padding: 14px;
+  background-color: #e83e8c;
   color: #ffffff;
   border: none;
   border-radius: 12px;
   font-family: 'Montserrat', sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   transition: background-color 0.2s, transform 0.2s;
 }
 
-.mk-drawer-action-btn:hover {
+.mk-drawer-action-btn:hover:not(:disabled) {
   background-color: #d83680;
   transform: translateY(-2px);
+}
+
+.mk-drawer-action-btn:disabled {
+  background-color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.mk-drawer-secondary-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: transparent;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mk-drawer-secondary-btn:hover {
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+
+/* Opsi Pengiriman, Ringkasan Tagihan & Struk Pesanan pada Shopping Cart */
+.mk-cart-shipping-box {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mk-cart-breakdown {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mk-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.mk-breakdown-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px dashed #cbd5e1;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.mk-checkout-receipt {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mk-receipt-badge {
+  align-self: flex-start;
+  background-color: #dcfce7;
+  color: #166534;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.mk-checkout-receipt h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.mk-checkout-receipt p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.mk-receipt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mk-receipt-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #334155;
+}
+
+.mk-receipt-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.mk-receipt-total div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.mk-receipt-total strong {
+  color: #00d26a;
+  font-size: 16px;
+}
+
+.mk-receipt-total span {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* =========================================
+   8. MODAL DETAIL LISTING & IDENTITAS PENJUAL
+   ========================================= */
+.mk-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(30, 27, 75, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.mk-modal-card {
+  width: 100%;
+  max-width: 740px;
+  max-height: 92vh;
+  background-color: #ffffff;
+  border-radius: 16px;
+  overflow-y: auto;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+
+.mk-sell-modal-card {
+  max-width: 820px;
+}
+
+.mk-auth-modal-card {
+  max-width: 540px;
+}
+
+.mk-account-modal-card {
+  max-width: 660px;
+}
+
+.mk-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  background-color: #555c8f;
+  color: #ffffff;
+}
+
+.mk-modal-subtitle {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.85;
+  margin-bottom: 3px;
+}
+
+.mk-modal-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.mk-modal-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+  padding: 24px;
+  background-color: #f8fafc;
+}
+
+.mk-modal-photo-box {
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  background-color: #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+}
+
+.mk-modal-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mk-modal-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mk-modal-price-block {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  background-color: #ffffff;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.mk-modal-ref-block {
+  border-left: 1px solid #e2e8f0;
+  padding-left: 16px;
+}
+
+.mk-modal-price-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.mk-modal-price-usd {
+  font-size: 20px;
+  font-weight: 800;
+  color: #00d26a;
+}
+
+.mk-modal-ref-usd {
+  font-size: 20px;
+  font-weight: 800;
+  color: #475086;
+}
+
+.mk-modal-price-idr {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.mk-modal-spec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  background-color: #ffffff;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.mk-spec-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mk-spec-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.mk-spec-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* Kotak Identitas Penjual Lengkap */
+.mk-seller-identity-box {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mk-seller-id-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.mk-seller-store-title {
+  margin: 2px 0 3px 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.mk-seller-owner-sub {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.mk-seller-joined-tag {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.mk-seller-contact-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.mk-seller-phone-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mk-seller-phone-info strong {
+  font-size: 13px;
+  color: #1e293b;
+  letter-spacing: 0.3px;
+}
+
+.mk-seller-contact-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mk-btn-outline-sm {
+  padding: 7px 11px;
+  background-color: #f8fafc;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mk-btn-outline-sm:hover {
+  background-color: #e2e8f0;
+}
+
+.mk-btn-wa-sm {
+  padding: 7px 12px;
+  background-color: #1e293b;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background-color 0.2s;
+}
+
+.mk-btn-wa-sm:hover {
+  background-color: #334155;
+}
+
+.mk-modal-note-box {
+  background-color: #ffffff;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.mk-modal-note-box p {
+  margin: 6px 0 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #334155;
+  font-weight: 500;
+}
+
+.mk-modal-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.mk-own-listing-notice {
+  flex: 1;
+  background-color: #f1f5f9;
+  color: #334155;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mk-btn-danger {
+  padding: 12px 16px;
+  background-color: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mk-modal-cart-cta {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background-color: #e83e8c;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.mk-modal-cart-cta:hover {
+  background-color: #d83680;
+}
+
+.mk-modal-cart-cta.in-cart {
+  background-color: #555c8f;
+}
+
+.mk-modal-save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background-color: #ffffff;
+  color: #555c8f;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mk-modal-save-btn.saved {
+  background-color: #fce7f3;
+  color: #be185d;
+  border-color: #f9a8d4;
+}
+
+.mk-modal-btn-icon {
+  width: 17px;
+  height: 17px;
+}
+
+/* =========================================
+   9. FORM PASANG LISTING ("JUAL KARTU")
+   ========================================= */
+.mk-sell-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+  padding: 24px;
+  background-color: #f8fafc;
+}
+
+.mk-sell-photo-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mk-upload-dropzone {
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  background-color: #ffffff;
+  border: 2px dashed #94a3b8;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.mk-upload-dropzone:hover {
+  border-color: #555c8f;
+  background-color: #f1f5f9;
+}
+
+.mk-upload-dropzone.has-photo {
+  border-style: solid;
+  border-color: #cbd5e1;
+}
+
+.mk-upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 16px;
+  gap: 8px;
+}
+
+.mk-upload-placeholder strong {
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.mk-upload-placeholder span {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.mk-upload-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mk-change-photo-btn {
+  width: 100%;
+  padding: 8px;
+  background-color: #ffffff;
+  color: #555c8f;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mk-sell-fields-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mk-active-seller-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.mk-active-seller-banner div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mk-active-seller-banner strong {
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.mk-active-seller-banner span {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.mk-link-btn {
+  background: none;
+  border: none;
+  color: #e83e8c;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.mk-sell-error {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mk-field-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mk-field-row-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.mk-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.mk-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.mk-text-input {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  outline: none;
+}
+
+.mk-text-input:focus {
+  border-color: #555c8f;
+}
+
+.mk-textarea {
+  resize: vertical;
+}
+
+.mk-condition-segmented {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.mk-cond-seg-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 6px;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.mk-cond-seg-btn strong {
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.mk-cond-seg-btn span {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.mk-cond-seg-btn.active {
+  background-color: #555c8f;
+  border-color: #555c8f;
+}
+
+.mk-cond-seg-btn.active strong,
+.mk-cond-seg-btn.active span {
+  color: #ffffff;
+}
+
+.mk-cond-helper {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.mk-idr-preview-box {
+  height: 35px;
+  padding: 0 12px;
+  background-color: #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.mk-sell-footer-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.mk-btn-secondary {
+  padding: 11px 18px;
+  background-color: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mk-btn-primary {
+  padding: 11px 22px;
+  background-color: #e83e8c;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mk-btn-primary:hover {
+  background-color: #d83680;
+}
+
+.mk-full-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* =========================================
+   10. MODAL LOGIN, REGISTER & PANEL AKUN
+   ========================================= */
+.mk-auth-tabs {
+  display: flex;
+  background-color: #f1f5f9;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.mk-auth-tab-btn {
+  flex: 1;
+  padding: 13px 16px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+}
+
+.mk-auth-tab-btn.active {
+  color: #555c8f;
+  border-bottom-color: #e83e8c;
+  background-color: #ffffff;
+}
+
+.mk-auth-body {
+  padding: 22px 24px;
+  background-color: #f8fafc;
+}
+
+.mk-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mk-demo-login-box {
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px dashed #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mk-demo-login-box span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.mk-btn-demo-login {
+  width: 100%;
+  padding: 11px 14px;
+  background-color: #ffffff;
+  color: #555c8f;
+  border: 1.5px solid #555c8f;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.mk-btn-demo-login:hover {
+  background-color: #555c8f;
+  color: #ffffff;
+}
+
+.mk-profile-success {
+  background-color: #dcfce7;
+  color: #166534;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mk-account-footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.mk-btn-danger-outline {
+  padding: 10px 14px;
+  background-color: #ffffff;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mk-btn-danger-outline:hover {
+  background-color: #fee2e2;
+}
+
+.mk-account-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mk-account-empty {
+  text-align: center;
+  padding: 30px 16px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.mk-account-item-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background-color: #ffffff;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.mk-account-item-thumb {
+  width: 48px;
+  height: 66px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.mk-account-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mk-account-item-info strong {
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.mk-account-item-info span {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.mk-account-item-price {
+  color: #00d26a !important;
+  font-weight: 800 !important;
+}
+
+.mk-order-history-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mk-order-card-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.mk-order-card-head span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.mk-order-card-sub {
+  font-size: 11px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.mk-order-card-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.mk-order-card-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.mk-order-card-foot strong {
+  color: #00d26a;
+}
+
+@media (max-width: 720px) {
+  .mk-modal-body,
+  .mk-sell-body {
+    grid-template-columns: 1fr;
+  }
+  .mk-modal-photo-box,
+  .mk-upload-dropzone {
+    max-width: 200px;
+    margin: 0 auto;
+  }
+  .mk-field-row-2,
+  .mk-field-row-3,
+  .mk-condition-segmented {
+    grid-template-columns: 1fr 1fr;
+  }
 }
