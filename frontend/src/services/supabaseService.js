@@ -6,14 +6,7 @@
 // ==============================================================================
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://rrvjtuylgiljaqvkavyk.supabase.co';
-
-// Kredensial Supabase (dibaca dari env variable VITE_SUPABASE_KEY atau runtime fallback)
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || [
-  'sb',
-  'secret',
-  '34DPldX0lU2UxEs9jf325g',
-  'dw3kroWS'
-].join('_');
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || '';
 
 const DEFAULT_USD_TO_IDR = 16000;
 
