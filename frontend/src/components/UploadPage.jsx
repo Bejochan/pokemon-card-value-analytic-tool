@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../config/api';
 import './UploadPage.css';
 
 // Helper: Penentuan Kategori Valuasi Pasar (Sama persis dengan script lokal Python)
@@ -229,7 +230,7 @@ function UploadPage({ onUploadComplete }) {
     if (!frontImage) return;
     setIsUploading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/analyze', {
+      const response = await fetch(`${API_BASE_URL}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -386,7 +387,7 @@ function UploadPage({ onUploadComplete }) {
       const t0 = performance.now();
 
       try {
-        const res = await fetch('http://127.0.0.1:8000/identify', {
+        const res = await fetch(`${API_BASE_URL}/identify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64Image })

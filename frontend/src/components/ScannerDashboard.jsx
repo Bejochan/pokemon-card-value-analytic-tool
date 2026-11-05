@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/api';
 import './ScannerDashboard.css';
 
 function ScannerDashboard({ scanResult, onScanOther }) {
@@ -16,7 +17,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
     // 1. Ambil riwayat harga masa lalu
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/cards/${scanResult.card_id}/history`);
+        const res = await fetch(`${API_BASE_URL}/cards/${scanResult.card_id}/history`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
@@ -31,7 +32,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
     // 2. Ambil data peramalan 7 hari dari endpoint Forecast Model
     const fetchForecast = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/cards/${scanResult.card_id}/forecast`);
+        const res = await fetch(`${API_BASE_URL}/cards/${scanResult.card_id}/forecast`);
         if (res.ok) {
           const data = await res.json();
           if (data && data.status === 'success') {

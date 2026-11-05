@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/api';
 import './DashboardPage.css';
 
 // 2. Buat komponen AnimatedCounter untuk menangani animasi angka
@@ -96,7 +97,7 @@ function DashboardPage() {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch('http://127.0.0.1:8000/dashboard');
+        const response = await fetch(`${API_BASE_URL}/dashboard`);
         if (response.ok) {
           const data = await response.json();
           setTrendingCards(data.trending || []);

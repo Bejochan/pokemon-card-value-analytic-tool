@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config/api';
 import './CatalogPage.css';
 
 function CatalogPage() {
@@ -76,7 +77,7 @@ function CatalogPage() {
   useEffect(() => {
     const fetchSets = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/sets?limit=150');
+        const response = await fetch(`${API_BASE_URL}/sets?limit=150`);
         if (response.ok) {
           const sets = await response.json();
           if (Array.isArray(sets) && sets.length > 0) {
@@ -119,7 +120,7 @@ function CatalogPage() {
       if (activeSet.set_id !== 'all') params.append('set_id', activeSet.set_id);
       if (sortBy) params.append('sort_by', sortBy);
 
-      const response = await fetch(`http://127.0.0.1:8000/cards?${params.toString()}`);
+      const response = await fetch(`${API_BASE_URL}/cards?${params.toString()}`);
       if (!response.ok) {
         throw new Error('Gagal mengambil data dari server');
       }

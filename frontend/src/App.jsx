@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import UploadPage from './components/UploadPage';
@@ -7,28 +7,48 @@ import CatalogPage from './components/CatalogPage';
 import DashboardPage from './components/DashboardPage';
 import Marketplace from './components/Marketplace';
 
+const VALID_PAGES = ['home', 'upload', 'result', 'catalog', 'dashboard', 'marketplace'];
+
 function App() {
-  const [currentPage, setCurrentPage] = useState('home');
+  const [currentPage, setCurrentPage] = useState(() => {
+    const hash = window.location.hash.replace('#', '').toLowerCase();
+    return VALID_PAGES.includes(hash) ? hash : 'home';
+  });
   const [scanResult, setScanResult] = useState(null);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '').toLowerCase();
+      if (VALID_PAGES.includes(hash)) {
+        setCurrentPage(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const handleNavigate = (page) => {
+    setCurrentPage(page);
+    window.location.hash = page;
+  };
 
   return (
     <div>
-      {/* --- PERBAIKAN 1 --- */}
-      {/* Tambahkan prop onNavigate ke Navbar utama agar tombolnya berfungsi */}
-      <Navbar onNavigate={setCurrentPage} />
+      {/* Navbar utama dengan sinkronisasi URL hash */}
+      <Navbar onNavigate={handleNavigate} />
       
       {/* Trik React: Atribut 'key' memaksa animasi CSS diputar ulang tiap state berubah */}
       <div key={currentPage} className={currentPage === 'result' ? '' : 'page-transition'}>
         
         {currentPage === 'home' && (
-          <HeroSection onNavigate={() => setCurrentPage('upload')} />
+          <HeroSection onNavigate={() => handleNavigate('upload')} />
         )}
 
         {currentPage === 'upload' && (
           <UploadPage 
             onUploadComplete={(resultData) => {
               setScanResult(resultData);
-              setCurrentPage('result');
+              handleNavigate('result');
             }} 
           />
         )}
@@ -36,12 +56,10 @@ function App() {
         {currentPage === 'result' && (
           <ScannerDashboard 
             scanResult={scanResult} 
-            onScanOther={() => setCurrentPage('upload')}
+            onScanOther={() => handleNavigate('upload')}
           />
         )}
 
-        {/* --- PERBAIKAN 2 --- */}
-        {/* Render CatalogPage saat state currentPage adalah 'catalog' */}
         {currentPage === 'catalog' && (
           <CatalogPage />
         )}
@@ -50,7 +68,6 @@ function App() {
           <DashboardPage />
         )}
 
-        {/* PENAMBAHAN: Render Marketplace saat state currentPage adalah 'marketplace' */}
         {currentPage === 'marketplace' && (
           <Marketplace />
         )}
