@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config/api';
+import { fetchSetsFromSupabase, fetchCardsFromSupabase } from '../services/supabaseService';
 import './CatalogPage.css';
 
 function CatalogPage() {
@@ -74,8 +75,10 @@ function CatalogPage() {
   };
 
   // 1. Ambil daftar Sets secara dinamis dari backend (kronologis rilis terbaru ke lama)
+  // 1. Ambil daftar Sets secara dinamis dari backend (fallback langsung ke Supabase Cloud jika offline)
   useEffect(() => {
     const fetchSets = async () => {
+      let rawSets = [];
       try {
         const response = await fetch(`${API_BASE_URL}/sets?limit=150`);
         if (response.ok) {
@@ -96,17 +99,41 @@ function CatalogPage() {
             ];
             setAvailableSets(formatted);
           }
+          rawSets = await response.json();
+        } else {
+          throw new Error('Backend sets offline');
         }
       } catch (err) {
         console.error("Gagal memuat daftar sets:", err);
+        console.warn("[Catalog] Backend lokal tidak aktif, mengambil daftar Sets langsung dari Supabase Cloud:", err.message);
+        rawSets = await fetchSetsFromSupabase(150);
+      }
+
+      if (Array.isArray(rawSets) && rawSets.length > 0) {
+        const formatted = [
+          { set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' },
+          ...rawSets.map(s => {
+            const yearStr = s.release_year ? ` (${s.release_year})` : '';
+            return {
+              set_id: s.set_id,
+              name: `${s.name}${yearStr}`,
+              raw_name: s.name,
+              release_date: s.release_date,
+              logo: getSetLogoUrl(s)
+            };
+          })
+        ];
+        setAvailableSets(formatted);
       }
     };
     fetchSets();
   }, []);
 
-  // 2. Fungsi Mengambil Data Kartu
+  // 2. Fungsi Mengambil Data Kartu (dengan Direct Supabase Fallback)
   const fetchCards = async (targetPage = 1) => {
     setIsLoading(true);
+    let cardsResult = null;
+
     try {
       const params = new URLSearchParams({
         page: targetPage.toString(),
@@ -122,335 +149,350 @@ function CatalogPage() {
 
       const response = await fetch(`${API_BASE_URL}/cards?${params.toString()}`);
       if (!response.ok) {
-        throw new Error('Gagal mengambil data dari server');
+        throw new Error('Backend cards offline');
       }
-      const data = await response.json();
-      
-      if (data && data.cards) {
-        setCardsData(data.cards);
-        setTotalCards(data.total || 0);
-        setTotalPages(data.total_pages || 1);
-        setPage(data.page || 1);
-        if (data.currency_rate) setCurrencyRate(data.currency_rate);
-      } else if (Array.isArray(data)) {
-        setCardsData(data);
-        setTotalCards(data.length);
-        setTotalPages(1);
-      }
+      cardsResult = await response.json();
     } catch (error) {
-      console.error("Error fetching cards:", error);
-      setCardsData([]);
-    } finally {
-      setIsLoading(false);
+      console.warn("[Catalog] Backend lokal tidak aktif, mengambil data 20.617 kartu langsung dari Supabase Cloud:", error.message);
+      try {
+        cardsResult = await fetchCardsFromSupabase({
+          page: targetPage,
+          limit: 20,
+          search: activeSearch,
+          supertype: selectedSupertype,
+          rarity: selectedRarity,
+          holo: selectedHolo,
+          set_id: activeSet.set_id,
+          sortBy
+        });
+      } catch (sbError) {
+        console.error("Gagal mengambil data dari Supabase:", sbError);
+      }
     }
+
+    if (cardsResult && cardsResult.cards) {
+      setCardsData(cardsResult.cards);
+      setTotalCards(cardsResult.total || 0);
+      setTotalPages(cardsResult.total_pages || 1);
+      setPage(cardsResult.page || 1);
+      if (cardsResult.currency_rate) setCurrencyRate(cardsResult.currency_rate);
+    } else if (Array.isArray(cardsResult)) {
+      setCardsData(cardsResult);
+      setTotalCards(cardsResult.length);
+      setTotalPages(1);
+    } else {
+      setCardsData([]);
+      setTotalCards(0);
+    }
+    setIsLoading(false);
   };
 
-  // Re-fetch saat filter / search / sort / set berubah
-  useEffect(() => {
-    fetchCards(page);
-  }, [page, activeSearch, selectedSupertype, selectedRarity, selectedHolo, activeSet, sortBy]);
+    // Re-fetch saat filter / search / sort / set berubah
+    useEffect(() => {
+      fetchCards(page);
+    }, [page, activeSearch, selectedSupertype, selectedRarity, selectedHolo, activeSet, sortBy]);
 
-  // Handler Submit Pencarian
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setActiveSearch(searchInput);
-  };
+    // Handler Submit Pencarian
+    const handleSearchSubmit = (e) => {
+      e.preventDefault();
+      setPage(1);
+      setActiveSearch(searchInput);
+    };
 
-  const handleSupertypeChange = (type) => {
-    setPage(1);
-    setSelectedSupertype(prev => prev === type ? 'all' : type);
-  };
+    const handleSupertypeChange = (type) => {
+      setPage(1);
+      setSelectedSupertype(prev => prev === type ? 'all' : type);
+    };
 
-  const handleResetFilters = () => {
-    setSelectedSupertype('all');
-    setSelectedRarity('all');
-    setSelectedHolo('all');
-    setActiveSet({ set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' });
-    setSearchInput('');
-    setActiveSearch('');
-    setPage(1);
-  };
+    const handleResetFilters = () => {
+      setSelectedSupertype('all');
+      setSelectedRarity('all');
+      setSelectedHolo('all');
+      setActiveSet({ set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' });
+      setSearchInput('');
+      setActiveSearch('');
+      setPage(1);
+    };
 
-  const isAnyFilterActive = 
-    selectedSupertype !== 'all' || 
-    selectedRarity !== 'all' || 
-    selectedHolo !== 'all' || 
-    activeSet.set_id !== 'all' || 
-    activeSearch.trim() !== '';
+    const isAnyFilterActive =
+      selectedSupertype !== 'all' ||
+      selectedRarity !== 'all' ||
+      selectedHolo !== 'all' ||
+      activeSet.set_id !== 'all' ||
+      activeSearch.trim() !== '';
 
-  return (
-    <div className="catalog-container">
-      
-      {/* HEADER PENCARIAN */}
-      <div className="catalog-header">
-        <div className="set-selector-container" ref={setSelectorRef}>
-          <button 
-            className="set-selector-btn" 
-            onClick={() => setIsSetMenuOpen(!isSetMenuOpen)}
-            title={activeSet.name}
-          >
-            <img 
-              src={activeSet.logo} 
-              alt={activeSet.name} 
-              className="celebration-icon" 
-              onError={(e) => {
-                if (!e.target.dataset.triedFallback) {
-                  e.target.dataset.triedFallback = 'true';
-                  e.target.src = '/pokemon-logo.png';
-                }
-              }}
-            /> 
-            <span className="celebration-text">{activeSet.name}</span>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1e1b4b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`set-arrow ${isSetMenuOpen ? 'open' : ''}`}>
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
+    return (
+      <div className="catalog-container">
 
-          {/* MENU SET (Dropdown) */}
-          {isSetMenuOpen && (
-            <div className="set-dropdown-menu">
-              <div className="set-dropdown-list">
-                {availableSets.map((setObj) => (
-                  <div 
-                    key={setObj.set_id} 
-                    className={`set-dropdown-item ${activeSet.set_id === setObj.set_id ? 'active' : ''}`}
-                    onClick={() => {
-                      setActiveSet(setObj);
-                      setPage(1);
-                      setIsSetMenuOpen(false); 
-                    }}
-                    title={setObj.name}
-                  >
-                    <img 
-                      src={setObj.logo} 
-                      alt="" 
-                      className="set-dropdown-icon"
-                      onError={(e) => {
-                        if (!e.target.dataset.triedFallback) {
-                          e.target.dataset.triedFallback = 'true';
-                          e.target.src = '/pokemon-logo.png';
-                        }
+        {/* HEADER PENCARIAN */}
+        <div className="catalog-header">
+          <div className="set-selector-container" ref={setSelectorRef}>
+            <button
+              className="set-selector-btn"
+              onClick={() => setIsSetMenuOpen(!isSetMenuOpen)}
+              title={activeSet.name}
+            >
+              <img
+                src={activeSet.logo}
+                alt={activeSet.name}
+                className="celebration-icon"
+                onError={(e) => {
+                  if (!e.target.dataset.triedFallback) {
+                    e.target.dataset.triedFallback = 'true';
+                    e.target.src = '/pokemon-logo.png';
+                  }
+                }}
+              />
+              <span className="celebration-text">{activeSet.name}</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1e1b4b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`set-arrow ${isSetMenuOpen ? 'open' : ''}`}>
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+
+            {/* MENU SET (Dropdown) */}
+            {isSetMenuOpen && (
+              <div className="set-dropdown-menu">
+                <div className="set-dropdown-list">
+                  {availableSets.map((setObj) => (
+                    <div
+                      key={setObj.set_id}
+                      className={`set-dropdown-item ${activeSet.set_id === setObj.set_id ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveSet(setObj);
+                        setPage(1);
+                        setIsSetMenuOpen(false);
                       }}
-                    />
-                    <span className="set-dropdown-label">{setObj.name}</span>
-                  </div>
-                ))}
+                      title={setObj.name}
+                    >
+                      <img
+                        src={setObj.logo}
+                        alt=""
+                        className="set-dropdown-icon"
+                        onError={(e) => {
+                          if (!e.target.dataset.triedFallback) {
+                            e.target.dataset.triedFallback = 'true';
+                            e.target.src = '/pokemon-logo.png';
+                          }
+                        }}
+                      />
+                      <span className="set-dropdown-label">{setObj.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-        
-        {/* FORM SEARCH BAR */}
-        <form className="search-bar-wrapper" onSubmit={handleSearchSubmit}>
-          <input 
-            type="text" 
-            className="search-input" 
-            placeholder="Cari kartu (misal: Charizard, Pikachu)..." 
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-          <button type="submit" className="search-icon-btn" title="Cari Kartu">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e83e8c" strokeWidth="3" strokeLinecap="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </button>
-        </form>
-      </div>
-
-      {/* AREA KONTEN PUTIH */}
-      <div className="catalog-content-area">
-        
-        {/* BARIS FILTER */}
-        <div className="filter-bar">
-          <div className="filter-group">
-            <span className="filter-label">Filter:</span>
-            <label className="checkbox-label">
-              <input 
-                type="checkbox" 
-                checked={selectedSupertype === 'Pokémon'} 
-                onChange={() => handleSupertypeChange('Pokémon')} 
-              /> Pokémon
-            </label>
-            <label className="checkbox-label">
-              <input 
-                type="checkbox" 
-                checked={selectedSupertype === 'Trainer'} 
-                onChange={() => handleSupertypeChange('Trainer')} 
-              /> Trainer
-            </label>
-            <label className="checkbox-label">
-              <input 
-                type="checkbox" 
-                checked={selectedSupertype === 'Energy'} 
-                onChange={() => handleSupertypeChange('Energy')} 
-              /> Energy
-            </label>
-
-            <select 
-              className="filter-select"
-              value={selectedRarity}
-              onChange={(e) => {
-                setSelectedRarity(e.target.value);
-                setPage(1);
-              }}
-              title="Filter Tingkat Kelangkaan (Rarity)"
-            >
-              <option value="all">Semua Rarity</option>
-              <option value="Common">Common</option>
-              <option value="Uncommon">Uncommon</option>
-              <option value="Rare">Rare</option>
-              <option value="Ultra">Ultra / Secret Rare</option>
-            </select>
-
-            <select 
-              className="filter-select"
-              value={selectedHolo}
-              onChange={(e) => {
-                setSelectedHolo(e.target.value);
-                setPage(1);
-              }}
-              title="Filter Efek Foil"
-            >
-              <option value="all">Semua Foil</option>
-              <option value="holo">Holo Only</option>
-              <option value="non_holo">Normal Print</option>
-            </select>
-
-            {isAnyFilterActive && (
-              <button 
-                className="reset-filter-btn" 
-                onClick={handleResetFilters}
-                title="Reset Semua Filter"
-              >
-                Reset
-              </button>
             )}
           </div>
 
-          <div className="filter-right-controls">
-            <div className="catalog-count-info">
-              Menampilkan <strong>{cardsData.length}</strong> dari <strong>{totalCards.toLocaleString('id-ID')}</strong> kartu
-            </div>
-
-            <div className="sort-group">
-              <span className="filter-label">Sort by:</span>
-              <select 
-                className="sort-dropdown"
-                value={sortBy}
-                onChange={(e) => {
-                  setSortBy(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="newest">Rilis: Terbaru ke Lama</option>
-                <option value="oldest">Rilis: Terlama ke Baru</option>
-                <option value="price_desc">Harga Tertinggi</option>
-                <option value="price_asc">Harga Terendah</option>
-                <option value="name_asc">Nama (A - Z)</option>
-                <option value="name_desc">Nama (Z - A)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* GRID GALERI KARTU */}
-        {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', width: '100%', color: '#e83e8c' }}>
-            <div className="catalog-loader"></div>
-            <h3 style={{ marginTop: '15px' }}>Memuat Data Kartu...</h3>
-          </div>
-        ) : cardsData.length === 0 ? (
-          <div className="catalog-empty-state">
-            <div className="empty-icon">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#e83e8c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {/* FORM SEARCH BAR */}
+          <form className="search-bar-wrapper" onSubmit={handleSearchSubmit}>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Cari kartu (misal: Charizard, Pikachu)..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+            <button type="submit" className="search-icon-btn" title="Cari Kartu">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e83e8c" strokeWidth="3" strokeLinecap="round">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-            </div>
-            <h3>Kartu Tidak Ditemukan</h3>
-            <p>Tidak ada kartu yang cocok dengan kata kunci <em>"{activeSearch}"</em> atau filter yang dipilih.</p>
-            <button 
-              className="reset-all-btn"
-              onClick={() => {
-                setActiveSearch('');
-                setSearchInput('');
-                setSelectedSupertype('all');
-                setActiveSet(availableSets[0]);
-                setPage(1);
-              }}
-            >
-              Reset Semua Filter
             </button>
+          </form>
+        </div>
+
+        {/* AREA KONTEN PUTIH */}
+        <div className="catalog-content-area">
+
+          {/* BARIS FILTER */}
+          <div className="filter-bar">
+            <div className="filter-group">
+              <span className="filter-label">Filter:</span>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={selectedSupertype === 'Pokémon'}
+                  onChange={() => handleSupertypeChange('Pokémon')}
+                /> Pokémon
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={selectedSupertype === 'Trainer'}
+                  onChange={() => handleSupertypeChange('Trainer')}
+                /> Trainer
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={selectedSupertype === 'Energy'}
+                  onChange={() => handleSupertypeChange('Energy')}
+                /> Energy
+              </label>
+
+              <select
+                className="filter-select"
+                value={selectedRarity}
+                onChange={(e) => {
+                  setSelectedRarity(e.target.value);
+                  setPage(1);
+                }}
+                title="Filter Tingkat Kelangkaan (Rarity)"
+              >
+                <option value="all">Semua Rarity</option>
+                <option value="Common">Common</option>
+                <option value="Uncommon">Uncommon</option>
+                <option value="Rare">Rare</option>
+                <option value="Ultra">Ultra / Secret Rare</option>
+              </select>
+
+              <select
+                className="filter-select"
+                value={selectedHolo}
+                onChange={(e) => {
+                  setSelectedHolo(e.target.value);
+                  setPage(1);
+                }}
+                title="Filter Efek Foil"
+              >
+                <option value="all">Semua Foil</option>
+                <option value="holo">Holo Only</option>
+                <option value="non_holo">Normal Print</option>
+              </select>
+
+              {isAnyFilterActive && (
+                <button
+                  className="reset-filter-btn"
+                  onClick={handleResetFilters}
+                  title="Reset Semua Filter"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            <div className="filter-right-controls">
+              <div className="catalog-count-info">
+                Menampilkan <strong>{cardsData.length}</strong> dari <strong>{totalCards.toLocaleString('id-ID')}</strong> kartu
+              </div>
+
+              <div className="sort-group">
+                <span className="filter-label">Sort by:</span>
+                <select
+                  className="sort-dropdown"
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="newest">Rilis: Terbaru ke Lama</option>
+                  <option value="oldest">Rilis: Terlama ke Baru</option>
+                  <option value="price_desc">Harga Tertinggi</option>
+                  <option value="price_asc">Harga Terendah</option>
+                  <option value="name_asc">Nama (A - Z)</option>
+                  <option value="name_desc">Nama (Z - A)</option>
+                </select>
+              </div>
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="card-gallery-grid">
-              {cardsData.map((card) => (
-                <div key={card.id} className="gallery-card-item">
-                  <div className="card-image-wrapper">
-                    <img 
-                      src={card.image} 
-                      alt={card.name} 
-                      className="card-image" 
-                      loading="lazy"
-                      onError={(e) => { e.target.src = '/card-result.png'; }}
-                    />
-                  </div>
-                  
-                  <div className="card-details-mini">
-                    <div className="detail-row">
-                      <span className="card-name-mini" title={card.name}>{card.name}</span>
-                      <span className={`card-price-mini ${card.is_unlisted ? 'price-unlisted' : ''}`}>
-                        {card.price_usd || card.price}
-                      </span>
-                    </div>
-                    
-                    <div className="detail-row">
-                      <span className="card-rarity-text">{card.rarityText}</span>
-                      <span className={`card-price-idr ${card.is_unlisted ? 'idr-unlisted' : ''}`} title="Estimasi IDR">
-                        {card.price_idr}
-                      </span>
-                    </div>
-                    
-                    <div className="detail-row footer-row">
-                      <span className="rarity-icon-badge">{card.rarityIcon}</span>
-                      <span className="set-badge">{card.set}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+
+          {/* GRID GALERI KARTU */}
+          {isLoading ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px', width: '100%', color: '#e83e8c' }}>
+              <div className="catalog-loader"></div>
+              <h3 style={{ marginTop: '15px' }}>Memuat Data Kartu...</h3>
             </div>
-
-            {/* BARIS PAGINATION */}
-            <div className="catalog-pagination">
-              <button 
-                className="pagination-btn"
-                disabled={page <= 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+          ) : cardsData.length === 0 ? (
+            <div className="catalog-empty-state">
+              <div className="empty-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#e83e8c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </div>
+              <h3>Kartu Tidak Ditemukan</h3>
+              <p>Tidak ada kartu yang cocok dengan kata kunci <em>"{activeSearch}"</em> atau filter yang dipilih.</p>
+              <button
+                className="reset-all-btn"
+                onClick={() => {
+                  setActiveSearch('');
+                  setSearchInput('');
+                  setSelectedSupertype('all');
+                  setActiveSet(availableSets[0]);
+                  setPage(1);
+                }}
               >
-                ◀ Sebelumnya
-              </button>
-              
-              <span className="pagination-info">
-                Halaman <strong>{page}</strong> dari <strong>{totalPages.toLocaleString('id-ID')}</strong>
-              </span>
-
-              <button 
-                className="pagination-btn"
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              >
-                Selanjutnya ▶
+                Reset Semua Filter
               </button>
             </div>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="card-gallery-grid">
+                {cardsData.map((card) => (
+                  <div key={card.id} className="gallery-card-item">
+                    <div className="card-image-wrapper">
+                      <img
+                        src={card.image}
+                        alt={card.name}
+                        className="card-image"
+                        loading="lazy"
+                        onError={(e) => { e.target.src = '/card-result.png'; }}
+                      />
+                    </div>
 
+                    <div className="card-details-mini">
+                      <div className="detail-row">
+                        <span className="card-name-mini" title={card.name}>{card.name}</span>
+                        <span className={`card-price-mini ${card.is_unlisted ? 'price-unlisted' : ''}`}>
+                          {card.price_usd || card.price}
+                        </span>
+                      </div>
+
+                      <div className="detail-row">
+                        <span className="card-rarity-text">{card.rarityText}</span>
+                        <span className={`card-price-idr ${card.is_unlisted ? 'idr-unlisted' : ''}`} title="Estimasi IDR">
+                          {card.price_idr}
+                        </span>
+                      </div>
+
+                      <div className="detail-row footer-row">
+                        <span className="rarity-icon-badge">{card.rarityIcon}</span>
+                        <span className="set-badge">{card.set}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* BARIS PAGINATION */}
+              <div className="catalog-pagination">
+                <button
+                  className="pagination-btn"
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                >
+                  ◀ Sebelumnya
+                </button>
+
+                <span className="pagination-info">
+                  Halaman <strong>{page}</strong> dari <strong>{totalPages.toLocaleString('id-ID')}</strong>
+                </span>
+
+                <button
+                  className="pagination-btn"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                >
+                  Selanjutnya ▶
+                </button>
+              </div>
+            </>
+          )}
+
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-export default CatalogPage;
+  export default CatalogPage;

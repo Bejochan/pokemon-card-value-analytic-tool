@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config/api';
+import { fetchCardHistoryFromSupabase } from '../services/supabaseService';
 import './ScannerDashboard.css';
 
 function ScannerDashboard({ scanResult, onScanOther }) {
@@ -14,18 +15,21 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   useEffect(() => {
     if (!scanResult?.card_id) return;
     
-    // 1. Ambil riwayat harga masa lalu
+    // 1. Ambil riwayat harga masa lalu (dengan Supabase Cloud fallback)
     const fetchHistory = async () => {
+      let historyData = [];
       try {
         const res = await fetch(`${API_BASE_URL}/cards/${scanResult.card_id}/history`);
         if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setPriceHistory(data.filter(d => d.effective_market_price !== null));
-          }
+          historyData = await res.json();
+        } else {
+          throw new Error('Backend history offline');
         }
       } catch (err) {
-        console.error("Gagal memuat riwayat harga:", err);
+        historyData = await fetchCardHistoryFromSupabase(scanResult.card_id);
+      }
+      if (Array.isArray(historyData)) {
+        setPriceHistory(historyData.filter(d => d.effective_market_price !== null));
       }
     };
 
