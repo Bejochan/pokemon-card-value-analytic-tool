@@ -609,7 +609,7 @@ def get_dashboard_data():
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_key = os.getenv("SUPABASE_KEY", "")
     if not supabase_url or not supabase_key:
-        return {"trending": []}
+        return {"trending": [], "total_cards": 20617, "total_sets": 172}
     
     # Ambil 4 kartu dengan limit
     url = f"{supabase_url}/rest/v1/cards?select=card_id,name,rarity,image_small,sets(set_id),card_prices(effective_market_price)&limit=4"
@@ -645,10 +645,14 @@ def get_dashboard_data():
                 "flagIcon": "🇺🇸"
             })
             
-        return {"trending": trendingCards}
+        return {
+            "trending": trendingCards,
+            "total_cards": 20617,
+            "total_sets": 172
+        }
     except Exception as e:
         print(f"[API] Error fetching dashboard: {e}")
-        return {"trending": []}
+        return {"trending": [], "total_cards": 20617, "total_sets": 172}
 
 
 @app.get("/currency")
