@@ -430,7 +430,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                   {/* KOLOM KIRI: Kotak Trading Signal Besar  */}
                   {/* ======================================= */}
                   <div className="stats-left">
-                    <div className={`stat-card signal-${recommendationSignal.toLowerCase()}`}>
+                    <div className={`stat-card signal-${recommendationSignal.toLowerCase().replace(/\s+/g, '-')}`}>
                       <span className="stat-label">Trading Signal</span>
                       <span className={`stat-value ${signalColor}`}>{recommendationSignal}</span>
                       {forecastData?.signal_reason && (

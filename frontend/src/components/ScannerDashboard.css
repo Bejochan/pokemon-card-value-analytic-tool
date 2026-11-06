@@ -697,33 +697,46 @@
 }
 
 /* ============================================
-   SIGNAL CARD COLORS
+   SIGNAL CARD COLORS (Trading Signal)
+   Tema harmonis:
+   - Background pastel lembut yang sepadan dengan tema
+   - Teks sinyal tebal kontras tinggi agar tidak menyatu dengan background
+   - Label dan deskripsi putih bersih
    ============================================ */
-.stat-card.signal-buy {
-  background-color: #00d26a;
-  border-color: #00d26a;
+.stat-card.signal-buy,
+.stat-card.signal-strong-buy {
+  background-color: #8ceba4;
+  border-color: #8ceba4;
 }
 .stat-card.signal-buy .stat-label,
-.stat-card.signal-buy .stat-value {
+.stat-card.signal-strong-buy .stat-label {
   color: #ffffff;
+}
+.stat-card.signal-buy .stat-value,
+.stat-card.signal-strong-buy .stat-value {
+  color: #008f47 !important;
 }
 
 .stat-card.signal-hold {
-  background-color: #f59e0b;
-  border-color: #f59e0b;
+  background-color: #fde68a;
+  border-color: #fde68a;
 }
-.stat-card.signal-hold .stat-label,
-.stat-card.signal-hold .stat-value {
+.stat-card.signal-hold .stat-label {
   color: #ffffff;
+}
+.stat-card.signal-hold .stat-value {
+  color: #d97706 !important;
 }
 
 .stat-card.signal-sell {
   background-color: #f8a5cb;
-  /* border-color: #dc2626; */
+  border-color: #f8a5cb;
 }
-.stat-card.signal-sell .stat-label,
-.stat-card.signal-sell .stat-value {
+.stat-card.signal-sell .stat-label {
   color: #ffffff;
+}
+.stat-card.signal-sell .stat-value {
+  color: #fb0276 !important;
 }
 
 /* GRAFIK SVG & PERAMALAN HARGA */
