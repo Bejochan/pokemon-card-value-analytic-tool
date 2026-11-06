@@ -6,7 +6,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![OpenAI CLIP](https://img.shields.io/badge/Model_1-CLIP_ViT--B%2F32-412991?style=flat&logo=openai&logoColor=white)](https://github.com/mlfoundations/open_clip)
 [![FAISS](https://img.shields.io/badge/FAISS-Vector_Index-00599C?style=flat&logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
-[![YOLO26s](https://img.shields.io/badge/Model_2-YOLO26s_800px-00FFFF?style=flat&logo=ultralytics&logoColor=black)](https://universe.roboflow.com/group-6-major-project/card-grader)
+[![YOLO26s](https://img.shields.io/badge/Model_2-YOLO26s_800px-00FFFF?style=flat&logo=ultralytics&logoColor=black)](https://github.com/ultralytics/ultralytics)
 [![Amazon Chronos](https://img.shields.io/badge/Model_3-Amazon_Chronos--Bolt-FF9900?style=flat&logo=amazon&logoColor=white)](https://github.com/amazon-science/chronos-forecasting)
 [![Supabase](https://img.shields.io/badge/Database-Supabase_Cloud-3ECF8E?style=flat&logo=supabase&logoColor=white)](https://supabase.com/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -114,12 +114,12 @@ graph TD
 * **Dual-Side Inspection (Tampak Depan & Tampak Belakang):**
   * Mendukung inspeksi cacat pada kedua sisi kartu (`detect_card_defects_dual_side`). Cacat di sisi belakang (seperti goresan *Poké Ball*, *edge whitening*, dan kikisan sudut) terintegrasi langsung ke dalam laporan kondisi akhir.
 * **Kelas Cacat Fisik & Pengali Depresiasi (F_condition):**
-  * `Clean / Mint (Mulus)` → Multiplier = **1.00** *(Diskon 0% — Near Mint / Mint)*
-  * `Scratched (Lecet Permukaan)` → Multiplier = **0.85** *(Diskon 15% — Lightly Played)*
-  * `Edge Wear (Kikis Tepi)` → Multiplier = **0.80** *(Diskon 20% — Moderately Played)*
-  * `Corner Wear (Kikis Sudut)` → Multiplier = **0.80** *(Diskon 20% — Moderately Played)*
-  * `Bent / Crease (Tertekuk)` → Multiplier = **0.65** *(Diskon 35% — Heavily Played)*
-  * `Akumulasi Cacat Berat` → Multiplier batas bawah = **0.40** *(Diskon hingga 60% — Damaged)*
+  * `Clean / Mint (Mulus)` → Multiplier = **1.00** *(Diskon 0% : Near Mint / Mint)*
+  * `Scratched (Lecet Permukaan)` → Multiplier = **0.85** *(Diskon 15% : Lightly Played)*
+  * `Edge Wear (Kikis Tepi)` → Multiplier = **0.80** *(Diskon 20% : Moderately Played)*
+  * `Corner Wear (Kikis Sudut)` → Multiplier = **0.80** *(Diskon 20% : Moderately Played)*
+  * `Bent / Crease (Tertekuk)` → Multiplier = **0.65** *(Diskon 35% : Heavily Played)*
+  * `Akumulasi Cacat Berat` → Multiplier batas bawah = **0.40** *(Diskon hingga 60% : Damaged)*
 
 ---
 
@@ -137,9 +137,9 @@ graph TD
   * Mengisi celah hari transaksi yang kosong dengan metode *forward-fill* (`ffill`) pada frekuensi harian `D`, memastikan deret waktu teratur sebelum diproses oleh model Transformer.
 * **Logika Keputusan Pasar Preskriptif (Dynamic Trading Tunnel):**
   * Membandingkan harga listing penjual saat ini terhadap rentang kuantil dinamis H+1:
-    * `Listing Price < P10(H+1)` → **BUY (Undervalued)** — Peluang beli di bawah lantai harga wajar.
-    * `P10(H+1) <= Listing Price <= P90(H+1)` → **HOLD (Fair Market)** — Harga berada dalam toleransi wajar pasar.
-    * `Listing Price > P90(H+1)` → **SELL (Overvalued)** — Harga listing terlalu mahal di atas batas atas wajar.
+    * `Listing Price < P10(H+1)` → **BUY (Undervalued)** : Peluang beli di bawah lantai harga wajar.
+    * `P10(H+1) <= Listing Price <= P90(H+1)` → **HOLD (Fair Market)** : Harga berada dalam toleransi wajar pasar.
+    * `Listing Price > P90(H+1)` → **SELL (Overvalued)** : Harga listing terlalu mahal di atas batas atas wajar.
 * **Metrik Keyakinan AI Dinamis (Confidence Metric):**
   * Dihitung matematis dari rasio dispersi: `Spread Ratio = (P90 - P10) / P50`. Jika pita sempit, AI Confidence tinggi (~95%); jika pasar bergejolak liar, pita melebar dan confidence turun secara transparan.
 * **Dokumentasi Lengkap:** Pelajari arsitektur dan justifikasi teknis di [`docs/chronos_model_architecture_and_rationale.md`](docs/chronos_model_architecture_and_rationale.md).
@@ -194,12 +194,12 @@ P_final = P_base × M_variant × F_condition × F_market
 
 > [!TIP]
 > Dokumentasi teknis rinci mengenai arsitektur model, variabel data, skema SQL, dan analisis statistik:
-> * 📄 [`docs/chronos_model_architecture_and_rationale.md`](docs/chronos_model_architecture_and_rationale.md) — Arsitektur & rasional ilmiah Amazon Chronos-Bolt Mini.
-> * 📄 [`docs/clip_model_architecture_and_rationale.md`](docs/clip_model_architecture_and_rationale.md) — Arsitektur & rasional ilmiah CLIP ViT-B-32 + FAISS + ORB.
-> * 📄 [`docs/dataset_dictionary.md`](docs/dataset_dictionary.md) — Kamus data 22 variabel CSV.
-> * 📄 [`docs/dataset_summary_and_metrics.md`](docs/dataset_summary_and_metrics.md) — Ringkasan statistik & metrik eksekutif.
-> * 📄 [`docs/supabase_database_dictionary.md`](docs/supabase_database_dictionary.md) — Skema database PostgreSQL Supabase.
-> * 📄 [`docs/schema.sql`](docs/schema.sql) — Script DDL pembuatan tabel database.
+> * 📄 [`docs/chronos_model_architecture_and_rationale.md`](docs/chronos_model_architecture_and_rationale.md) : Arsitektur & rasional teknis Amazon Chronos-Bolt Mini.
+> * 📄 [`docs/clip_model_architecture_and_rationale.md`](docs/clip_model_architecture_and_rationale.md) : Arsitektur & rasional teknis CLIP ViT-B-32 + FAISS + ORB.
+> * 📄 [`docs/dataset_dictionary.md`](docs/dataset_dictionary.md) : Kamus data 22 variabel CSV.
+> * 📄 [`docs/dataset_summary_and_metrics.md`](docs/dataset_summary_and_metrics.md) : Ringkasan statistik & metrik teknis.
+> * 📄 [`docs/supabase_database_dictionary.md`](docs/supabase_database_dictionary.md) : Skema database PostgreSQL Supabase.
+> * 📄 [`docs/schema.sql`](docs/schema.sql) : Script DDL pembuatan tabel database.
 
 ---
 
@@ -258,16 +258,19 @@ pokemon-card-value-analytic-tool/
 │   ├── requirements.txt                  # Dependensi Python Backend
 │   └── .env                              # Konfigurasi API Keys & CAMERA_SOURCE
 │
-├── frontend/                             # Single Page Application (React 18 + Vite)
+├── frontend/                             # Single Page Application (React 19 + Vite)
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── CatalogPage.jsx           # Katalog Interaktif 20.617 kartu (Filter, Search, Sort)
-│   │   │   ├── ScannerDashboard.jsx      # Live Scanner Web UI (Webcam Feed, HUD 63:88, Ketajaman & Telemetri)
-│   │   │   ├── DashboardPage.jsx         # Analitika Data Pasar, Chronos Quantile Charts & Sinyal BUY/HOLD/SELL
-│   │   │   ├── UploadPage.jsx            # Upload Foto Statis (Canvas 1280px Resize, Dual-Side Upload & YOLO26s)
-│   │   │   ├── HeroSection.jsx           # Banner Utama Interaktif
-│   │   │   └── Navbar.jsx                # Navigasi Global
-│   │   ├── App.jsx                       # Routing & State Manajer
+│   │   │   ├── UploadPage.jsx            # Pemindai Langsung (Live HUD, Camera Selector, Guide-Box Crop) & Upload Inspeksi Foto Statis
+│   │   │   ├── ScannerDashboard.jsx      # Detail Valuasi & Hasil Inspeksi (Riwayat Harga, Proyeksi Chronos, Grade Cacat Fisik)
+│   │   │   ├── CatalogPage.jsx           # Katalog Interaktif 20.617 Kartu Resmi (Filter Set, Search, Sort, Kurs USD/IDR)
+│   │   │   ├── DashboardPage.jsx         # Analitika Pasar, Distribusi Kelangkaan, Leaderboard Karakter & Tren Historis
+│   │   │   ├── Marketplace.jsx           # Simulasi Marketplace Sekunder, Keranjang Transaksi & Integrasi Valuasi Wajar
+│   │   │   ├── HeroSection.jsx           # Landing Viewport Interaktif
+│   │   │   └── Navbar.jsx                # Navigasi Global & Sinkronisasi URL Hash
+│   │   ├── config/
+│   │   │   └── api.js                    # Konfigurasi Dinamis Endpoint Backend API
+│   │   ├── App.jsx                       # Routing SPA Berbasis Hash (#home, #upload, #result, #catalog, #dashboard, #marketplace)
 │   │   └── main.jsx                      # Entrypoint React
 │   └── package.json                      # Dependensi Node.js
 │
@@ -355,10 +358,12 @@ npm run dev
 ```
 Buka browser di: **`http://localhost:5173`**
 * **Navigasi Halaman:**
-  * **CATALOG (`#catalog`):** Eksplorasi 20.617 kartu lengkap dengan foto, nama, nomor set, kelangkaan, dan harga pasar wajar (IDR & USD).
-  * **LIVE SCANNER HUD:** Pindai kartu secara langsung melalui webcam browser dengan antarmuka Cyber Obsidian HUD (viewfinder 63:88, indikator ketajaman sensor Laplacian, laser animasi, serta telemetri FPS & latensi).
-  * **DASHBOARD (`#dashboard`):** Visualisasi analitika pasar, grafik harga historis, proyeksi kuantil dinamis 7 hari Amazon Chronos-Bolt (P10, P50, P90), dan rekomendasi preskriptif (BUY/HOLD/SELL).
-  * **UPLOAD / INSPECT:** Unggah berkas foto kartu tampak depan dan belakang (dengan kompresi otomatis Canvas 1280px & drag-and-drop) untuk inspeksi cacat fisik komprehensif via YOLO26s.
+  * **HOME (`#home`):** Tampilan beranda interaktif dengan visualisasi aset dan pintasan akses cepat pemindai kartu.
+  * **PEMINDAI LANGSUNG / UPLOAD (`#upload`):** Pindai kartu fisik langsung via webcam atau kamera smartphone (fitur pemilih kamera eksternal/DroidCam, dynamic guide-box crop, sensor fokus Laplacian, dan buffer konsensus) atau unggah foto tampak depan dan belakang untuk inspeksi cacat fisik komprehensif via YOLO26s.
+  * **HASIL VALUASI (`#result`):** Rincian penilaian kartu, grafik tren harga historis, peramalan probabilistik 7 hari Amazon Chronos-Bolt (P10, P50, P90), laporan cacat fisik dua sisi, dan rekomendasi preskriptif (BUY / HOLD / SELL).
+  * **CATALOG (`#catalog`):** Eksplorasi 20.617 kartu resmi dengan filter set kronologis, pencarian nama, filter supertype/rarity, serta konversi kurs otomatis USD dan IDR.
+  * **DASHBOARD (`#dashboard`):** Analitika pasar, distribusi kelangkaan populasi riil, analisis korelasi atribut terhadap harga pasar, dan leaderboard karakter bernilai tinggi.
+  * **MARKETPLACE (`#marketplace`):** Simulasi transaksi marketplace sekunder dengan integrasi valuasi nilai pasar wajar secara real-time.
 
 ---
 
@@ -387,7 +392,7 @@ Buka browser di: **`http://localhost:5173`**
 
 * **Metadata Kartu & Harga Pasar:** [pokemontcg.io REST API](https://pokemontcg.io/)
 * **Vision Transformer Backbone (Model 1):** [OpenAI CLIP (OpenCLIP)](https://github.com/mlfoundations/open_clip)
-* **Dataset Cacat Fisik (Model 2):** [Roboflow Universe — Card Grader](https://universe.roboflow.com/group-6-major-project/card-grader)
+* **Dataset Cacat Fisik (Model 2):** [Roboflow Universe: Card Grader Dataset](https://universe.roboflow.com/)
 * **Dataset Referensi Tambahan (Model 2):** [GemSnipe Pokemon Centering Measurements](https://gemsnipe.com/) (Open-Source CC BY 4.0 via Contributor Issue #1)
 * **Time-Series Foundation Model (Model 3):** [Amazon Chronos-Bolt (AWS Research)](https://github.com/amazon-science/chronos-forecasting)
 * **Vector Retrieval Engine:** [Meta AI FAISS](https://github.com/facebookresearch/faiss)
