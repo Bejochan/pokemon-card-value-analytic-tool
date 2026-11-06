@@ -321,7 +321,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
               </div>
 
               <div className="card-specs">
-                {/* Tabel Spesifikasi Kartu — dari dataset pokemon_cards_dataset_cleaned.csv */}
+                {/* Tabel Spesifikasi Kartu - dari dataset pokemon_cards_dataset_cleaned.csv */}
                 <table className="specs-table">
                   <tbody>
                     <tr><td>Name</td><td>{cardName}</td></tr>
@@ -335,7 +335,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                 </table>
 
                 {/* ============================================ */}
-                {/* SEKSI KONDISI FISIK — dari YOLO Condition Grader */}
+                {/* SEKSI KONDISI FISIK - dari YOLO Condition Grader */}
                 {/* ============================================ */}
                 <div className="defect-section">
 
@@ -363,7 +363,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                     </>
                   )}
 
-                  {/* Tabel Pecahan Harga — dari analytics_engine.py */}
+                  {/* Tabel Pecahan Harga - dari analytics_engine.py */}
                   <table className="specs-table">
                     <tbody>
                       <tr>
