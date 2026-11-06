@@ -1,7 +1,7 @@
 # ⏳ Arsitektur Model Amazon Chronos-Bolt & Rasional Pemilihan pada Sistem Regokemon
 ## Zero-Shot Foundation Model untuk Peramalan Deret Waktu & Valuasi Preskriptif Pasar Pokémon TCG
 
-> **Pokemon Card Value Analytic Tool (REGOKEMON) — Model 3 Architecture Document**  
+> **Pokemon Card Value Analytic Tool (REGOKEMON) : Model 3 Architecture Document**  
 > **Modul Terkait:** `backend/models/chronos_forecaster.py`, `backend/app/analytics_engine.py`, `backend/app/schemas.py`  
 > **Model Backbone:** `amazon/chronos-bolt-mini` (Amazon Web Services Research, 2024)  
 > **Status Integrasi:** Master Production Pipeline (Forward-Fill Calendar, Dynamic Quantile Ribbon P10-P50-P90, Dynamic Tunnel Signals)
@@ -200,7 +200,7 @@ AI Confidence (%) = clamp(100 - (Spread Ratio * 60), min=20.0, max=98.0)
 
 ### Q1: *"Mengapa memilih model Foundation Chronos-Bolt daripada melatih model LSTM atau XGBoost sendiri?"*
 > **Penjelasan Teknis:**  
-> Untuk membangun model khusus (*custom-trained*) pada 20.617 jenis kartu, tim harus mengelola lebih dari 20.000 file model terpisah atau satu model multi-task raksasa yang membutuhkan jutaan baris riwayat harga. Sebagian besar kartu Pokémon tidak memiliki transaksi setiap hari (data tipis/sparse).  
+> Untuk membangun model khusus (*custom-trained*) pada 20.617 jenis kartu, arsitektur harus mengelola lebih dari 20.000 file model terpisah atau satu model multi-task besar yang membutuhkan jutaan baris riwayat harga. Sebagian besar kartu Pokémon tidak memiliki transaksi setiap hari (data tipis/sparse).  
 > Chronos-Bolt telah dilatih sebelumnya (*pre-trained*) oleh tim riset AWS pada korpus data deret waktu yang sangat masif, mencakup pola tren, momentum, dan pembalikan harga. Kemampuan *Zero-Shot*-nya memungkinkan satu model terpusat (ukuran 100 MB) melayani peramalan seluruh kartu secara akurat tanpa perlu proses *training* berulang.
 
 ---

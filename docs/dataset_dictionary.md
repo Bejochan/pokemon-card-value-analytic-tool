@@ -50,7 +50,7 @@ Berdasarkan hasil Data Quality Audit pada 20.617 kartu:
    * Kartu ber-supertype `Pokémon` memiliki data `types` dan `hp` **100% lengkap**.
 2. **`effective_market_price` (Coverage 95.48%):**
    * Kartu yang tidak memiliki harga umumnya merupakan kartu edisi khusus promo lawas atau kartu langka yang tidak memiliki transaksi aktif di marketplace.
-   * **Strategi Fallback Backend:** Saat kalkulasi P_final, jika `effective_market_price` bernilai *NaN*, engine akan menggunakan *median price* dari kelompok `rarity` dan `release_year` yang sejenis.
+   * **Strategi Fallback Backend:** Saat kalkulasi P_final, jika `effective_market_price` bernilai *NaN*, engine akan menggunakan *median price* dari kategori `rarity` dan `release_year` yang sejenis.
 
 ### B. Penanganan Kasus Khusus File System (Windows Reserved Character)
 * **Kasus Kartu Unown ? (`ex10-?`):**
