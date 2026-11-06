@@ -120,6 +120,7 @@ graph TD
   * `Corner Wear (Kikis Sudut)` → Multiplier = **0.80** *(Diskon 20% : Moderately Played)*
   * `Bent / Crease (Tertekuk)` → Multiplier = **0.65** *(Diskon 35% : Heavily Played)*
   * `Akumulasi Cacat Berat` → Multiplier batas bawah = **0.40** *(Diskon hingga 60% : Damaged)*
+* **Dokumentasi Lengkap:** Pelajari arsitektur dan evaluasi performa di [`docs/yolo_model_architecture_and_rationale.md`](docs/yolo_model_architecture_and_rationale.md).
 
 ---
 
@@ -193,9 +194,11 @@ P_final = P_base × M_variant × F_condition × F_market
 | **Median Harga Pasar** | **$0,96 (~Rp14.880)** | 50% kartu Pokémon bernilai <= $1 USD (*Right-Skewed*) |
 
 > [!TIP]
-> Dokumentasi teknis rinci mengenai arsitektur model, variabel data, skema SQL, dan analisis statistik:
-> * 📄 [`docs/chronos_model_architecture_and_rationale.md`](docs/chronos_model_architecture_and_rationale.md) : Arsitektur & rasional teknis Amazon Chronos-Bolt Mini.
-> * 📄 [`docs/clip_model_architecture_and_rationale.md`](docs/clip_model_architecture_and_rationale.md) : Arsitektur & rasional teknis CLIP ViT-B-32 + FAISS + ORB.
+> Dokumentasi teknis rinci mengenai arsitektur model, spesifikasi API, variabel data, dan skema SQL:
+> * 📄 [`docs/clip_model_architecture_and_rationale.md`](docs/clip_model_architecture_and_rationale.md) : Arsitektur & rasional teknis Model 1 (CLIP ViT-B/32 + FAISS + ORB).
+> * 📄 [`docs/yolo_model_architecture_and_rationale.md`](docs/yolo_model_architecture_and_rationale.md) : Arsitektur & rasional teknis Model 2 (Local YOLO26s 800px Condition Grader).
+> * 📄 [`docs/chronos_model_architecture_and_rationale.md`](docs/chronos_model_architecture_and_rationale.md) : Arsitektur & rasional teknis Model 3 (Amazon Chronos-Bolt Mini).
+> * 📄 [`docs/api_specification.md`](docs/api_specification.md) : Spesifikasi teknis 14 REST API endpoints, kontrak payload & schema.
 > * 📄 [`docs/dataset_dictionary.md`](docs/dataset_dictionary.md) : Kamus data 22 variabel CSV.
 > * 📄 [`docs/dataset_summary_and_metrics.md`](docs/dataset_summary_and_metrics.md) : Ringkasan statistik & metrik teknis.
 > * 📄 [`docs/supabase_database_dictionary.md`](docs/supabase_database_dictionary.md) : Skema database PostgreSQL Supabase.
@@ -275,8 +278,10 @@ pokemon-card-value-analytic-tool/
 │   └── package.json                      # Dependensi Node.js
 │
 ├── docs/                                 # Dokumentasi Teknis Lengkap
-│   ├── chronos_model_architecture_and_rationale.md # Arsitektur & Analisis Amazon Chronos-Bolt
-│   ├── clip_model_architecture_and_rationale.md    # Arsitektur & Analisis CLIP ViT-B-32
+│   ├── clip_model_architecture_and_rationale.md    # Arsitektur & Analisis Model 1 (CLIP ViT-B-32 + FAISS + ORB)
+│   ├── yolo_model_architecture_and_rationale.md    # Arsitektur & Analisis Model 2 (YOLO26s 800px Condition Grader)
+│   ├── chronos_model_architecture_and_rationale.md # Arsitektur & Analisis Model 3 (Amazon Chronos-Bolt Mini)
+│   ├── api_specification.md              # Spesifikasi 14 REST API Endpoints & Kontrak Data
 │   ├── dataset_dictionary.md             # Kamus Data 22 Variabel CSV
 │   ├── dataset_summary_and_metrics.md    # Statistik & Metrik Dataset Master
 │   ├── supabase_database_dictionary.md   # Dokumentasi Database Supabase
