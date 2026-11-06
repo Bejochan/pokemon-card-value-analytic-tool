@@ -798,7 +798,7 @@ function UploadPage({ onUploadComplete }) {
                   >
                     {videoDevices.map((dev, idx) => (
                       <option key={dev.deviceId || idx} value={dev.deviceId}>
-                        📷 {dev.label || `Kamera ${idx + 1}`}
+                        {dev.label || `Kamera ${idx + 1}`}
                       </option>
                     ))}
                   </select>
