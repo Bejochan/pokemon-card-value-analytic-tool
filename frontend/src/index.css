@@ -1,20 +1,26 @@
 :root {
-  /* Background Palettes */
-  --bg-dark-obsidian: #14100d;
-  --bg-card-panel: #1c1612;
-  --bg-border-subtle: #372d26;
-
-  /* Brand Accents */
+  /* Brand Core Palette */
   --color-brand-primary: #e83e8c;  /* Magenta Accent */
-  --color-brand-navy: #1e1b4b;     /* Deep Indigo */
-  --color-accent-amber: #ffaa00;   /* Trading Gold */
-  --color-accent-cyan: #00cdff;    /* HUD Cyan */
-  --color-accent-green: #00e673;   /* Value Green */
+  --color-brand-primary-hover: #d63384;
+  --color-brand-navy: #1e1b4b;     /* Deep Indigo / Headings */
+  --color-brand-muted-indigo: #555c8f;
 
-  /* Text Contrast */
-  --text-primary: #ffffff;
-  --text-secondary: #e2e8f0;
-  --text-muted: #94a3b8;
+  /* Status & Functional Accents */
+  --color-accent-amber: #f59e0b;   /* Warning / Hold Gold */
+  --color-accent-green: #00d26a;   /* Value Green / Success */
+  --color-accent-red: #ef4444;     /* Danger / Error Red */
+
+  /* Light Theme Surfaces & Borders */
+  --bg-app-light: #f8fafc;
+  --bg-card-white: #ffffff;
+  --border-subtle: #e2e8f0;
+  --border-brand-tint: #fce7f3;
+
+  /* Typography Colors */
+  --text-primary-dark: #1e1b4b;
+  --text-body: #334155;
+  --text-muted: #64748b;
+  --text-light: #ffffff;
 }
 
 body, html {
@@ -25,6 +31,16 @@ body, html {
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+body.hud-active {
+  overflow: hidden !important;
+  height: 100vh !important;
+}
+
+body.hud-active #root {
+  height: 100vh !important;
+  overflow: hidden !important;
 }
 
 #root {

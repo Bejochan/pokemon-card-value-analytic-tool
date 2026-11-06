@@ -90,12 +90,14 @@ function formatPriceInfo(priceUsd, priceIdr) {
   };
 }
 
-// Helper: Estimasi Ketajaman Sensor dari Canvas (Laplacian gradient variance)
+// Helper: Estimasi Ketajaman Sensor dari Area Tengah Kartu (Laplacian gradient variance)
 function calculateSharpness(ctx, width, height) {
   try {
-    const sampleW = Math.min(width, 120);
-    const sampleH = Math.min(height, 120);
-    const imgData = ctx.getImageData(0, 0, sampleW, sampleH);
+    const sampleW = Math.min(width, 160);
+    const sampleH = Math.min(height, 160);
+    const startX = Math.max(0, Math.round((width - sampleW) / 2));
+    const startY = Math.max(0, Math.round((height - sampleH) / 2));
+    const imgData = ctx.getImageData(startX, startY, sampleW, sampleH);
     const data = imgData.data;
     let sumDiff = 0;
     let count = 0;
@@ -183,15 +185,43 @@ function UploadPage({ onUploadComplete }) {
   const [latencyMs, setLatencyMs] = useState(0);
   const [liveSharpness, setLiveSharpness] = useState(115);
   const [camFps, setCamFps] = useState(30);
+  const [videoDevices, setVideoDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
 
   // Refs Kamera & Animasi
   const videoRef = useRef(null);
+  const viewfinderRef = useRef(null);
+  const guideBoxRef = useRef(null);
   const streamRef = useRef(null);
   const captureCanvasRef = useRef(null);
   const isRequestInProgress = useRef(false);
   const pollIntervalRef = useRef(null);
   const fpsFrameCountRef = useRef(0);
   const lastFpsTimeRef = useRef(performance.now());
+
+  // --- DETEKSI DAFTAR SUMBER KAMERA (WEBCAM / DROIDCAM / IRIUN) ---
+  const refreshCameraDevices = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      setVideoDevices(videoInputs);
+      return videoInputs;
+    } catch (err) {
+      console.warn("Gagal membaca daftar kamera:", err);
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    refreshCameraDevices();
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', refreshCameraDevices);
+      return () => {
+        navigator.mediaDevices.removeEventListener('devicechange', refreshCameraDevices);
+      };
+    }
+  }, []);
 
   // --- LOGIKA UPLOAD & ANALISIS DUA SISI ---
   const handleBrowseClick = () => {
@@ -272,23 +302,59 @@ function UploadPage({ onUploadComplete }) {
   };
 
   // --- LOGIKA BUKA / TUTUP KAMERA ---
-  const openCamera = async () => {
+  const openCamera = async (targetDeviceId) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      });
+      const devId = (typeof targetDeviceId === 'string' && targetDeviceId) 
+        ? targetDeviceId 
+        : selectedDeviceId;
+
+      const constraints = {
+        video: devId
+          ? { deviceId: { exact: devId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          : { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      };
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
+
+      const activeTrack = stream.getVideoTracks()[0];
+      if (activeTrack) {
+        const settings = activeTrack.getSettings();
+        if (settings.deviceId) {
+          setSelectedDeviceId(settings.deviceId);
+        }
+      }
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+
       setIsCameraOpen(true);
       setIsPaused(false);
       setPrediction(null);
+
+      // Refresh list agar Chrome memunculkan label asli kamera (misal: "DroidCam Source 3", "Iriun")
+      await refreshCameraDevices();
     } catch (err) {
       console.error("Gagal mengakses kamera:", err);
-      alert("Tidak dapat mengakses kamera. Pastikan memberikan izin pada peramban!");
+      if (targetDeviceId) {
+        // Fallback jika deviceId tertentu gagal dibuka
+        openCamera(null);
+      } else {
+        alert("Tidak dapat mengakses kamera. Pastikan memberikan izin pada peramban!");
+      }
     }
+  };
+
+  const handleCameraChange = (e) => {
+    const newId = e.target.value;
+    setSelectedDeviceId(newId);
+    openCamera(newId);
   };
 
   const stopCamera = useCallback(() => {
@@ -361,27 +427,65 @@ function UploadPage({ onUploadComplete }) {
       if (!videoRef.current || videoRef.current.readyState < 2) return;
 
       const video = videoRef.current;
-      const vW = video.videoWidth || 640;
-      const vH = video.videoHeight || 480;
+      const vW = video.videoWidth;
+      const vH = video.videoHeight;
+      if (!vW || !vH) return;
 
-      // Buat canvas sampling (resolusi optimal untuk inferensi kilat)
+      let cropX = 0;
+      let cropY = 0;
+      let cropW = vW;
+      let cropH = vH;
+
+      // Hitung koordinat cropping presisi mengikuti kotak panduan kartu di layar
+      if (viewfinderRef.current && guideBoxRef.current) {
+        const vfRect = viewfinderRef.current.getBoundingClientRect();
+        const gbRect = guideBoxRef.current.getBoundingClientRect();
+
+        if (vfRect.width > 0 && vfRect.height > 0 && gbRect.width > 0) {
+          // Skala video dalam viewfinder karena CSS object-fit: cover
+          const scale = Math.max(vfRect.width / vW, vfRect.height / vH);
+          const renderedW = vW * scale;
+          const renderedH = vH * scale;
+          const offsetX = (renderedW - vfRect.width) / 2;
+          const offsetY = (renderedH - vfRect.height) / 2;
+
+          const gbLeft = gbRect.left - vfRect.left;
+          const gbTop = gbRect.top - vfRect.top;
+
+          // Berikan sedikit kelonggaran (padding 4%) agar seluruh tepi kartu masuk utuh
+          const padX = gbRect.width * 0.04;
+          const padY = gbRect.height * 0.04;
+
+          const rawX = (gbLeft - padX + offsetX) / scale;
+          const rawY = (gbTop - padY + offsetY) / scale;
+          const rawW = (gbRect.width + padX * 2) / scale;
+          const rawH = (gbRect.height + padY * 2) / scale;
+
+          cropX = Math.max(0, Math.round(rawX));
+          cropY = Math.max(0, Math.round(rawY));
+          cropW = Math.min(vW - cropX, Math.round(rawW));
+          cropH = Math.min(vH - cropY, Math.round(rawH));
+        }
+      }
+
+      // Buat canvas sampling dengan rasio standar kartu Pokemon (448 x 625)
       if (!captureCanvasRef.current) {
         captureCanvasRef.current = document.createElement('canvas');
       }
       const canvas = captureCanvasRef.current;
-      const targetW = 480;
-      const targetH = Math.round((vH / vW) * targetW);
+      const targetW = 448;
+      const targetH = 625;
       canvas.width = targetW;
       canvas.height = targetH;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, targetW, targetH);
+      ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
 
-      // Hitung ketajaman sensor
+      // Hitung ketajaman sensor dari potongan kartu
       const sharpness = calculateSharpness(ctx, targetW, targetH);
       setLiveSharpness(sharpness);
 
-      // Encode Base64 JPEG
-      const base64Image = canvas.toDataURL('image/jpeg', 0.72);
+      // Encode Base64 JPEG kualitas tinggi (0.85)
+      const base64Image = canvas.toDataURL('image/jpeg', 0.85);
 
       isRequestInProgress.current = true;
       const t0 = performance.now();
@@ -437,6 +541,18 @@ function UploadPage({ onUploadComplete }) {
   useEffect(() => {
     return () => stopCamera();
   }, [stopCamera]);
+
+  // --- KUNCI SCROLL BODY AGAR LAYAR FIXED SAAT SCANNER AKTIF ---
+  useEffect(() => {
+    if (isCameraOpen) {
+      document.body.classList.add('hud-active');
+    } else {
+      document.body.classList.remove('hud-active');
+    }
+    return () => {
+      document.body.classList.remove('hud-active');
+    };
+  }, [isCameraOpen]);
 
   // --- PROPS & DATA BINDING UNTUK HUD ---
   const hasCard = Boolean(prediction && prediction.card_id);
@@ -656,27 +772,53 @@ function UploadPage({ onUploadComplete }) {
       ) : (
 
       /* ===================================================================== */
-      /* TAMPILAN 2: REAL-TIME COMPUTER VISION HUD (CYBER OBSIDIAN SLATE)       */
+      /* TAMPILAN 2: REAL-TIME SCANNER HUD                                     */
       /* ===================================================================== */
         <div className="realtime-hud-container">
           
           {/* TOP HEADER BAR */}
           <header className="hud-header">
             <div className="hud-brand-group">
-              <div className="hud-brand-title">REGOKEMON AI</div>
+              <div className="hud-brand-title">REGOKEMON</div>
               <div className="hud-brand-divider">|</div>
               <div className="hud-brand-subtitle">
-                REAL-TIME COMPUTER VISION & VALUATION SUITE
+                Pemindai Langsung & Estimasi Nilai Pasar
               </div>
             </div>
 
             <div className="hud-header-right">
+              {/* DROPDOWN PILIHAN SUMBER KAMERA (WEBCAM / DROIDCAM / IRIUN) */}
+              {videoDevices.length > 1 && (
+                <div className="hud-camera-picker">
+                  <select 
+                    className="hud-camera-select" 
+                    value={selectedDeviceId} 
+                    onChange={handleCameraChange}
+                    title="Pilih Sumber Kamera (Webcam / DroidCam / Iriun)"
+                  >
+                    {videoDevices.map((dev, idx) => (
+                      <option key={dev.deviceId || idx} value={dev.deviceId}>
+                        📷 {dev.label || `Kamera ${idx + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className={`hud-status-pill ${isPaused ? 'pill-paused' : 'pill-live'}`}>
                 <span className="status-dot"></span>
                 <span className="status-label">
-                  {isPaused ? 'PAUSED / FROZEN' : 'LIVE SCANNING'}
+                  {isPaused ? 'DIJEDA / FREEZE' : 'KAMERA AKTIF'}
                 </span>
               </div>
+              <button 
+                type="button" 
+                className="hud-close-btn" 
+                onClick={stopCamera}
+                title="Tutup Scanner (Esc)"
+              >
+                ✕ KELUAR SCANNER
+              </button>
             </div>
           </header>
 
@@ -684,34 +826,34 @@ function UploadPage({ onUploadComplete }) {
           {/* MAIN HUD BODY: SPLIT VIEW */}
           <div className="hud-body">
             
-            {/* PANE KIRI: CAMERA VIEWFINDER DENGAN CARD GUIDE 63:88 & LASER */}
+            {/* PANE KIRI: CAMERA VIEWFINDER DENGAN CARD GUIDE & SENSOR */}
             <div className="hud-left-pane">
-              <div className="viewfinder-wrapper">
+              <div className="viewfinder-wrapper" ref={viewfinderRef}>
                 <video ref={videoRef} autoPlay playsInline muted className="hud-video-element" />
 
                 {/* OVERLAY TAG */}
                 <div className="viewfinder-tag">
-                  PORTRAIT 63:88 LIVE
+                  PANDUAN KARTU
                 </div>
 
                 {/* CARD GUIDE FRAME & CORNERS */}
-                <div className={`card-guide-box ${guideClass}`}>
+                <div ref={guideBoxRef} className={`card-guide-box ${guideClass}`}>
                   <div className="corner corner-tl"></div>
                   <div className="corner corner-tr"></div>
                   <div className="corner corner-bl"></div>
                   <div className="corner corner-br"></div>
 
-                  {/* ANIMATED LASER SCANNING BEAM */}
+                  {/* ANIMATED SCANNING BEAM */}
                   {!isPaused && <div className="scanning-laser-beam"></div>}
                 </div>
 
                 {/* SENSOR STATUS STRIP */}
                 <div className="sensor-strip">
-                  <span className="sensor-title">Ketajaman Sensor:</span>
+                  <span className="sensor-title">Kondisi Fokus:</span>
                   <div className={`sensor-badge ${sharpClass}`}>
                     <span className="sensor-indicator-dot"></span>
                     <span className="sensor-value">
-                      {liveSharpness} [{sharpTag}]
+                      {sharpTag}
                     </span>
                   </div>
                 </div>
@@ -721,10 +863,10 @@ function UploadPage({ onUploadComplete }) {
             {/* PANE KANAN: ANALYTICS DASHBOARD */}
             <div className="hud-right-pane">
               
-              {/* PANEL 1: TARGET IDENTIFIKASI UTAMA (TOP-1 PREDICTION) */}
+              {/* PANEL 1: KARTU TERDETEKSI */}
               <div className="hud-panel panel-top1">
                 <div className="panel-header-title cyan-accent">
-                  TARGET IDENTIFIKASI UTAMA (TOP-1 PREDICTION & MARKET VALUE)
+                  KARTU TERDETEKSI
                 </div>
 
                 {hasCard ? (
@@ -734,7 +876,7 @@ function UploadPage({ onUploadComplete }) {
                       <div className="card-identity-block">
                         <div className="identity-pill-row">
                           <span className={`confidence-pill conf-${confLabel.toLowerCase()}`}>
-                            {confPct.toFixed(1)}% {confLabel.toUpperCase()}
+                            Kecocokan {confPct.toFixed(1)}% ({confLabel})
                           </span>
                           <span className="meta-pill">{prediction.rarity || 'Standard'}</span>
                           <span className="meta-pill id-pill">{prediction.card_id}</span>
@@ -746,7 +888,7 @@ function UploadPage({ onUploadComplete }) {
                           {prediction.name}
                         </h2>
                         <div className="top1-set-name">
-                          Set: <strong>{prediction.set_name || '-'}</strong>
+                          Seri: <strong>{prediction.set_name || '-'}</strong>
                         </div>
                       </div>
 
@@ -775,24 +917,24 @@ function UploadPage({ onUploadComplete }) {
                     {/* SUB-METRICS BREAKDOWN */}
                     <div className="sub-metrics-row">
                       <span>
-                        Cosine Similarity: <strong>{prediction.raw_similarity_score ? prediction.raw_similarity_score.toFixed(4) : 'N/A'}</strong>
+                        Akurasi Visual: <strong>{prediction.raw_similarity_score ? `${(prediction.raw_similarity_score * 100).toFixed(1)}%` : `${confPct.toFixed(1)}%`}</strong>
                       </span>
                       <span className="metric-sep">|</span>
                       <span>
-                        ORB Verification: <strong>{prediction.orb_verification_score ? prediction.orb_verification_score.toFixed(3) : 'N/A'}</strong>
+                        Verifikasi Detail: <strong>{prediction.orb_verification_score && prediction.orb_verification_score > 0 ? 'Cocok' : 'Standar'}</strong>
                       </span>
                       <span className="metric-sep">|</span>
                       <span>
-                        Margin ke Runner-Up: <strong>+{prediction.margin_to_runner_up ? prediction.margin_to_runner_up.toFixed(4) : '0.0000'}</strong>
+                        Tingkat Keyakinan: <strong>{confLabel}</strong>
                       </span>
                     </div>
 
                     {/* STATUS VERIFIKASI */}
                     <div className="verification-status-row">
                       <span className="status-label-bold">STATUS:</span>
-                      <span className="status-verified-text">TERVERIFIKASI MODEL 1 CLIP</span>
+                      <span className="status-verified-text">TERVERIFIKASI DATABASE RESMI</span>
                       <span className="status-sep">|</span>
-                      <span className="status-label-bold">VALUASI:</span>
+                      <span className="status-label-bold">KATEGORI:</span>
                       <span className={`status-tier-desc ${priceInfo.tierClass}`}>
                         {priceInfo.tierDesc.toUpperCase()}
                       </span>
@@ -813,34 +955,36 @@ function UploadPage({ onUploadComplete }) {
                     </div>
                     <div className="confidence-track idle-track"></div>
                     <div className="standby-status-footer">
-                      STATUS: STANDBY — MENUNGGU OBJEK KARTU
+                      STATUS: MENUNGGU KARTU DIARAHKAN KE KAMERA
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* PANEL 2: KANDIDAT LAIN & PERBANDINGAN HARGA (TOP 2 - 4) */}
+              {/* PANEL 2: KEMUNGKINAN HASIL & VARIAN LAIN */}
               <div className="hud-panel panel-runnerups">
                 <div className="panel-header-title amber-accent">
-                  KANDIDAT LAIN, PERBANDINGAN VARIAN REPRINT & HARGA (TOP 2 - 4)
+                  KEMUNGKINAN HASIL & VARIAN LAIN
                 </div>
 
                 <div className="runnerups-table-container">
                   <table className="runnerups-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '8%' }}>RANK</th>
-                        <th style={{ width: '28%' }}>NAMA KARTU</th>
-                        <th style={{ width: '26%' }}>SET & CARD ID</th>
-                        <th style={{ width: '20%' }}>HARGA PASAR</th>
-                        <th style={{ width: '9%' }}>COSINE</th>
-                        <th style={{ width: '9%' }}>ORB</th>
+                        <th style={{ width: '8%' }}>NO</th>
+                        <th style={{ width: '36%' }}>NAMA KARTU</th>
+                        <th style={{ width: '28%' }}>SERI & ID KARTU</th>
+                        <th style={{ width: '18%' }}>HARGA PASAR</th>
+                        <th style={{ width: '10%' }}>KECOCOKAN</th>
                       </tr>
                     </thead>
                     <tbody>
                       {prediction?.candidates && prediction.candidates.length > 0 ? (
                         prediction.candidates.slice(0, 3).map((cand, idx) => {
                           const candPrice = formatPriceInfo(cand.price_usd, cand.price_idr);
+                          const simPct = cand.raw_similarity_score 
+                            ? `${(cand.raw_similarity_score * 100).toFixed(0)}%` 
+                            : '-';
                           return (
                             <tr key={cand.card_id || idx} className="runnerup-row">
                               <td className="rank-col">#{cand.rank || idx + 2}</td>
@@ -854,10 +998,7 @@ function UploadPage({ onUploadComplete }) {
                                 {candPrice.label}
                               </td>
                               <td className="sim-col">
-                                {cand.raw_similarity_score ? cand.raw_similarity_score.toFixed(4) : '-'}
-                              </td>
-                              <td className="orb-col">
-                                {cand.orb_verification_score ? cand.orb_verification_score.toFixed(3) : '-'}
+                                {simPct}
                               </td>
                             </tr>
                           );
@@ -866,8 +1007,8 @@ function UploadPage({ onUploadComplete }) {
                         [1, 2, 3].map((slot) => (
                           <tr key={slot} className="runnerup-row placeholder-row">
                             <td className="rank-col">#{slot + 1}</td>
-                            <td colSpan="5" className="placeholder-text">
-                              --- Menunggu deteksi kartu ---
+                            <td colSpan="4" className="placeholder-text">
+                              Menunggu deteksi kartu...
                             </td>
                           </tr>
                         ))
@@ -877,26 +1018,26 @@ function UploadPage({ onUploadComplete }) {
                 </div>
               </div>
 
-              {/* PANEL 3: TELEMETRI & KONTROL PEMINDAIAN */}
+              {/* PANEL 3: STATUS SISTEM & KONTROL */}
               <div className="hud-panel panel-telemetry">
                 <div className="telemetry-grid">
                   <div className="telemetry-card">
-                    <span className="telemetry-label">Camera Speed</span>
-                    <span className="telemetry-val val-green">{camFps} FPS (Smooth)</span>
+                    <span className="telemetry-label">Kecepatan Kamera</span>
+                    <span className="telemetry-val val-green">{camFps} FPS</span>
                   </div>
                   <div className="telemetry-card">
-                    <span className="telemetry-label">AI Inference Latency</span>
-                    <span className="telemetry-val val-cyan">{latencyMs} ms (~{inferRate}/s)</span>
+                    <span className="telemetry-label">Waktu Pemrosesan</span>
+                    <span className="telemetry-val val-cyan">{latencyMs} ms</span>
                   </div>
                   <div className="telemetry-card">
-                    <span className="telemetry-label">Sensor Sharpness</span>
+                    <span className="telemetry-label">Fokus Kamera</span>
                     <span className={`telemetry-val ${isSharp ? 'val-green' : 'val-coral'}`}>
-                      {liveSharpness} [{sharpTag}]
+                      {sharpTag}
                     </span>
                   </div>
                   <div className="telemetry-card">
-                    <span className="telemetry-label">Vision Backbone</span>
-                    <span className="telemetry-val val-white">CLIP ViT-B-32 + FAISS</span>
+                    <span className="telemetry-label">Katalog Referensi</span>
+                    <span className="telemetry-val val-white">20.617 Kartu Resmi</span>
                   </div>
                 </div>
 
@@ -911,7 +1052,7 @@ function UploadPage({ onUploadComplete }) {
                     onClick={() => setIsPaused(prev => !prev)}
                     title="Freeze frame kamera agar tidak perlu terus menahan kartu"
                   >
-                    {isPaused ? "RESUME STREAM [SPASI]" : "FREEZE / PAUSE [SPASI]"}
+                    {isPaused ? "LANJUTKAN SCAN [SPASI]" : "JEDA / FREEZE [SPASI]"}
                   </button>
 
                   {hasCard && (
@@ -927,11 +1068,6 @@ function UploadPage({ onUploadComplete }) {
                           ...prediction,
                           user_scanned_image: snap
                         });
-                      }}
-                      style={{
-                        backgroundColor: '#00d26a',
-                        color: '#1e1b4b',
-                        fontWeight: '800'
                       }}
                     >
                       LIHAT DETAIL LENGKAP
