@@ -460,6 +460,22 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
             "execution_time_ms": ai_result.get("execution_time_ms", 0.0)
         }
 
+    conf_pct = float(top_match.get("confidence_percentage") or 0.0)
+    conf_label = str(top_match.get("confidence_label") or "Rendah")
+
+    # Ambang batas keyakinan minimal 60% untuk aliran kamera live:
+    # Mencegah kemunculan false-positive ketika kartu belum pas di kotak panduan
+    if conf_pct < 60.0:
+        return {
+            "status": "ambiguous",
+            "message": "Kartu belum teridentifikasi jelas. Posisikan kartu tegak lurus di tengah kotak panduan.",
+            "card_id": None,
+            "name": None,
+            "confidence_percentage": conf_pct,
+            "confidence_label": conf_label,
+            "execution_time_ms": ai_result.get("execution_time_ms", 0.0)
+        }
+
     price_usd = float(top_match.get("effective_market_price") or 0.0)
     price_usd = get_live_price(top_match.get("card_id"), price_usd)
     current_rate = get_usd_to_idr_rate()

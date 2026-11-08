@@ -511,8 +511,8 @@ function UploadPage({ onUploadComplete }) {
 
         if (res.ok) {
           const data = await res.json();
-          if (data.status === 'success' && data.card_id) {
-            // Masukkan prediksi ke ring buffer 3 frame terakhir untuk redam kedipan (flicker)
+          if (data.status === 'success' && data.card_id && (data.confidence_percentage >= 60)) {
+            // Masukkan prediksi valid ke ring buffer 3 frame terakhir
             consensusHistoryRef.current.push(data);
             if (consensusHistoryRef.current.length > 3) {
               consensusHistoryRef.current.shift();
@@ -521,7 +521,9 @@ function UploadPage({ onUploadComplete }) {
             // Hitung suara konsensus (modus)
             const counts = {};
             consensusHistoryRef.current.forEach(item => {
-              counts[item.card_id] = (counts[item.card_id] || 0) + 1;
+              if (item && item.card_id) {
+                counts[item.card_id] = (counts[item.card_id] || 0) + 1;
+              }
             });
 
             let dominantId = null;
@@ -536,10 +538,22 @@ function UploadPage({ onUploadComplete }) {
             // Kunci tampilan kartu jika mayoritas minimal 2 dari 3 frame cocok,
             // atau saat inisiasi frame pertama
             if (maxCount >= 2 || consensusHistoryRef.current.length === 1) {
-              const dominantItem = consensusHistoryRef.current.find(item => item.card_id === dominantId);
+              const dominantItem = consensusHistoryRef.current.find(item => item && item.card_id === dominantId);
               if (dominantItem) {
                 setPrediction(dominantItem);
               }
+            }
+          } else {
+            // Jika status ambiguous (keyakinan < 60%) atau kartu dilepas:
+            // Masukkan null ke buffer agar kartu lama perlahan mereda jika memang sudah tidak ada kartu di kamera
+            consensusHistoryRef.current.push(null);
+            if (consensusHistoryRef.current.length > 3) {
+              consensusHistoryRef.current.shift();
+            }
+            // Jika seluruh isi buffer adalah null (3 frame berturut-turut kosong/ambigu), lepaskan kunci
+            const validCount = consensusHistoryRef.current.filter(Boolean).length;
+            if (validCount === 0) {
+              setPrediction(null);
             }
           }
         }
@@ -592,18 +606,32 @@ function UploadPage({ onUploadComplete }) {
   }, [isCameraOpen]);
 
   // --- PROPS & DATA BINDING UNTUK HUD ---
-  const hasCard = Boolean(prediction && prediction.card_id);
   const confPct = prediction?.confidence_percentage || 0;
   const confLabel = prediction?.confidence_label || 'Uncertain';
+  const isLocked = Boolean(prediction && prediction.card_id && confPct >= 60);
+  const hasCard = isLocked;
   
-  // Warna Guide Frame & Status
+  // Warna Guide Frame & Status Dinamis
   let guideClass = 'guide-cyan';
+  let guideTagText = 'PANDUAN KARTU';
+  let guideTagClass = 'tag-cyan';
+
   if (isPaused) {
     guideClass = 'guide-amber';
-  } else if (hasCard) {
-    if (confLabel === 'Tinggi') guideClass = 'guide-neon';
-    else if (confLabel === 'Sedang') guideClass = 'guide-amber';
-    else guideClass = 'guide-coral';
+    guideTagText = 'PEMINDAIAN DIJEDA';
+    guideTagClass = 'tag-amber';
+  } else if (isLocked) {
+    guideClass = 'guide-neon';
+    guideTagText = '✓ KARTU TERKUNCI';
+    guideTagClass = 'tag-neon';
+  } else if (liveSharpness < 35) {
+    guideClass = 'guide-amber';
+    guideTagText = 'GERAKKAN PERLAHAN';
+    guideTagClass = 'tag-amber';
+  } else {
+    guideClass = 'guide-cyan';
+    guideTagText = 'MEMINDAI KARTU...';
+    guideTagClass = 'tag-cyan';
   }
 
   // Harga Top-1
@@ -868,9 +896,9 @@ function UploadPage({ onUploadComplete }) {
               <div className="viewfinder-wrapper" ref={viewfinderRef}>
                 <video ref={videoRef} autoPlay playsInline muted className="hud-video-element" />
 
-                {/* OVERLAY TAG */}
-                <div className="viewfinder-tag">
-                  PANDUAN KARTU
+                {/* OVERLAY TAG DINAMIS */}
+                <div className={`viewfinder-tag ${guideTagClass}`}>
+                  {guideTagText}
                 </div>
 
                 {/* CARD GUIDE FRAME & CORNERS */}

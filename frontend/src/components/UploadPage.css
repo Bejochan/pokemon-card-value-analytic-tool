@@ -707,6 +707,25 @@
   letter-spacing: 0.5px;
   backdrop-filter: blur(6px);
   z-index: 5;
+  transition: all 0.25s ease;
+}
+
+.viewfinder-tag.tag-neon {
+  border-color: rgba(0, 210, 106, 0.6);
+  color: #00d26a;
+  background-color: rgba(6, 78, 59, 0.75);
+}
+
+.viewfinder-tag.tag-amber {
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #f59e0b;
+  background-color: rgba(120, 53, 15, 0.75);
+}
+
+.viewfinder-tag.tag-cyan {
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #38bdf8;
+  background-color: rgba(15, 23, 42, 0.75);
 }
 
 /* Card Guide Box (Rasio Kartu Pokemon 63:88) */
