@@ -70,6 +70,13 @@ debug_hoothoot_upright.jpg
 backend/debug_gambar_dari_web.jpg
 
 # ============================================
+# Benchmark & Performance Simulation Outputs
+# ============================================
+backend/benchmark_*_results.json
+benchmark_*_results.json
+*_benchmark_results.json
+
+# ============================================
 # Local AI Auditing Tools & Reports
 # ============================================
 anti-slop/
