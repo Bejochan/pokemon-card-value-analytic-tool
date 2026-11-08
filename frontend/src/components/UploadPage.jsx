@@ -198,6 +198,7 @@ function UploadPage({ onUploadComplete }) {
   const pollIntervalRef = useRef(null);
   const fpsFrameCountRef = useRef(0);
   const lastFpsTimeRef = useRef(performance.now());
+  const consensusHistoryRef = useRef([]);
 
   // --- DETEKSI DAFTAR SUMBER KAMERA (WEBCAM / DROIDCAM / IRIUN) ---
   const refreshCameraDevices = async () => {
@@ -337,6 +338,7 @@ function UploadPage({ onUploadComplete }) {
       setIsCameraOpen(true);
       setIsPaused(false);
       setPrediction(null);
+      consensusHistoryRef.current = [];
 
       // Refresh list agar Chrome memunculkan label asli kamera (misal: "DroidCam Source 3", "Iriun")
       await refreshCameraDevices();
@@ -369,6 +371,7 @@ function UploadPage({ onUploadComplete }) {
     setIsCameraOpen(false);
     setIsPaused(false);
     setPrediction(null);
+    consensusHistoryRef.current = [];
   }, []);
 
   // --- FPS COUNTER DI VIDEO FEED ---
@@ -484,6 +487,12 @@ function UploadPage({ onUploadComplete }) {
       const sharpness = calculateSharpness(ctx, targetW, targetH);
       setLiveSharpness(sharpness);
 
+      // Smart Focus Gating: Tahan pengiriman request jika citra buram / tangan bergerak cepat
+      // Nilai ambang batas 35 ramah terhadap kamera laptop 720p namun efektif menahan frame gerak
+      if (sharpness < 35) {
+        return;
+      }
+
       // Encode Base64 JPEG kualitas tinggi (0.85)
       const base64Image = canvas.toDataURL('image/jpeg', 0.85);
 
@@ -497,13 +506,41 @@ function UploadPage({ onUploadComplete }) {
           body: JSON.stringify({ image: base64Image })
         });
         const elapsed = Math.round(performance.now() - t0);
-        // Exponential smoothing latency agar tidak macet di angka warm-up 2200ms
+        // Exponential smoothing latency agar responsif dan akurat
         setLatencyMs(prev => prev === 0 ? elapsed : Math.round(prev * 0.3 + elapsed * 0.7));
 
         if (res.ok) {
           const data = await res.json();
           if (data.status === 'success' && data.card_id) {
-            setPrediction(data);
+            // Masukkan prediksi ke ring buffer 3 frame terakhir untuk redam kedipan (flicker)
+            consensusHistoryRef.current.push(data);
+            if (consensusHistoryRef.current.length > 3) {
+              consensusHistoryRef.current.shift();
+            }
+
+            // Hitung suara konsensus (modus)
+            const counts = {};
+            consensusHistoryRef.current.forEach(item => {
+              counts[item.card_id] = (counts[item.card_id] || 0) + 1;
+            });
+
+            let dominantId = null;
+            let maxCount = 0;
+            for (const [id, count] of Object.entries(counts)) {
+              if (count > maxCount) {
+                maxCount = count;
+                dominantId = id;
+              }
+            }
+
+            // Kunci tampilan kartu jika mayoritas minimal 2 dari 3 frame cocok,
+            // atau saat inisiasi frame pertama
+            if (maxCount >= 2 || consensusHistoryRef.current.length === 1) {
+              const dominantItem = consensusHistoryRef.current.find(item => item.card_id === dominantId);
+              if (dominantItem) {
+                setPrediction(dominantItem);
+              }
+            }
           }
         }
       } catch (err) {
@@ -511,7 +548,7 @@ function UploadPage({ onUploadComplete }) {
       } finally {
         isRequestInProgress.current = false;
       }
-    }, 750);
+    }, 350);
 
 
     return () => {
