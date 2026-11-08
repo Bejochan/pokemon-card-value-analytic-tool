@@ -366,10 +366,18 @@ def detect_card_defects_dual_side(
 # FUNGSI SERVICE UTAMA
 # =====================================================================
 
-def process_card_identification(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
+def process_card_identification(
+    img_bgr: np.ndarray,
+    top_k: int = 4,
+    auto_align: bool = True,
+    auto_orient: bool = True,
+    dual_view: bool = True,
+    fast_mode: bool = False
+) -> Dict[str, Any]:
     """
     Menjalankan Model 1 CLIP ViT-B-32 pada gambar OpenCV di memori RAM.
-    Mengembalikan data kartu utama dan daftar kandidat alternatif.
+    Mendukung konfigurasi fast_mode untuk inferensi on-cam sub-detik
+    serta mode inspeksi penuh untuk berkas unggahan galeri.
     """
     identifier = get_card_identifier()
     
@@ -385,7 +393,11 @@ def process_card_identification(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str
     ai_result = identifier.identify_card(
         image_input=img_bgr,
         top_k=top_k,
-        debug=False
+        debug=False,
+        auto_align=auto_align,
+        auto_orient=auto_orient,
+        dual_view=dual_view,
+        fast_mode=fast_mode
     )
     return ai_result
 
@@ -428,8 +440,17 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
     """
     Alur khusus ON-CAM / Scanner Cepat:
     Hanya menjalankan Model 1 (Identifikasi jenis kartu) tanpa deteksi cacat.
+    Menggunakan konfigurasi fast-path (1-pass CLIP portrait + ORB focused eval)
+    karena feed kamera client sudah di-crop presisi ke rasio 448x625.
     """
-    ai_result = process_card_identification(img_bgr, top_k=top_k)
+    ai_result = process_card_identification(
+        img_bgr=img_bgr,
+        top_k=top_k,
+        auto_align=False,
+        auto_orient=False,
+        dual_view=False,
+        fast_mode=True
+    )
     top_match = ai_result.get("top_match")
 
     if not top_match:
