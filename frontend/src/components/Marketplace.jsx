@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import './Marketplace.css';
 
 const USD_TO_IDR = 16285;
@@ -427,6 +428,19 @@ export default function Marketplace() {
 
   // 5. State Modal & Navigasi Panel
   const [selectedCard, setSelectedCard] = useState(null);
+  const [isClosingModal, setIsClosingModal] = useState(false);
+  const selectedCardRef = useRef(selectedCard);
+  useEffect(() => {
+    selectedCardRef.current = selectedCard;
+  }, [selectedCard]);
+
+  const handleCloseModal = () => {
+    setIsClosingModal(true);
+    setTimeout(() => {
+      setSelectedCard(null);
+      setIsClosingModal(false);
+    }, 200);
+  };
   const [revealSellerPhone, setRevealSellerPhone] = useState(false);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
 
@@ -577,7 +591,9 @@ export default function Marketplace() {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setActiveDrawer(null);
-        setSelectedCard(null);
+        if (selectedCardRef.current) {
+          handleCloseModal();
+        }
         setIsSellModalOpen(false);
         setIsAuthModalOpen(false);
         setIsAccountModalOpen(false);
@@ -1281,9 +1297,15 @@ export default function Marketplace() {
       {/* =========================================
           MODAL 1: DETAIL LISTING & IDENTITAS PENJUAL
           ========================================= */}
-      {selectedCard && (
-        <div className="mk-modal-overlay" onClick={() => setSelectedCard(null)}>
-          <div className="mk-modal-card" onClick={(e) => e.stopPropagation()}>
+      {selectedCard && createPortal(
+        <div 
+          className={`mk-modal-overlay ${isClosingModal ? 'closing' : ''}`} 
+          onClick={handleCloseModal}
+        >
+          <div 
+            className={`mk-modal-card ${isClosingModal ? 'closing' : ''}`} 
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mk-modal-header">
               <div>
                 <span className="mk-modal-subtitle">{selectedCard.setName} ({selectedCard.set}) • #{selectedCard.cardNumber}</span>
@@ -1292,7 +1314,7 @@ export default function Marketplace() {
               <button
                 type="button"
                 className="mk-drawer-close-btn"
-                onClick={() => setSelectedCard(null)}
+                onClick={handleCloseModal}
                 title="Tutup Detail"
               >
                 <CloseIcon />
@@ -1430,13 +1452,14 @@ export default function Marketplace() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* =========================================
           MODAL 2: JUAL KARTU (TERHUBUNG KE AKUN LOGIN)
           ========================================= */}
-      {isSellModalOpen && currentUser && (
+      {isSellModalOpen && currentUser && createPortal(
         <div className="mk-modal-overlay" onClick={() => setIsSellModalOpen(false)}>
           <div className="mk-modal-card mk-sell-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="mk-modal-header">
@@ -1659,13 +1682,14 @@ export default function Marketplace() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* =========================================
           MODAL 3: LOGIN & REGISTRASI AKUN
           ========================================= */}
-      {isAuthModalOpen && (
+      {isAuthModalOpen && createPortal(
         <div className="mk-modal-overlay" onClick={() => setIsAuthModalOpen(false)}>
           <div className="mk-modal-card mk-auth-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="mk-modal-header">
@@ -1828,13 +1852,14 @@ export default function Marketplace() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* =========================================
           MODAL 4: PANEL AKUN, LISTING SAYA & PESANAN
           ========================================= */}
-      {isAccountModalOpen && currentUser && (
+      {isAccountModalOpen && currentUser && createPortal(
         <div className="mk-modal-overlay" onClick={() => setIsAccountModalOpen(false)}>
           <div className="mk-modal-card mk-account-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="mk-modal-header">
@@ -2043,16 +2068,19 @@ export default function Marketplace() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* =========================================
           UI SIDE DRAWER: SAVED ITEMS & SHOPPING CART
           ========================================= */}
-      <div 
-        className={`mk-drawer-overlay ${activeDrawer ? 'open' : ''}`} 
-        onClick={() => setActiveDrawer(null)}
-      ></div>
+      {createPortal(
+        <>
+          <div 
+            className={`mk-drawer-overlay ${activeDrawer ? 'open' : ''}`} 
+            onClick={() => setActiveDrawer(null)}
+          ></div>
 
       {/* DRAWER 1: SAVED ITEMS / WISHLIST */}
       <div className={`mk-saved-drawer ${activeDrawer === 'saved' ? 'open' : ''}`}>
@@ -2350,6 +2378,9 @@ export default function Marketplace() {
           </div>
         )}
       </div>
+        </>,
+        document.body
+      )}
 
     </div>
   );
