@@ -2,13 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config/api';
 import './CatalogPage.css';
 
+const CloseIcon = () => (
+  <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+);
+
 function CatalogPage() {
   const [cardsData, setCardsData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCards, setTotalCards] = useState(0);
-  const [currencyRate, setCurrencyRate] = useState(null);
 
   // Filter & Search states
   const [searchInput, setSearchInput] = useState('');
@@ -22,7 +28,10 @@ function CatalogPage() {
   const [isSetMenuOpen, setIsSetMenuOpen] = useState(false);
   const setSelectorRef = useRef(null);
 
-  // Menutup dropdown menu otomatis saat pengguna mengeklik di luar area menu atau menekan tombol Escape
+  // --- POP-UP MODAL STATE ---
+  const [selectedCard, setSelectedCard] = useState(null);
+
+  // Menutup dropdown menu otomatis
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (setSelectorRef.current && !setSelectorRef.current.contains(event.target)) {
@@ -33,10 +42,11 @@ function CatalogPage() {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         setIsSetMenuOpen(false);
+        setSelectedCard(null); 
       }
     };
 
-    if (isSetMenuOpen) {
+    if (isSetMenuOpen || selectedCard) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
@@ -45,35 +55,30 @@ function CatalogPage() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isSetMenuOpen]);
+  }, [isSetMenuOpen, selectedCard]);
 
   const [availableSets, setAvailableSets] = useState([
     { set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' }
   ]);
   const [activeSet, setActiveSet] = useState({ set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' });
 
-  // Helper untuk menentukan logo set (prioritas aset lokal resmi, lalu CDN resmi Pokemon TCG API)
+  // Helper untuk menentukan logo set
   const getSetLogoUrl = (s) => {
     if (!s || s.set_id === 'all') return '/pokemon-logo.png';
     const sId = (s.set_id || '').toLowerCase();
     const sNameLower = (s.name || '').toLowerCase();
 
-    // 1. Cek aset lokal tersimpan
     if (sId === 'hgss1') return '/hgss1-logo.png';
     if (sId === 'sma') return '/sma-logo.png';
     if (sId === 'base3') return '/base3-logo.png';
     if (sId === 'sm75') return '/sm75-logo.png';
     if (sNameLower.includes('30th')) return '/30th-celebration-logo.png';
     if (sNameLower.includes('ascended')) return '/ascended-heroes-logo.png';
-
-    // 2. Set masa depan atau belum berlogo di CDN resmi -> gunakan logo Regokemon
     if (sId === 'me3' || sId === 'me4' || sId === 'me5') return '/pokemon-logo.png';
 
-    // 3. Default ke CDN resmi Pokemon TCG API
     return `https://images.pokemontcg.io/${s.set_id}/logo.png`;
   };
 
-  // 1. Ambil daftar Sets secara dinamis dari backend (kronologis rilis terbaru ke lama)
   useEffect(() => {
     const fetchSets = async () => {
       try {
@@ -104,7 +109,6 @@ function CatalogPage() {
     fetchSets();
   }, []);
 
-  // 2. Fungsi Mengambil Data Kartu
   const fetchCards = async (targetPage = 1) => {
     setIsLoading(true);
     try {
@@ -131,7 +135,6 @@ function CatalogPage() {
         setTotalCards(data.total || 0);
         setTotalPages(data.total_pages || 1);
         setPage(data.page || 1);
-        if (data.currency_rate) setCurrencyRate(data.currency_rate);
       } else if (Array.isArray(data)) {
         setCardsData(data);
         setTotalCards(data.length);
@@ -145,12 +148,10 @@ function CatalogPage() {
     }
   };
 
-  // Re-fetch saat filter / search / sort / set berubah
   useEffect(() => {
     fetchCards(page);
   }, [page, activeSearch, selectedSupertype, selectedRarity, selectedHolo, activeSet, sortBy]);
 
-  // Handler Submit Pencarian
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     setPage(1);
@@ -178,6 +179,17 @@ function CatalogPage() {
     selectedHolo !== 'all' || 
     activeSet.set_id !== 'all' || 
     activeSearch.trim() !== '';
+
+  // Mencegah scrolling body saat pop-up terbuka
+  useEffect(() => {
+    if (selectedCard) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => { document.body.style.overflow = 'unset'; }
+  }, [selectedCard]);
+
 
   return (
     <div className="catalog-container">
@@ -207,7 +219,6 @@ function CatalogPage() {
             </svg>
           </button>
 
-          {/* MENU SET (Dropdown) */}
           {isSetMenuOpen && (
             <div className="set-dropdown-menu">
               <div className="set-dropdown-list">
@@ -241,7 +252,6 @@ function CatalogPage() {
           )}
         </div>
         
-        {/* FORM SEARCH BAR */}
         <form className="search-bar-wrapper" onSubmit={handleSearchSubmit}>
           <input 
             type="text" 
@@ -291,11 +301,7 @@ function CatalogPage() {
             <select 
               className="filter-select"
               value={selectedRarity}
-              onChange={(e) => {
-                setSelectedRarity(e.target.value);
-                setPage(1);
-              }}
-              title="Filter Tingkat Kelangkaan (Rarity)"
+              onChange={(e) => { setSelectedRarity(e.target.value); setPage(1); }}
             >
               <option value="all">Semua Rarity</option>
               <option value="Common">Common</option>
@@ -307,11 +313,7 @@ function CatalogPage() {
             <select 
               className="filter-select"
               value={selectedHolo}
-              onChange={(e) => {
-                setSelectedHolo(e.target.value);
-                setPage(1);
-              }}
-              title="Filter Efek Foil"
+              onChange={(e) => { setSelectedHolo(e.target.value); setPage(1); }}
             >
               <option value="all">Semua Foil</option>
               <option value="holo">Holo Only</option>
@@ -319,13 +321,7 @@ function CatalogPage() {
             </select>
 
             {isAnyFilterActive && (
-              <button 
-                className="reset-filter-btn" 
-                onClick={handleResetFilters}
-                title="Reset Semua Filter"
-              >
-                Reset
-              </button>
+              <button className="reset-filter-btn" onClick={handleResetFilters}>Reset</button>
             )}
           </div>
 
@@ -339,10 +335,7 @@ function CatalogPage() {
               <select 
                 className="sort-dropdown"
                 value={sortBy}
-                onChange={(e) => {
-                  setSortBy(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
               >
                 <option value="newest">Rilis: Terbaru ke Lama</option>
                 <option value="oldest">Rilis: Terlama ke Baru</option>
@@ -371,24 +364,18 @@ function CatalogPage() {
             </div>
             <h3>Kartu Tidak Ditemukan</h3>
             <p>Tidak ada kartu yang cocok dengan kata kunci <em>"{activeSearch}"</em> atau filter yang dipilih.</p>
-            <button 
-              className="reset-all-btn"
-              onClick={() => {
-                setActiveSearch('');
-                setSearchInput('');
-                setSelectedSupertype('all');
-                setActiveSet(availableSets[0]);
-                setPage(1);
-              }}
-            >
-              Reset Semua Filter
-            </button>
+            <button className="reset-all-btn" onClick={handleResetFilters}>Reset Semua Filter</button>
           </div>
         ) : (
           <>
             <div className="card-gallery-grid">
               {cardsData.map((card) => (
-                <div key={card.id} className="gallery-card-item">
+                <div 
+                  key={card.id} 
+                  className="gallery-card-item"
+                  onClick={() => setSelectedCard(card)} 
+                  style={{ cursor: 'pointer' }}
+                >
                   <div className="card-image-wrapper">
                     <img 
                       src={card.image} 
@@ -447,10 +434,173 @@ function CatalogPage() {
             </div>
           </>
         )}
-
       </div>
+
+      {/* =========================================
+          POP-UP MODAL (DETAIL KARTU) - LAYOUT REVISI
+          ========================================= */}
+      {selectedCard && (
+        <div className="catalog-modal-overlay" onClick={() => setSelectedCard(null)}>
+          <div className="catalog-modal-content" onClick={(e) => e.stopPropagation()}>
+            
+            {/* Tombol Tutup */}
+            <button className="catalog-modal-close" onClick={() => setSelectedCard(null)}>
+              <CloseIcon />
+            </button>
+
+            {/* Kolom Kiri (Latar Kuning Penuh) */}
+            <div className="catalog-modal-left">
+              <div className="modal-card-img-container">
+                <img 
+                  src={selectedCard.image} 
+                  alt={selectedCard.name} 
+                  className="catalog-modal-card-img"
+                  onError={(e) => { e.target.src = '/card-result.png'; }} 
+                />
+              </div>
+            </div>
+
+            {/* Kolom Kanan (Konten Putih) */}
+            <div className="catalog-modal-right">
+              
+              <div className="modal-right-content-wrapper">
+                {/* Bagian Atas Kanan: Tabel + Kotak Abu (Sejajar) */}
+                <div className="modal-top-section">
+                  
+                  {/* Kiri dari Bagian Atas: Tabel Spesifikasi */}
+                  <div className="catalog-modal-specs-section">
+                    <table className="catalog-modal-table">
+                      <tbody>
+                        <tr>
+                          <td className="spec-label">Name</td>
+                          <td className="spec-value">{selectedCard.name || '-'}</td>
+                          <td className="spec-label">HP</td>
+                          <td className="spec-value">{selectedCard.hp || '120'}</td>
+                        </tr>
+                        <tr>
+                          <td className="spec-label">Rarity</td>
+                          <td className="spec-value">{selectedCard.rarityText || '-'}</td>
+                          <td className="spec-label">Attack</td>
+                          <td className="spec-value">Windmill <span style={{float: 'right'}}>20</span></td>
+                        </tr>
+                        <tr>
+                          <td className="spec-label">Holofoil type</td>
+                          <td className="spec-value">Standard holofoil</td>
+                          <td className="spec-label"></td>
+                          <td className="spec-value">Flower tornado <span style={{float: 'right'}}>60</span></td>
+                        </tr>
+                        <tr>
+                          <td className="spec-label">Language</td>
+                          <td className="spec-value">English</td>
+                          <td className="spec-label">Weakness</td>
+                          <td className="spec-value">*fire x 2</td>
+                        </tr>
+                        <tr>
+                          <td className="spec-label">Set number</td>
+                          <td className="spec-value">036 / 084</td>
+                          <td className="spec-label">Resistance</td>
+                          <td className="spec-value">-</td>
+                        </tr>
+                        <tr>
+                          <td className="spec-label">Year</td>
+                          <td className="spec-value">2017</td>
+                          <td className="spec-label">Retreat</td>
+                          <td className="spec-value">*</td>
+                        </tr>
+                        <tr>
+                          <td className="spec-label">Set code</td>
+                          <td className="spec-value">{selectedCard.set || '-'}</td>
+                          <td className="spec-label">Number</td>
+                          <td className="spec-value">182</td>
+                        </tr>
+                        <tr>
+                          <td className="spec-label">Regulation mark</td>
+                          <td className="spec-value">H</td>
+                          <td className="spec-label">Height</td>
+                          <td className="spec-value">1' 04"</td>
+                        </tr>
+                        <tr>
+                          <td className="spec-label">Stage</td>
+                          <td className="spec-value">2</td>
+                          <td className="spec-label">Weight</td>
+                          <td className="spec-value">12.8 lbs.</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Kanan dari Bagian Atas: Grid Kotak Abu-abu */}
+                  <div className="catalog-modal-analytics-grid">
+                    <div className="analytics-box-gray"><span className="analytics-label">All-time high</span>
+                    <span className="analytics-value">$12.50</span></div>
+                    <div className="analytics-box-gray"><span className="analytics-label">Market AVG</span>
+                    <span className="analytics-value">$4.80</span></div>
+                    <div className="analytics-box-gray"><span className="analytics-label">30 day trend</span>
+                    <span className="analytics-value trend-positive">+14.5%</span></div>
+                    <div className="analytics-box-gray"><span className="analytics-label">Age to market</span>
+                    <span className="analytics-value">7 Thn</span></div>
+                    <div className="analytics-box-gray"><span className="analytics-label">Price valuation</span>
+                    <span className="analytics-value">Undervalued</span></div>
+                    <div className="analytics-box-gray"><span className="analytics-label">Trading signal</span>
+                    <span className="analytics-value signal-buy">Strong Buy</span></div>
+                  </div>
+
+                </div>
+
+                {/* Bagian Bawah Kanan: Grafik Garis (Dengan Padding Atas Aman & Skala Lengkap 0-10) */}
+                <div className="catalog-modal-chart-area">
+                  <svg width="100%" height="100%" viewBox="0 0 700 155" preserveAspectRatio="none">
+                    {/* Grid Lines Horizontal Sumbu Y (0, 2, 4, 6, 8, 10) */}
+                    <line x1="35" y1="130" x2="680" y2="130" stroke="#f1f5f9" strokeWidth="1.5" />
+                    <line x1="35" y1="108" x2="680" y2="108" stroke="#f1f5f9" strokeWidth="1.5" />
+                    <line x1="35" y1="86"  x2="680" y2="86"  stroke="#f1f5f9" strokeWidth="1.5" />
+                    <line x1="35" y1="64"  x2="680" y2="64"  stroke="#f1f5f9" strokeWidth="1.5" />
+                    <line x1="35" y1="42"  x2="680" y2="42"  stroke="#f1f5f9" strokeWidth="1.5" />
+                    <line x1="35" y1="20"  x2="680" y2="20"  stroke="#f1f5f9" strokeWidth="1.5" />
+                    
+                    {/* Label Angka Sumbu Y (Posisi y sudah diturunkan agar tidak terpotong) */}
+                    <text x="25" y="134" fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">0</text>
+                    <text x="25" y="112" fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">2</text>
+                    <text x="25" y="90"  fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">4</text>
+                    <text x="25" y="68"  fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">6</text>
+                    <text x="25" y="46"  fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">8</text>
+                    <text x="25" y="24"  fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">10</text>
+
+                    {/* Garis Kurva Halus Magenta (#c2185b) Sesuai Mockup Canva */}
+                    <path 
+                      d="M 50 100 C 110 95, 130 90, 170 88 C 210 86, 250 66, 290 62 C 330 58, 370 72, 410 70 C 450 68, 490 48, 530 44 C 570 40, 610 35, 650 33" 
+                      fill="none" 
+                      stroke="#c2185b" 
+                      strokeWidth="2.5" 
+                      strokeLinecap="round" 
+                    />
+                    
+                    {/* Titik Data (Dots) */}
+                    <circle cx="50"  cy="100" r="3.5" fill="#c2185b" />
+                    <circle cx="170" cy="88"  r="3.5" fill="#c2185b" />
+                    <circle cx="290" cy="62"  r="3.5" fill="#c2185b" />
+                    <circle cx="410" cy="70"  r="3.5" fill="#c2185b" />
+                    <circle cx="530" cy="44"  r="3.5" fill="#c2185b" />
+                    <circle cx="650" cy="33"  r="3.5" fill="#c2185b" />
+
+                    {/* Label Bulan Sumbu X */}
+                    <text x="50"  y="148" fontSize="9.5" fill="#94a3b8" textAnchor="middle" fontWeight="600">May</text>
+                    <text x="170" y="148" fontSize="9.5" fill="#94a3b8" textAnchor="middle" fontWeight="600">Jun</text>
+                    <text x="290" y="148" fontSize="9.5" fill="#94a3b8" textAnchor="middle" fontWeight="600">Jul</text>
+                    <text x="410" y="148" fontSize="9.5" fill="#94a3b8" textAnchor="middle" fontWeight="600">Aug</text>
+                    <text x="530" y="148" fontSize="9.5" fill="#94a3b8" textAnchor="middle" fontWeight="600">Sep</text>
+                    <text x="650" y="148" fontSize="9.5" fill="#94a3b8" textAnchor="middle" fontWeight="600">Oct</text>
+                  </svg>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
 
-export default CatalogPage;
+export default CatalogPage;

@@ -681,4 +681,273 @@
     width: 100% !important;
   }
 }
-
+
+/* =========================================
+   6. POP-UP MODAL (DETAIL KARTU) - REVISI FINAL
+   ========================================= */
+
+/* Latar Gelap Overlay */
+.catalog-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(30, 27, 75, 0.4); 
+  backdrop-filter: blur(4px); 
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.2s ease-out; 
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Kotak Pop-up Utama (Persegi Panjang Lebar) */
+.catalog-modal-content {
+  background-color: #ffffff;
+  width: 95%; 
+  max-width: 1300px; /* Lebar direntangkan agar seperti mockup */
+  height: auto; 
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  display: flex; /* Flex row untuk membagi kiri dan kanan */
+  position: relative;
+  
+  /* PENTING: Memotong warna kuning di ujung kiri agar melengkung rapi */
+  overflow: hidden; 
+  animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Tombol Tutup (X) */
+.catalog-modal-close {
+  display: none; 
+}
+
+.catalog-modal-close:hover {
+  background: #e2e8f0;
+  color: #ef4444; 
+}
+
+/* =========================================
+   KOLOM KIRI (LATAR KUNING PENUH)
+   ========================================= */
+.catalog-modal-left {
+  width: 35%; /* Proporsi area gambar */
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  padding: 15px; 
+  box-sizing: border-box;
+}
+
+.modal-card-img-container {
+  width: 100%;
+  display: flex;
+  justify-content: left;
+}
+
+.catalog-modal-card-img {
+  width: 100%;
+  max-width: 350px; 
+  height: auto;
+  border-radius: 0px;
+  /* box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25); /* Bayangan kartu */
+}
+
+/* =========================================
+   KOLOM KANAN (KONTEN DATA PUTIH)
+   ========================================= */
+.catalog-modal-right {
+  width: 80%; /* Sisa ruang untuk area data */
+  padding: 20px 20px 20px 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-right-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: space-between; /* Elemen tersebar tanpa scroll */
+}
+
+.modal-top-section {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* --- Tabel Spesifikasi --- */
+.catalog-modal-specs-section {
+  flex: 1.2; 
+}
+
+.catalog-modal-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.catalog-modal-table td {
+  padding: 7px 8px;
+  vertical-align: middle;
+}
+
+/* 1. Garis Vertikal Pemisah antara Label dan Value */
+.catalog-modal-table td:nth-child(1),
+.catalog-modal-table td:nth-child(3) {
+  border-right: 1px solid #000000;
+  width: 25%;
+}
+
+.catalog-modal-table td:nth-child(2),
+.catalog-modal-table td:nth-child(4) {
+  width: 25%;
+}
+
+/* 2. Garis Horizontal Bawah untuk Blok Kiri (Name s/d Stage) */
+.catalog-modal-table td:nth-child(1) {
+  background: linear-gradient(#000000, #000000) bottom / 100% 1px no-repeat;
+  padding-right: 8px;
+}
+
+.catalog-modal-table td:nth-child(2) {
+  /* Memberi celah kosong di kanan agar tidak menyambung ke kolom HP */
+  background: linear-gradient(#000000, #000000) bottom left / calc(100% - 15px) 1px no-repeat;
+  padding-left: 8px;
+  padding-right: 15px;
+}
+
+/* 3. Garis Horizontal Bawah untuk Blok Kanan (HP s/d Weight) */
+.catalog-modal-table td:nth-child(3) {
+  /* Mulai setelah jeda kosong di tengah */
+  background: linear-gradient(#000000, #000000) bottom right / calc(100% - 15px) 1px no-repeat;
+  padding-left: 15px;
+  padding-right: 8px;
+}
+
+.catalog-modal-table td:nth-child(4) {
+  background: linear-gradient(#000000, #000000) bottom / 100% 1px no-repeat;
+  padding-left: 8px;
+}
+
+/* 4. Menghilangkan garis pemisah di antara Windmill dan Flower Tornado (agar Attack menyatu seperti Canva) */
+.catalog-modal-table tr:nth-child(2) td:nth-child(3),
+.catalog-modal-table tr:nth-child(2) td:nth-child(4) {
+  background: none;
+}
+
+/* 5. Menghilangkan garis horizontal di baris paling bawah (Stage & Weight) */
+.catalog-modal-table tr:last-child td {
+  background: none;
+}
+
+/* 5. Penyesuaian Font & Ketegasan Teks */
+.spec-label {
+  font-family: 'Montserrat', sans-serif;
+  color: #1e293b;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.spec-value {
+  font-family: 'Montserrat', sans-serif;
+  color: #000000;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* --- Kotak Abu-abu (Analitik) --- */
+.catalog-modal-analytics-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr); /* Grid 12 kolom untuk pembagian proporsi */
+  gap: 8px;
+  align-content: start;
+}
+
+/* Base Kotak Abu-abu */
+.analytics-box-gray {
+  background-color: #f3f4f6;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 10px;
+  min-height: 85px;            /* Tinggi pas untuk judul + nilai */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* Judul di atas, Nilai di bawah */
+  box-sizing: border-box;
+}
+
+/* Pola Selang-Seling (5 kolom : 7 kolom) */
+/* Baris 1: Pendek (Kiri) - Panjang (Kanan) */
+.analytics-box-gray:nth-child(1) { grid-column: span 5; }
+.analytics-box-gray:nth-child(2) { grid-column: span 7; }
+
+/* Baris 2: Panjang (Kiri) - Pendek (Kanan) */
+.analytics-box-gray:nth-child(3) { grid-column: span 7; }
+.analytics-box-gray:nth-child(4) { grid-column: span 5; }
+
+/* Baris 3: Pendek (Kiri) - Panjang (Kanan) */
+.analytics-box-gray:nth-child(5) { grid-column: span 5; }
+.analytics-box-gray:nth-child(6) { grid-column: span 7; }
+
+/* Label Teks di dalam Kotak */
+/* Judul / Label Kotak */
+.analytics-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  color: #64748b;              /* Abu-abu medium agar kontras dengan nilai */
+  font-weight: 500;
+  letter-spacing: -0.1px;
+}
+
+/* Nilai / Angka Utama di dalam Kotak */
+.analytics-value {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;             /* Ukuran angka tegas & mudah dibaca */
+  font-weight: 400;
+  color: #0f172a;              /* Hitam pekat */
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+/* --- Area Grafik Garis --- */
+.catalog-modal-chart-area {
+  width: 100%;
+  height: 180px; /* Tinggi diatur pas agar tidak menyebabkan scroll */
+  margin-top: 5px;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Responsif untuk Layar Tablet / Ponsel */
+@media (max-width: 900px) {
+  .catalog-modal-content {
+    flex-direction: column;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .catalog-modal-left {
+    width: 100%;
+    padding: 30px;
+  }
+  .catalog-modal-right {
+    width: 100%;
+    padding: 25px;
+  }
+  .modal-top-section {
+    flex-direction: column;
+  }
+}
