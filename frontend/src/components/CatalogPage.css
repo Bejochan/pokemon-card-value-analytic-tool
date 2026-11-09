@@ -689,16 +689,22 @@
 /* Latar Gelap Overlay */
 .catalog-modal-overlay {
   position: fixed;
+  inset: 0;
   top: 0;
   left: 0;
+  right: 0;
+  bottom: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(30, 27, 75, 0.4); 
-  backdrop-filter: blur(4px); 
-  z-index: 1000;
+  background-color: rgba(30, 27, 75, 0.6); 
+  backdrop-filter: blur(6px); 
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 99999;
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: 20px;
+  box-sizing: border-box;
   animation: fadeIn 0.2s ease-out; 
 }
 
@@ -707,20 +713,30 @@
   to { opacity: 1; }
 }
 
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.catalog-modal-overlay.closing {
+  animation: fadeOut 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
 /* Kotak Pop-up Utama (Persegi Panjang Lebar) */
 .catalog-modal-content {
   background-color: #ffffff;
   width: 95%; 
-  max-width: 1300px; /* Lebar direntangkan agar seperti mockup */
-  height: auto; 
+  max-width: 1200px; /* Lebar direntangkan agar seperti mockup */
+  max-height: 90vh;
+  overflow-y: auto;
   border-radius: 16px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
   display: flex; /* Flex row untuk membagi kiri dan kanan */
   position: relative;
   
   /* PENTING: Memotong warna kuning di ujung kiri agar melengkung rapi */
   overflow: hidden; 
-  animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 0;
 }
 
@@ -729,14 +745,40 @@
   to { transform: scale(1); opacity: 1; }
 }
 
+@keyframes scaleDown {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.95); opacity: 0; }
+}
+
+.catalog-modal-content.closing {
+  animation: scaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
 /* Tombol Tutup (X) */
 .catalog-modal-close {
-  display: none; 
+  display: flex !important;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #1e1b4b;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 50;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .catalog-modal-close:hover {
-  background: #e2e8f0;
+  background: #fee2e2;
   color: #ef4444; 
+  border-color: #fca5a5;
+  transform: scale(1.08);
 }
 
 /* =========================================
@@ -744,10 +786,11 @@
    ========================================= */
 .catalog-modal-left {
   width: 35%; /* Proporsi area gambar */
+  background-color: #fef08a;
   display: flex;
   justify-content: center;
-  align-items: stretch;
-  padding: 15px; 
+  align-items: center;
+  padding: 24px 20px; 
   box-sizing: border-box;
 }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { API_BASE_URL } from '../config/api';
 import './CatalogPage.css';
 
@@ -30,6 +31,16 @@ function CatalogPage() {
 
   // --- POP-UP MODAL STATE ---
   const [selectedCard, setSelectedCard] = useState(null);
+  const [isClosingModal, setIsClosingModal] = useState(false);
+
+  const handleCloseModal = () => {
+    if (isClosingModal) return;
+    setIsClosingModal(true);
+    setTimeout(() => {
+      setSelectedCard(null);
+      setIsClosingModal(false);
+    }, 200);
+  };
 
   // Menutup dropdown menu otomatis
   useEffect(() => {
@@ -42,7 +53,9 @@ function CatalogPage() {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         setIsSetMenuOpen(false);
-        setSelectedCard(null); 
+        if (selectedCard) {
+          handleCloseModal();
+        }
       }
     };
 
@@ -373,7 +386,18 @@ function CatalogPage() {
                 <div 
                   key={card.id} 
                   className="gallery-card-item"
-                  onClick={() => setSelectedCard(card)} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCard(card);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedCard(card);
+                    }
+                  }}
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="card-image-wrapper">
@@ -439,12 +463,24 @@ function CatalogPage() {
       {/* =========================================
           POP-UP MODAL (DETAIL KARTU) - LAYOUT REVISI
           ========================================= */}
-      {selectedCard && (
-        <div className="catalog-modal-overlay" onClick={() => setSelectedCard(null)}>
-          <div className="catalog-modal-content" onClick={(e) => e.stopPropagation()}>
+      {selectedCard && createPortal(
+        <div 
+          className={`catalog-modal-overlay ${isClosingModal ? 'closing' : ''}`} 
+          onClick={handleCloseModal}
+        >
+          <div 
+            className={`catalog-modal-content ${isClosingModal ? 'closing' : ''}`} 
+            onClick={(e) => e.stopPropagation()}
+          >
             
             {/* Tombol Tutup */}
-            <button className="catalog-modal-close" onClick={() => setSelectedCard(null)}>
+            <button 
+              type="button" 
+              className="catalog-modal-close" 
+              onClick={handleCloseModal}
+              title="Tutup (Esc)"
+              aria-label="Tutup"
+            >
               <CloseIcon />
             </button>
 
@@ -596,7 +632,8 @@ function CatalogPage() {
 
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>
