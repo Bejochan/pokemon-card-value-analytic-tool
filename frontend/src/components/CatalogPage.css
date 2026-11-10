@@ -733,7 +733,7 @@
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
   display: flex; /* Flex row untuk membagi kiri dan kanan */
   position: relative;
-  
+  margin-top: 130px;
   /* PENTING: Memotong warna kuning di ujung kiri agar melengkung rapi */
   overflow: hidden; 
   animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -754,24 +754,9 @@
   animation: scaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* Tombol Tutup (X) */
+/* Tombol Tutup (X) (tidak perlu) */
 .catalog-modal-close {
-  display: flex !important;
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  color: #1e1b4b;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 50;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  display: none; 
 }
 
 .catalog-modal-close:hover {
@@ -782,15 +767,15 @@
 }
 
 /* =========================================
-   KOLOM KIRI (LATAR KUNING PENUH)
+   KOLOM KIRI
    ========================================= */
 .catalog-modal-left {
   width: 35%; /* Proporsi area gambar */
-  background-color: #fef08a;
+  background-color: #ffffff;
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: 24px 20px; 
+  align-items: stretch;
+  padding: 15px; 
   box-sizing: border-box;
 }
 
@@ -802,7 +787,7 @@
 
 .catalog-modal-card-img {
   width: 100%;
-  max-width: 350px; 
+  max-width: 390px; 
   height: auto;
   border-radius: 0px;
   /* box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25); /* Bayangan kartu */
@@ -851,7 +836,7 @@
 .catalog-modal-table td:nth-child(1),
 .catalog-modal-table td:nth-child(3) {
   border-right: 1px solid #000000;
-  width: 25%;
+  width: 20%;
 }
 
 .catalog-modal-table td:nth-child(2),
@@ -973,6 +958,12 @@
   margin-top: 5px;
   display: flex;
   align-items: flex-end;
+}
+
+/* Mengubah semua teks (Sumbu X dan Sumbu Y) menjadi Montserrat */
+.catalog-modal-chart-area text {
+  font-family: 'Montserrat', sans-serif !important;
+  letter-spacing: -0.2px;
 }
 
 /* Responsif untuk Layar Tablet / Ponsel */
