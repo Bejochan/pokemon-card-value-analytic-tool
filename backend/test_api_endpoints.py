@@ -1,5 +1,9 @@
 import sys, time, base64, asyncio
-sys.path.insert(0, 'backend')
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 from app.main import get_card_forecast, evaluate_card_condition_base64
 from app.schemas import CardConditionRequest
@@ -19,9 +23,19 @@ def to_b64(path):
     with open(path, "rb") as f:
         return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode("utf-8")
 
+front_img_path = BASE_DIR / "models" / "debug_TAMPAK_DEPAN.jpg"
+back_img_path = BASE_DIR / "models" / "debug_TAMPAK_BELAKANG.jpg"
+
+# Fallback ke val_samples jika gambar debug tidak tersedia
+if not front_img_path.exists():
+    fallback_sample = list((BASE_DIR / "dataset" / "val_samples").glob("*.jpeg"))
+    if fallback_sample:
+        front_img_path = fallback_sample[0]
+        back_img_path = fallback_sample[0]
+
 req = CardConditionRequest(
-    front_image=to_b64("backend/models/debug_TAMPAK_DEPAN.jpg"),
-    back_image=to_b64("backend/models/debug_TAMPAK_BELAKANG.jpg")
+    front_image=to_b64(front_img_path),
+    back_image=to_b64(back_img_path)
 )
 
 t1 = time.time()
