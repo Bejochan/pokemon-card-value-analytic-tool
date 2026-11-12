@@ -1,0 +1,24 @@
+name: Auto Sync Fork from Upstream
+
+on:
+  schedule:
+    # Otomatis berjalan setiap hari pada jam 00:00 UTC (07:00 WIB)
+    - cron: '0 0 * * *'
+  # Mengizinkan pemicuan manual kapan pun dari tab Actions di GitHub
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-fork:
+    name: Sync main branch with upstream Bejochan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync Fork via GitHub CLI
+        run: |
+          gh repo sync ${{ github.repository }} -b main --source Bejochan/pokemon-card-value-analytic-tool
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
