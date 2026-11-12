@@ -458,35 +458,38 @@ def forecast_7_days(card_id: str, current_price_override: Optional[float] = None
 
 def calculate_condition_factor(defects: List[Dict[str, Any]]) -> Tuple[float, str, float]:
     """
-    Menghitung pengali kondisi fisik (F_condition), kategori tier, dan persentase diskon.
+    Menghitung pengali kondisi fisik (F_condition), kategori tier, dan persentase diskon
+    secara proporsional berdasarkan frekuensi dan tingkat keparahan cacat fisik.
     
-    Aturan Diskon Cacat Fisik:
+    Aturan Diskon Cacat Fisik Proporsional:
     - Tidak ada cacat    : Multiplier = 1.00 (Diskon 0%)  -> "Near Mint / Mint"
-    - Scratched (Lecet)  : Multiplier = 0.85 (Diskon 15%) -> "Lightly Played (LP)"
-    - Edge Wear (Aus)    : Multiplier = 0.80 (Diskon 20%) -> "Moderately Played (MP)"
-    - Bent / Crease      : Multiplier = 0.65 (Diskon 35%) -> "Heavily Played (HP)"
-    - Akumulasi cacat berat: Dibatasi minimal 0.40        -> "Damaged"
+    - Scratch            : Diskon 5% per titik goresan (maks 20%)
+    - Corner Wear        : Diskon 6% per sudut aus (maks 24%)
+    - Edge Wear          : Diskon 8% per sisi aus (maks 25%)
+    - Bent / Crease      : Cacat struktural berat 25% per titik (maks 40%)
+    - Akumulasi cacat    : Dibatasi minimal multiplier 0.40 (Diskon maks 60% -> "Damaged")
     """
     if not defects:
         return 1.00, "Near Mint / Mint", 0.0
 
-    multiplier = 1.00
     defect_names = [d.get("label", "").lower() for d in defects]
 
-    # Evaluasi potongan berdasarkan cacat terparah
-    has_crease = any("crease" in name or "bent" in name for name in defect_names)
-    has_edge = any("edge" in name or "wear" in name or "corner" in name for name in defect_names)
-    has_scratch = any("scratch" in name for name in defect_names)
+    # Hitung jumlah kemunculan per jenis cacat
+    crease_count = sum(1 for name in defect_names if "crease" in name or "bent" in name)
+    edge_count = sum(1 for name in defect_names if "edge" in name)
+    corner_count = sum(1 for name in defect_names if "corner" in name)
+    scratch_count = sum(1 for name in defect_names if "scratch" in name)
+    other_count = max(0, len(defect_names) - (crease_count + edge_count + corner_count + scratch_count))
 
-    if has_crease:
-        multiplier *= 0.65
-    if has_edge:
-        multiplier *= 0.80
-    if has_scratch:
-        multiplier *= 0.85
+    # Penalti proporsional per jenis cacat
+    crease_penalty = min(0.40, crease_count * 0.25)
+    edge_penalty = min(0.25, edge_count * 0.08)
+    corner_penalty = min(0.24, corner_count * 0.06)
+    scratch_penalty = min(0.20, scratch_count * 0.05)
+    other_penalty = min(0.15, other_count * 0.05)
 
-    # Batas minimum multiplier agar tidak negatif / nol
-    multiplier = max(0.40, round(multiplier, 2))
+    total_discount = min(0.60, crease_penalty + edge_penalty + corner_penalty + scratch_penalty + other_penalty)
+    multiplier = round(max(0.40, 1.00 - total_discount), 2)
     discount_pct = round((1.0 - multiplier) * 100, 2)
 
     # Klasifikasi Tingkat Kondisi
@@ -631,8 +634,24 @@ def evaluate_card_valuation(
             p10_1d = forecast_res["p10"][0]
             p50_1d = forecast_res["p50"][0]
             p90_1d = forecast_res["p90"][0]
-            signal, signal_reason, gap_pct = calculate_dynamic_tunnel_signal(final_price_usd, p10_1d, p90_1d, p50_1d)
-            predicted_fair_value_usd = p50_1d
+
+            # Kalibrasi batas lorong kuantil terhadap kondisi fisik kartu & varian
+            cond_factor = m_variant * f_condition
+            adj_p10_1d = round(p10_1d * cond_factor, 2)
+            adj_p50_1d = round(p50_1d * cond_factor, 2)
+            adj_p90_1d = round(p90_1d * cond_factor, 2)
+
+            # Jika cacat fisik berat (diskon >= 30%), jangan beri sinyal BUY spekulatif
+            if discount_pct >= 30.0:
+                signal = "HOLD"
+                signal_reason = f"Kondisi fisik kartu memiliki degradasi berat ({condition_tier}, diskon -{discount_pct:.1f}%); transaksi disarankan ditahan (HOLD)."
+                gap_pct = round(((final_price_usd - adj_p50_1d) / adj_p50_1d) * 100, 2) if adj_p50_1d > 0 else 0.0
+            else:
+                signal, signal_reason, gap_pct = calculate_dynamic_tunnel_signal(final_price_usd, adj_p10_1d, adj_p90_1d, adj_p50_1d)
+                if condition_tier != "Near Mint / Mint" and signal == "BUY":
+                    signal_reason += f" (Telah disesuaikan terhadap kondisi {condition_tier})."
+
+            predicted_fair_value_usd = adj_p50_1d
             forecast_ribbon = {
                 "future_dates": forecast_res["future_dates"],
                 "p10": forecast_res["p10"],
@@ -641,14 +660,16 @@ def evaluate_card_valuation(
             }
 
     if forecast_ribbon is None:
-        predicted_fair_value_usd = predict_fair_value_ml(card_id, release_year, rarity, supertype, hp)
+        raw_ml_fair_value = predict_fair_value_ml(card_id, release_year, rarity, supertype, hp)
+        cond_factor = m_variant * f_condition
+        predicted_fair_value_usd = round(raw_ml_fair_value * cond_factor, 2)
         ml_signal, gap_pct = calculate_mispricing_signal(final_price_usd, predicted_fair_value_usd)
         if discount_pct >= 30.0:
             signal = "HOLD"
             signal_reason = f"Kondisi fisik kartu memiliki diskon cacat {discount_pct:.1f}%; transaksi disarankan ditahan (HOLD)."
         elif predicted_fair_value_usd > 0:
             signal = ml_signal
-            signal_reason = f"Selisih harga terhadap nilai wajar ML: {gap_pct:+.1f}%."
+            signal_reason = f"Selisih harga terhadap nilai wajar ML ({condition_tier}): {gap_pct:+.1f}%."
         else:
             signal = "HOLD"
             signal_reason = "Data riwayat transaksi deret waktu terbatas; rekomendasi ditahan."
