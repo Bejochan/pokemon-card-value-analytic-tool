@@ -2,8 +2,8 @@ name: Auto Sync Fork from Upstream
 
 on:
   schedule:
-    # Otomatis berjalan setiap hari pada jam 00:00 UTC (07:00 WIB)
-    - cron: '0 0 * * *'
+    # Otomatis berjalan setiap 3 jam (07:00, 10:00, 13:00, 16:00, 19:00, 22:00, 01:00, 04:00 WIB)
+    - cron: '0 */3 * * *'
   # Mengizinkan pemicuan manual kapan pun dari tab Actions di GitHub
   workflow_dispatch:
 
