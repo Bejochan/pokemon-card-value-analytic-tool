@@ -114,12 +114,12 @@ graph TD
 * **Dual-Side Inspection (Tampak Depan & Tampak Belakang):**
   * Mendukung inspeksi cacat pada kedua sisi kartu (`detect_card_defects_dual_side`). Cacat di sisi belakang (seperti goresan *Poké Ball*, *edge whitening*, dan kikisan sudut) terintegrasi langsung ke dalam laporan kondisi akhir.
 * **Kelas Cacat Fisik & Pengali Depresiasi (F_condition):**
+  * Model YOLO mendeteksi 4 kelas utama: `Card`, `Corner Wear`, `Edge Wear`, dan `Scratch`.
   * `Clean / Mint (Mulus)` → Multiplier = **1.00** *(Diskon 0% : Near Mint / Mint)*
-  * `Scratched (Lecet Permukaan)` → Multiplier = **0.85** *(Diskon 15% : Lightly Played)*
-  * `Edge Wear (Kikis Tepi)` → Multiplier = **0.80** *(Diskon 20% : Moderately Played)*
-  * `Corner Wear (Kikis Sudut)` → Multiplier = **0.80** *(Diskon 20% : Moderately Played)*
-  * `Bent / Crease (Tertekuk)` → Multiplier = **0.65** *(Diskon 35% : Heavily Played)*
-  * `Akumulasi Cacat Berat` → Multiplier batas bawah = **0.40** *(Diskon hingga 60% : Damaged)*
+  * `Scratched (Goresan Permukaan)` → Multiplier = **0.85** *(Diskon 15% : Lightly Played)*
+  * `Edge Wear / Corner Wear (Kikis Tepi / Sudut)` → Multiplier = **0.80** *(Diskon 20% : Moderately Played)*
+  * `Bent / Crease (Lipatan / Tekukan)` → Multiplier = **0.65** *(Diskon 35% : Heavily Played, aturan penalti struktural)*
+  * `Akumulasi Cacat Ganda` → Multiplier akumulatif dengan batas bawah (*floor*) = **0.40** *(Diskon hingga 60% : Damaged)*
 * **Dokumentasi Lengkap:** Pelajari arsitektur dan evaluasi performa di [`docs/yolo_model_architecture_and_rationale.md`](docs/yolo_model_architecture_and_rationale.md).
 
 ---
@@ -154,9 +154,9 @@ P_final = P_base × M_variant × F_condition × F_market
 ```
 
 * **P_base:** Harga pasar efektif konsolidasi TCGPlayer & Cardmarket dari Supabase Cloud.
-* **M_variant:** Pengali kelangkaan edisi khusus (Vintage sebelum tahun 2005: +20% s/d +50%, Secret Rare/Promo: +15% s/d +35%).
-* **F_condition:** Pengali kondisi fisik objektif dari Model 2 YOLO26s.
-* **F_market:** Atribut kondisi penjualan (Bahasa Inggris/Jepang vs Indonesia, kelengkapan Toploader/Sleeve).
+* **M_variant:** Pengali vintage edisi khusus era awal Wizards of the Coast (rilis sebelum tahun 2005: +20%).
+* **F_condition:** Pengali kondisi fisik objektif dari Model 2 YOLO (1.00x hingga floor 0.40x).
+* **F_market:** Pengali kondisi pasar transaksi (default 1.00; disiapkan untuk diferensiasi kemasan/bahasa).
 
 ---
 
@@ -246,10 +246,18 @@ pokemon-card-value-analytic-tool/
 │   │   ├── card_id_map.json              # Pemetaan indeks FAISS ke card_id resmi
 │   │   └── legacy_mobilenet/             # [Arsip] Baseline MobileNetV3 untuk studi komparasi
 │   │
-│   ├── notebooks/                        # Eksplorasi Analisis Data (Jupyter Notebooks)
-│   │   ├── eda_research_tcg.ipynb        # Visualisasi distribusi data & pemodelan
-│   │   ├── valuation_analytics.ipynb     # Analisis mendalam pasar & eksperimen valuasi
-│   │   └── forecasting_model.ipynb       # Eksperimen time-series & regresi tabular
+│   ├── notebooks/                        # Eksplorasi Analisis Data (11 Jupyter Notebooks)
+│   │   ├── analitik_harga_kartu_pokemon.ipynb      # Analisis pergerakan harga & distribusi kelangkaan
+│   │   ├── eda_condition_card_roboflow.ipynb       # Eksplorasi dataset Roboflow Card Grader
+│   │   ├── eda_heatmap.ipynb                       # Korelasi fitur dan matriks panas data pasar
+│   │   ├── eda_pokemon_images.ipynb                # Inspeksi dimensi, rasio, dan kualitas gambar kartu
+│   │   ├── eda_pokemon_json.ipynb                  # Ekstraksi dan pemetaan struktur JSON pokemontcg.io
+│   │   ├── eda_research_tcg.ipynb                  # Visualisasi distribusi data & pemodelan awal
+│   │   ├── forecasting_model.ipynb                 # Eksperimen peramalan deret waktu & regresi tabular
+│   │   ├── model_comparison_card_identifier.ipynb  # Komparasi akurasi MobileNetV3 vs CLIP ViT-B-32
+│   │   ├── test_card_condition_grader.ipynb        # Pengujian deteksi cacat Roboflow fallback
+│   │   ├── test_card_condition_retrain.ipynb       # Pelatihan ulang dan evaluasi mAP model YOLO
+│   │   └── valuation_analytics.ipynb               # Analisis mendalam formula valuasi & pasar
 │   │
 │   ├── seed_supabase.py                  # Seeding dataset bersih ke Supabase Cloud
 │   ├── daily_price_tracker.py            # Sinkronisasi harga harian dari pokemontcg.io
@@ -258,6 +266,7 @@ pokemon-card-value-analytic-tool/
 │   ├── export_broken_links.py            # Export audit laporan broken links
 │   ├── compress_images.py                # Kompresi paralel gambar ke format JPG Lanczos
 │   ├── test_api_endpoints.py             # Uji integrasi endpoint REST API
+│   ├── test_realtime_simulation.py       # Simulasi pemindaian kamera real-time
 │   ├── requirements.txt                  # Dependensi Python Backend
 │   └── .env                              # Konfigurasi API Keys & CAMERA_SOURCE
 │
@@ -286,6 +295,7 @@ pokemon-card-value-analytic-tool/
 │   ├── dataset_summary_and_metrics.md    # Statistik & Metrik Dataset Master
 │   ├── supabase_database_dictionary.md   # Dokumentasi Database Supabase
 │   └── schema.sql                        # Script DDL Relasional Database
+├── vercel.json                           # Konfigurasi deployment frontend Vercel
 └── README.md                             # Dokumentasi Utama Proyek
 ```
 
