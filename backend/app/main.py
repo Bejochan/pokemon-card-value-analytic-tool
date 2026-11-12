@@ -167,11 +167,12 @@ def healthcheck():
 # ---------------------------------------------------------------------
 
 @app.post("/identify", response_model=IdentifyResponse)
-async def identify_card_base64(data: ImageDataRequest):
+def identify_card_base64(data: ImageDataRequest):
     """
     Endpoint pemindaian kamera langsung (On-Cam).
     Menerima Base64 gambar kartu, menjalankan Model 1 CLIP ViT-B-32 sub-milidetik,
     dan mengembalikan metadata spesifikasi kartu lengkap tanpa beban deteksi cacat fisik.
+    Dieksekusi dalam threadpool FastAPI agar tidak memblokir event loop.
     """
     img_bgr, _ = decode_base64_to_cv2(data.image)
     if img_bgr is None:
@@ -188,9 +189,9 @@ async def identify_card_base64(data: ImageDataRequest):
 
 
 @app.post("/upload/identify", response_model=IdentifyResponse)
-async def identify_card_file(file: UploadFile = File(...)):
+def identify_card_file(file: UploadFile = File(...)):
     """Versi Multipart Form-Data untuk endpoint On-Cam / Identify."""
-    contents = await file.read()
+    contents = file.file.read()
     img_bgr, _ = decode_bytes_to_cv2(contents)
     if img_bgr is None:
         raise HTTPException(status_code=400, detail="Berkas gambar tidak dapat dibaca.")
@@ -455,7 +456,7 @@ def get_cards(
 
 
 @app.get("/sets")
-def get_sets(limit: int = 150):
+def get_sets(limit: int = 250):
     """
     Mengambil daftar Set Pokémon dari Supabase untuk dropdown filter katalog,
     diurutkan secara kronologis dari set rilis paling baru ke lawas.

@@ -32,14 +32,14 @@ const AnimatedCounter = ({ endValue, duration, prefix = "", suffix = "", isDecim
   return <span>{prefix}{formatNumber(count)}{suffix}</span>;
 };
 
+const MARKET_TERMS = [
+  "volatile", "bearish", "stagnant", "fluctuating", 
+  "recovering", "correction", "rallying", "stable"
+];
+
 // Komponen baru untuk mengacak teks tren pasar
 const AnimatedTextScramble = ({ targetText, duration }) => {
   const [displayText, setDisplayText] = useState("");
-  
-  const marketTerms = [
-    "volatile", "bearish", "stagnant", "fluctuating", 
-    "recovering", "correction", "rallying", "stable"
-  ];
 
   useEffect(() => {
     let startTimestamp = null;
@@ -61,11 +61,11 @@ const AnimatedTextScramble = ({ targetText, duration }) => {
           let randomIndex;
           // PERBAIKAN 2: Mencegah sistem memilih kata yang sama 2x berturut-turut (mencegah lag visual)
           do {
-            randomIndex = Math.floor(Math.random() * marketTerms.length);
+            randomIndex = Math.floor(Math.random() * MARKET_TERMS.length);
           } while (randomIndex === lastRandomIndex);
           
           lastRandomIndex = randomIndex;
-          setDisplayText(marketTerms[randomIndex]);
+          setDisplayText(MARKET_TERMS[randomIndex]);
           lastUpdate = elapsed;
         }
         window.requestAnimationFrame(step);

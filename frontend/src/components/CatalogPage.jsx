@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { API_BASE_URL } from '../config/api';
 import './CatalogPage.css';
@@ -33,14 +33,14 @@ function CatalogPage() {
   const [selectedCard, setSelectedCard] = useState(null);
   const [isClosingModal, setIsClosingModal] = useState(false);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     if (isClosingModal) return;
     setIsClosingModal(true);
     setTimeout(() => {
       setSelectedCard(null);
       setIsClosingModal(false);
     }, 200);
-  };
+  }, [isClosingModal]);
 
   // Menutup dropdown menu otomatis
   useEffect(() => {
@@ -68,7 +68,7 @@ function CatalogPage() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isSetMenuOpen, selectedCard]);
+  }, [isSetMenuOpen, selectedCard, handleCloseModal]);
 
   const [availableSets, setAvailableSets] = useState([
     { set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' }
@@ -95,7 +95,7 @@ function CatalogPage() {
   useEffect(() => {
     const fetchSets = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/sets?limit=150`);
+        const response = await fetch(`${API_BASE_URL}/sets?limit=250`);
         if (response.ok) {
           const sets = await response.json();
           if (Array.isArray(sets) && sets.length > 0) {
@@ -122,7 +122,7 @@ function CatalogPage() {
     fetchSets();
   }, []);
 
-  const fetchCards = async (targetPage = 1) => {
+  const fetchCards = useCallback(async (targetPage = 1) => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
@@ -159,14 +159,14 @@ function CatalogPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeSearch, selectedSupertype, selectedRarity, selectedHolo, activeSet.set_id, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchCards(page);
     }, 0);
     return () => clearTimeout(timer);
-  }, [page, activeSearch, selectedSupertype, selectedRarity, selectedHolo, activeSet, sortBy]);
+  }, [page, fetchCards]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();

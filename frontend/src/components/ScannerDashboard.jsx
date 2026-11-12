@@ -114,7 +114,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   // =====================================================================
   // PERHITUNGAN GRAFIK TREN HARGA & FORECAST 7 HARI
   // =====================================================================
-  const currentRateVal = currencyRate || 18000;
+  const currentRateVal = currencyRate || 16500;
   // Menyelaraskan basis ke harga pasar acuan (Base Market Price) agar kurva tidak melonjak
   const currentPriceVal = (forecastData?.current_price_usd > 0)
     ? forecastData.current_price_usd

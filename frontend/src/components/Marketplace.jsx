@@ -1,13 +1,9 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { API_BASE_URL } from '../config/api';
 import './Marketplace.css';
 
-const USD_TO_IDR = 16285;
-
-function formatIdr(usd) {
-  const idr = Math.round((usd || 0) * USD_TO_IDR);
-  return 'Rp ' + idr.toLocaleString('id-ID');
-}
+const DEFAULT_USD_TO_IDR = 16500;
 
 function maskPhoneNumber(phone) {
   const clean = (phone || '').replace(/\s+/g, '');
@@ -361,6 +357,34 @@ function getRarityMeta(rarityStr) {
 // 3. KOMPONEN UTAMA MARKETPLACE
 // ==========================================
 export default function Marketplace() {
+  // 0. State Kurs Acuan Live dari Backend (Fallback cadangan: 16500)
+  const [currencyRate, setCurrencyRate] = useState(DEFAULT_USD_TO_IDR);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch(`${API_BASE_URL}/currency`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Gagal mengambil kurs live');
+        return res.json();
+      })
+      .then((data) => {
+        if (isMounted && data && data.rate && data.rate > 10000) {
+          setCurrencyRate(data.rate);
+        }
+      })
+      .catch((err) => {
+        console.debug('Menggunakan kurs cadangan 16500:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const formatIdr = useCallback((usd) => {
+    const idr = Math.round((usd || 0) * currencyRate);
+    return 'Rp ' + idr.toLocaleString('id-ID');
+  }, [currencyRate]);
+
   // 1. State Akun Pengguna / Pelapak (Tersimpan di localStorage)
   const [currentUser, setCurrentUser] = useState(() => {
     try {
