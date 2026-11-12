@@ -190,7 +190,8 @@ def predict_fair_value_ml(
     if _forecast_model is None:
         return 0.0
     
-    age = 2026 - int(release_year) if release_year else 0
+    current_year = datetime.date.today().year
+    age = max(0, current_year - int(release_year)) if release_year else 0
     hp_val = float(hp) if hp and not pd.isna(hp) else 0.0
     rarity_enc = encode_category(rarity, _rarity_categories)
     supertype_enc = encode_category(supertype, _supertype_categories)
@@ -371,7 +372,8 @@ def forecast_7_days(card_id: str, current_price_override: Optional[float] = None
         curr_price = lag_1 if lag_1 > 0 else float(meta["effective_market_price"] or 1.0)
     p_lag_1, p_lag_2 = (lag_1 if lag_1 > 0 else curr_price), (lag_2 if lag_2 > 0 else curr_price)
 
-    age = 2026 - int(release_year) if release_year else 0
+    current_year = datetime.date.today().year
+    age = max(0, current_year - int(release_year)) if release_year else 0
     hp_val = float(hp) if hp and not pd.isna(hp) else 0.0
     rarity_enc = encode_category(rarity, _rarity_categories)
     supertype_enc = encode_category(supertype, _supertype_categories)
