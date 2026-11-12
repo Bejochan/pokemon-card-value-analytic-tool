@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config/api';
 import './ScannerDashboard.css';
 
@@ -62,16 +62,16 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   const rarity     = scanResult?.rarity        ?? '-';
   const rarityLower = (rarity || '').toLowerCase();
   const isRareCard = ['rare', 'ultra rare', 'secret rare', 'illustration rare', 'special illustration rare', 'hyper rare', 'shiny rare', 'holofoil'].some(r => rarityLower.includes(r));
-  const supertype  = scanResult?.supertype     ?? '-';
+  // const supertype  = scanResult?.supertype     ?? '-';
   const subtypes   = scanResult?.subtypes      ?? '-';
-  const types      = scanResult?.types         ?? '-';
-  const hp         = scanResult?.hp            ?? '-';
+  // const types      = scanResult?.types         ?? '-';
+  // const hp         = scanResult?.hp            ?? '-';
   const officialImage = (scanResult?.official_image_url) || '/card-result.png';
   const userScannedImage = scanResult?.user_scanned_image || scanResult?.scanned_image || null;
 
   // --- Confidence AI ---
   const confidencePct   = scanResult?.confidence_percentage ?? 0;
-  const confidenceLabel = scanResult?.confidence_label      ?? 'Uncertain';
+  // const confidenceLabel = scanResult?.confidence_label      ?? 'Uncertain';
 
   // --- Harga (dari analytics_engine.py) ---
   const pricing              = scanResult?.pricing             ?? {};

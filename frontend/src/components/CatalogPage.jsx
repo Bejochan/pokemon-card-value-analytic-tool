@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { API_BASE_URL } from '../config/api';
 import './CatalogPage.css';
@@ -162,7 +162,10 @@ function CatalogPage() {
   };
 
   useEffect(() => {
-    fetchCards(page);
+    const timer = setTimeout(() => {
+      fetchCards(page);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [page, activeSearch, selectedSupertype, selectedRarity, selectedHolo, activeSet, sortBy]);
 
   const handleSearchSubmit = (e) => {

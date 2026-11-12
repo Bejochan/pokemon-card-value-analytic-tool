@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config/api';
 import './UploadPage.css';
 
@@ -196,8 +196,6 @@ function UploadPage({ onUploadComplete }) {
   const captureCanvasRef = useRef(null);
   const isRequestInProgress = useRef(false);
   const pollIntervalRef = useRef(null);
-  const fpsFrameCountRef = useRef(0);
-  const lastFpsTimeRef = useRef(performance.now());
   const consensusHistoryRef = useRef([]);
 
   // --- DETEKSI DAFTAR SUMBER KAMERA (WEBCAM / DROIDCAM / IRIUN) ---
@@ -215,13 +213,17 @@ function UploadPage({ onUploadComplete }) {
   };
 
   useEffect(() => {
-    refreshCameraDevices();
+    const timer = setTimeout(() => {
+      refreshCameraDevices();
+    }, 0);
     if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
       navigator.mediaDevices.addEventListener('devicechange', refreshCameraDevices);
       return () => {
+        clearTimeout(timer);
         navigator.mediaDevices.removeEventListener('devicechange', refreshCameraDevices);
       };
     }
+    return () => clearTimeout(timer);
   }, []);
 
   // --- LOGIKA UPLOAD & ANALISIS DUA SISI ---
@@ -612,9 +614,9 @@ function UploadPage({ onUploadComplete }) {
   const hasCard = isLocked;
   
   // Warna Guide Frame & Status Dinamis
-  let guideClass = 'guide-cyan';
-  let guideTagText = 'PANDUAN KARTU';
-  let guideTagClass = 'tag-cyan';
+  let guideClass;
+  let guideTagText;
+  let guideTagClass;
 
   if (isPaused) {
     guideClass = 'guide-amber';
@@ -643,9 +645,6 @@ function UploadPage({ onUploadComplete }) {
   const isSharp = liveSharpness >= 60;
   const sharpTag = isSharp ? "FOKUS TAJAM" : "KURANG FOKUS";
   const sharpClass = isSharp ? "sensor-sharp" : "sensor-blur";
-
-  // Rate Inferensi per Detik
-  const inferRate = latencyMs > 0 ? (1000 / latencyMs).toFixed(1) : '0.0';
 
   return (
     <div className={`upload-page-root ${isCameraOpen ? 'hud-mode' : 'normal-mode'}`}>

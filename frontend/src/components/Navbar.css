@@ -9,16 +9,15 @@
   align-items: center;
   background-color: #ffffff;
   padding: 12px 20px;
-  /* Dibuat lebih tipis dari shadow tebal sebelumnya agar lebih premium */
   border-bottom: 1px solid #eaeaea; 
-  font-family: 'Montserrat', sans-serif; /* Lexar menggunakan font sans-serif modern */
+  font-family: 'Montserrat', sans-serif;
 }
 
 /* Membagi area menjadi 3 bagian yang simetris */
 .navbar-left {
   display: flex;
   align-items: center;
-  flex: 1; /* Memakan porsi 1 bagian */
+  flex: 1;
 }
 
 .logo {
@@ -29,18 +28,18 @@
   display: flex;
   gap: 40px;
   justify-content: center;
-  flex: 2; /* Diberi porsi 2 bagian agar menempati ruang tengah penuh */
+  flex: 2;
 }
 
 .navbar-right {
   display: flex;
-  gap: 25px; /* Jarak antar ikon */
+  gap: 25px;
   align-items: center;
   justify-content: flex-end;
-  flex: 1; /* Memakan porsi 1 bagian, menyeimbangkan sisi kiri */
+  flex: 1;
 }
 
-/* GAYA FONT ALA LEXAR (Hitam, Kecil, Tebal, Kapital, Renggang) */
+/* GAYA FONT ALA LEXAR (Asli Milikmu: Pink, Kapital, Renggang, Tanpa Garis Bawah) */
 .nav-link {
   text-decoration: none;
   color: #e83e8c; 
@@ -51,7 +50,6 @@
   transition: color 0.2s;
 }
 
-/* Saat disentuh mouse, warna berubah menjadi warna pink khas tema websitemu #e83e8c #000000 */
 .nav-link:hover {
   color: #000000; 
 }
@@ -71,5 +69,50 @@
 
 .icon-btn:hover {
   color: #000000;
-  transform: scale(1.1); /* Membesar sedikit saat disentuh */
+  transform: scale(1.1);
+}
+
+/* Tombol Hamburger (Hanya untuk Layar HP, di Desktop Display: None) */
+.mobile-hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: #e83e8c;
+  cursor: pointer;
+  padding: 5px;
+}
+
+/* =========================================
+   HANYA UNTUK MOBILE (< 768px)
+   (Di layar PC / Laptop aturan ini tidak berlaku sama sekali)
+   ========================================= */
+@media (max-width: 768px) {
+  .mobile-hamburger-btn {
+    display: flex;
+    align-items: center;
+  }
+
+  .navbar-center {
+    position: absolute;
+    top: 70px;
+    left: 0;
+    width: 100%;
+    background-color: #ffffff;
+    flex-direction: column;
+    gap: 0;
+    border-bottom: 1px solid #eaeaea;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.06);
+    display: none;
+  }
+
+  .navbar-center.mobile-open {
+    display: flex;
+    padding: 10px 0;
+  }
+
+  .nav-link {
+    padding: 12px 20px;
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
