@@ -22,6 +22,7 @@ Menyediakan antarmuka routing modular untuk integrasi Frontend React:
 import os
 import sys
 import math
+import urllib.parse
 from typing import Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -328,17 +329,17 @@ def get_cards(
 
     # Filter Search Nama Kartu
     if search and search.strip():
-        clean_search = search.strip()
+        clean_search = urllib.parse.quote(search.strip(), safe="")
         url_parts.append(f"&name=ilike.*{clean_search}*")
 
     # Filter Supertype (misal: Pokémon, Trainer, Energy)
     if supertype and supertype.strip() and supertype.lower() != "all":
-        clean_super = supertype.strip()
+        clean_super = urllib.parse.quote(supertype.strip(), safe="")
         url_parts.append(f"&supertype=ilike.*{clean_super}*")
 
     # Filter Rarity
     if rarity and rarity.strip() and rarity.lower() != "all":
-        clean_rarity = rarity.strip()
+        clean_rarity = urllib.parse.quote(rarity.strip(), safe="")
         url_parts.append(f"&rarity=ilike.*{clean_rarity}*")
 
     # Filter Holo
@@ -350,7 +351,7 @@ def get_cards(
 
     # Filter Set ID
     if set_id and set_id.strip() and set_id.lower() != "all":
-        clean_set = set_id.strip()
+        clean_set = urllib.parse.quote(set_id.strip(), safe="")
         url_parts.append(f"&set_id=eq.{clean_set}")
 
     # Pengurutan Kronologis Rilis & Harga
@@ -490,7 +491,8 @@ def get_card_history(card_id: str):
     if not supabase_url or not supabase_key:
         return []
     
-    url = f"{supabase_url}/rest/v1/card_price_history?select=recorded_date,effective_market_price&card_id=eq.{card_id}&order=recorded_date.asc"
+    encoded_card_id = urllib.parse.quote(card_id.strip(), safe="")
+    url = f"{supabase_url}/rest/v1/card_price_history?select=recorded_date,effective_market_price&card_id=eq.{encoded_card_id}&order=recorded_date.asc"
     headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
     try:
         res = requests.get(url, headers=headers, timeout=10)

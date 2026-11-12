@@ -18,6 +18,7 @@ Fungsi utama:
 from typing import Dict, List, Any, Tuple, Optional
 import os
 import datetime
+import urllib.parse
 import requests
 import joblib
 import pandas as pd
@@ -152,7 +153,8 @@ def get_price_lags(card_id: str) -> Tuple[float, float]:
     
     if supabase_url and supabase_key and card_id:
         try:
-            url = f"{supabase_url}/rest/v1/card_price_history?select=effective_market_price&card_id=eq.{card_id}&order=recorded_date.desc&limit=2"
+            encoded_card_id = urllib.parse.quote(str(card_id).strip(), safe="")
+            url = f"{supabase_url}/rest/v1/card_price_history?select=effective_market_price&card_id=eq.{encoded_card_id}&order=recorded_date.desc&limit=2"
             headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
             res = requests.get(url, headers=headers, timeout=1.0)
             if res.status_code == 200:
@@ -241,7 +243,8 @@ def fetch_card_price_series(card_id: str) -> Tuple[List[str], List[float]]:
     if not supabase_url or not supabase_key or not card_id:
         return [], []
     try:
-        url = f"{supabase_url}/rest/v1/card_price_history?card_id=eq.{card_id}&select=recorded_date,effective_market_price&order=recorded_date.asc"
+        encoded_card_id = urllib.parse.quote(str(card_id).strip(), safe="")
+        url = f"{supabase_url}/rest/v1/card_price_history?card_id=eq.{encoded_card_id}&select=recorded_date,effective_market_price&order=recorded_date.asc"
         headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
         res = requests.get(url, headers=headers, timeout=5.0)
         if res.status_code == 200:

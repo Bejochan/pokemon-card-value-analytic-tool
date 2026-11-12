@@ -10,6 +10,7 @@ Layanan Computer Vision (CV Service) untuk Regokemon:
 import os
 import sys
 import base64
+import urllib.parse
 import requests
 import cv2
 import numpy as np
@@ -135,7 +136,8 @@ def get_live_price(card_id: str, default_price: float) -> float:
         return default_price if (default_price and not np.isnan(default_price)) else 0.0
 
     try:
-        url = f"{SUPABASE_URL}/rest/v1/card_prices?select=effective_market_price&card_id=eq.{card_id}"
+        encoded_card_id = urllib.parse.quote(str(card_id).strip(), safe="")
+        url = f"{SUPABASE_URL}/rest/v1/card_prices?select=effective_market_price&card_id=eq.{encoded_card_id}"
         headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
         res = requests.get(url, headers=headers, timeout=1.5)
         if res.status_code == 200:
