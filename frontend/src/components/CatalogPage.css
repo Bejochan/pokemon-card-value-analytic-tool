@@ -896,6 +896,13 @@
   font-weight: 500;
 }
 
+.spec-card-id {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e1b4b;
+}
+
 /* --- Kotak Abu-abu (Analitik) --- */
 .catalog-modal-analytics-grid {
   flex: 1;
@@ -905,16 +912,17 @@
   align-content: start;
 }
 
-/* Base Kotak Abu-abu */
+/* Base Kotak Abu-abu (Dipadatkan agar seimbang dengan tabel spesifikasi) */
 .analytics-box-gray {
   background-color: #f3f4f6;
   border: none;
-  border-radius: 12px;
-  padding: 10px 10px;
-  min-height: 85px;            /* Tinggi pas untuk judul + nilai */
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-height: 62px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* Judul di atas, Nilai di bawah */
+  justify-content: center;
+  gap: 3px;
   box-sizing: border-box;
 }
 
@@ -932,32 +940,228 @@
 .analytics-box-gray:nth-child(6) { grid-column: span 7; }
 
 /* Label Teks di dalam Kotak */
-/* Judul / Label Kotak */
 .analytics-label {
   font-family: 'Montserrat', sans-serif;
-  font-size: 11px;
+  font-size: 10.5px;
   color: #64748b;              /* Abu-abu medium agar kontras dengan nilai */
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.1px;
 }
 
 /* Nilai / Angka Utama di dalam Kotak */
 .analytics-value {
   font-family: 'Montserrat', sans-serif;
-  font-size: 14px;             /* Ukuran angka tegas & mudah dibaca */
-  font-weight: 400;
+  font-size: 13.5px;
+  font-weight: 600;
   color: #0f172a;              /* Hitam pekat */
   line-height: 1.2;
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
-/* --- Area Grafik Garis --- */
+/* Pewarnaan Dinamis Kotak Analitika */
+.trend-positive {
+  color: #16a34a !important; /* Hijau tegas */
+  font-weight: 700 !important;
+}
+
+.trend-negative {
+  color: #dc2626 !important; /* Merah tegas */
+  font-weight: 700 !important;
+}
+
+/* Badge Trading Signal */
+.signal-buy {
+  background-color: #dcfce7;
+  color: #15803d !important;
+  font-weight: 700 !important;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 12px;
+}
+
+.signal-sell {
+  background-color: #ffe4e6;
+  color: #be123c !important;
+  font-weight: 700 !important;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 12px;
+}
+
+.signal-hold {
+  background-color: #fef3c7;
+  color: #b45309 !important;
+  font-weight: 700 !important;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 12px;
+}
+
+/* Badge Price Valuation */
+.val-undervalued {
+  background-color: #dcfce7;
+  color: #15803d !important;
+  font-weight: 700 !important;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 12px;
+}
+
+.val-overvalued {
+  background-color: #ffe4e6;
+  color: #be123c !important;
+  font-weight: 700 !important;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 12px;
+}
+
+.val-fair {
+  background-color: #e0f2fe;
+  color: #0369a1 !important;
+  font-weight: 700 !important;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 12px;
+}
+
+/* --- Area Grafik Garis & Forecasting --- */
 .catalog-modal-chart-area {
   width: 100%;
-  height: 180px; /* Tinggi diatur pas agar tidak menyebabkan scroll */
-  margin-top: 5px;
+  margin-top: 6px;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  position: relative;
+}
+
+.catalog-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  padding: 0 4px;
+}
+
+.catalog-chart-title-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.catalog-chart-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e293b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.catalog-chart-trend-tag {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+}
+
+.chart-legend-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.legend-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-bar {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.history-bar {
+  background-color: #c2185b;
+}
+
+.forecast-bar {
+  background-color: #00d26a;
+  border-top: 1px dashed #00d26a;
+}
+
+.legend-bar.ribbon-bar {
+  background-color: rgba(0, 210, 106, 0.25);
+  border: 1px dashed rgba(0, 210, 106, 0.7);
+  height: 6px;
+  width: 14px;
+  border-radius: 2px;
+}
+
+.legend-name {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.catalog-chart-svg-container {
+  position: relative;
+  width: 100%;
+  height: 145px;
+}
+
+/* Tooltip Mengambang Saat Hover Titik */
+.chart-hover-card {
+  position: absolute;
+  top: -8px;
+  transform: translate(-50%, -100%);
+  background: #1e1b4b;
+  color: #ffffff;
+  padding: 5px 10px;
+  border-radius: 7px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  font-family: 'Montserrat', sans-serif;
+  pointer-events: none;
+  z-index: 20;
+  white-space: nowrap;
+}
+
+.hover-type-label {
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.hover-date {
+  font-size: 9.5px;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.hover-price-val {
+  font-size: 12px;
+  color: #00d26a;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.hover-usd-val {
+  font-size: 10px;
+  color: #cbd5e1;
+  font-weight: 500;
 }
 
 /* Mengubah semua teks (Sumbu X dan Sumbu Y) menjadi Montserrat */
