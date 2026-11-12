@@ -48,7 +48,7 @@ def check_tables_exist():
     
     if missing:
         print(f"\n[PERINGATAN] Tabel berikut belum dibuat di Supabase: {missing}")
-        print("Silakan jalankan file SQL 'backend/schema.sql' di SQL Editor dashboard Supabase terlebih dahulu!")
+        print("Silakan jalankan file SQL 'docs/schema.sql' di SQL Editor dashboard Supabase terlebih dahulu!")
         return False
     return True
 

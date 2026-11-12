@@ -138,21 +138,24 @@ def prewarm_models_background():
 def read_root():
     return {
         "app": "Regokemon Analytics API",
-        "version": "3.0.0",
+        "version": "3.1.0",
         "status": "online",
         "docs_url": "/docs",
         "endpoints": {
+            "root_info": "GET /",
+            "healthcheck": "GET /health",
             "oncam_identify": "POST /identify",
-            "upload_analyze": "POST /analyze",
+            "upload_identify": "POST /upload/identify",
+            "full_analyze": "POST /analyze",
+            "upload_analyze": "POST /upload/analyze",
+            "cards_catalog": "GET /cards",
+            "sets_catalog": "GET /sets",
+            "card_history": "GET /cards/{card_id}/history",
             "card_forecast": "GET /cards/{card_id}/forecast",
             "card_condition": "POST /cards/{card_id}/condition",
             "upload_card_condition": "POST /upload/cards/{card_id}/condition",
-            "card_history": "GET /cards/{card_id}/history",
-            "cards_catalog": "GET /cards",
-            "sets_catalog": "GET /sets",
             "dashboard_trending": "GET /dashboard",
-            "currency_status": "GET /currency",
-            "healthcheck": "GET /health"
+            "currency_status": "GET /currency"
         }
     }
 
