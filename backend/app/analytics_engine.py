@@ -17,6 +17,7 @@ Fungsi utama:
 
 from typing import Dict, List, Any, Tuple, Optional
 import os
+import time
 import datetime
 import urllib.parse
 import requests
@@ -53,7 +54,9 @@ _df_master = None
 _df_master_indexed = None
 _rarity_categories = []
 _supertype_categories = []
-_lags_cache: Dict[str, Tuple[float, float]] = {}
+_lags_cache: Dict[str, Tuple[float, float, float]] = {}  # card_id -> (p1, p2, timestamp)
+_LAGS_CACHE_TTL = 3600.0  # 1 jam Time-To-Live
+_LAGS_CACHE_MAX_SIZE = 2000
 
 try:
     model_path = os.path.join(backend_dir, "models", "forecast_model.pkl")
@@ -141,12 +144,19 @@ def get_card_metadata(card_id: str) -> Dict[str, Any]:
 def get_price_lags(card_id: str) -> Tuple[float, float]:
     """
     Mengambil data riwayat harga lag_1 dan lag_2.
-    Memprioritaskan cache lokal & tabel Supabase card_price_history.
+    Memprioritaskan cache lokal dengan TTL & batas ukuran, serta tabel Supabase card_price_history.
     Jika tidak ada / offline, menggunakan harga pasar dataset master.
     """
     global _lags_cache
+    now = time.time()
     if card_id in _lags_cache:
-        return _lags_cache[card_id]
+        p1, p2, ts = _lags_cache[card_id]
+        if now - ts < _LAGS_CACHE_TTL:
+            return (p1, p2)
+
+    # Batasi ukuran cache agar memori RAM tidak membengkak
+    if len(_lags_cache) > _LAGS_CACHE_MAX_SIZE:
+        _lags_cache.clear()
 
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_key = os.getenv("SUPABASE_KEY", "")
@@ -163,21 +173,21 @@ def get_price_lags(card_id: str) -> Tuple[float, float]:
                     p1 = float(data[0].get("effective_market_price") or 0.0)
                     p2 = float(data[1].get("effective_market_price") or 0.0)
                     if p1 > 0:
-                        _lags_cache[card_id] = (p1, (p2 if p2 > 0 else p1))
-                        return _lags_cache[card_id]
+                        _lags_cache[card_id] = (p1, (p2 if p2 > 0 else p1), now)
+                        return (p1, (p2 if p2 > 0 else p1))
                 elif len(data) == 1:
                     p1 = float(data[0].get("effective_market_price") or 0.0)
                     if p1 > 0:
-                        _lags_cache[card_id] = (p1, p1)
-                        return _lags_cache[card_id]
+                        _lags_cache[card_id] = (p1, p1, now)
+                        return (p1, p1)
         except Exception:
             pass
 
     # Fallback ke dataset master
     meta = get_card_metadata(card_id)
     fallback_price = float(meta.get("effective_market_price") or 0.0)
-    _lags_cache[card_id] = (fallback_price, fallback_price)
-    return _lags_cache[card_id]
+    _lags_cache[card_id] = (fallback_price, fallback_price, now)
+    return (fallback_price, fallback_price)
 
 
 def predict_fair_value_ml(
