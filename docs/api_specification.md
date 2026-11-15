@@ -4,14 +4,16 @@
 > **Pokemon Card Value Analytic Tool (REGOKEMON) : API Reference**  
 > **Server Engine:** FastAPI (Python 3.10 - 3.12, Uvicorn ASGI)  
 > **Base URL Lokal:** `http://127.0.0.1:8000`  
+> **Versi API:** `3.1.0`  
 > **Dokumentasi Interaktif:** `/docs` (Swagger UI) & `/redoc` (ReDoc)  
-> **CORS Policy:** Mengizinkan komunikasi lintas-asal (`*`) untuk integrasi Frontend React  
+> **Kebijakan CORS:** Whitelist asal terpercaya (`http://localhost:5173`, `http://localhost:3000`, `http://localhost:8000`), regex subdomain Vercel (`https://*.vercel.app`), dan konfigurasi variabel lingkungan `ALLOWED_ORIGINS`.  
+> **Proteksi Keamanan:** Batas ukuran payload maksimum 15 MB (File & Base64) serta in-memory sliding window rate limiting (60 req/menit per IP) untuk seluruh endpoint komputasi AI.  
 
 ---
 
 ## 📌 Daftar Isi
 1. [Ikhtisar Arsitektur API](#1-ikhtisar-arsitektur-api)
-2. [Konfigurasi Base URL & Environment](#2-konfigurasi-base-url--environment)
+2. [Konfigurasi Base URL, Keamanan, & Environment](#2-konfigurasi-base-url-keamanan--environment)
 3. [Daftar Lengkap Endpoint REST API](#3-daftar-lengkap-endpoint-rest-api)
 4. [Spesifikasi Rinci per Endpoint](#4-spesifikasi-rinci-per-endpoint)
    - [A. Layanan Status & Healthcheck](#a-layanan-status--healthcheck)
@@ -27,46 +29,56 @@
 
 ## 🌐 1. Ikhtisar Arsitektur API
 
-REST API Regokemon dirancang menggunakan framework **FastAPI** dengan arsitektur asinkron berbasis ASGI (*Asynchronous Server Gateway Interface*). API ini bertindak sebagai jembatan terpadu antara antarmuka pengguna (React Single Page Application) dengan tiga engine komputasi:
-1. **Model 1 Engine:** Ekstraksi embedding visual OpenAI CLIP (ViT-B/32) dan pencarian vektor FAISS IndexFlatIP (20.617 kartu).
-2. **Model 2 Engine:** Deteksi cacat fisik lokal YOLO26s (800px) untuk tampak depan dan tampak belakang.
+REST API Regokemon dirancang menggunakan framework **FastAPI** dengan arsitektur asinkron berbasis ASGI (*Asynchronous Server Gateway Interface*). API ini bertindak sebagai jembatan terpadu antara antarmuka pengguna (React Single Page Application) dengan tiga engine komputasi AI dan sistem data:
+1. **Model 1 Engine:** Ekstraksi embedding visual OpenAI CLIP (ViT-B/32), pencarian vektor FAISS IndexFlatIP (20.617 kartu), dan verifikasi mikro ORB Re-Ranking.
+2. **Model 2 Engine:** Deteksi cacat fisik lokal YOLO26s (800px) untuk tampak depan dan belakang kartu (`best-model-v6-card-condition.pt`).
 3. **Model 3 Engine:** Peramalan deret waktu probabilistik Amazon Chronos-Bolt Mini (Pita Kuantil P10, P50, P90).
-4. **Analytics Engine:** Formula valuasi harga wajar pasar dan konversi kurs mata uang real-time.
+4. **Analytics Engine:** Formula valuasi harga wajar pasar dinamis, Offline CSV Fallback otomatis, dan sinkronisasi kurs live USD ke IDR.
 
 ---
 
-## ⚙️ 2. Konfigurasi Base URL & Environment
+## ⚙️ 2. Konfigurasi Base URL, Keamanan, & Environment
 
-Pada lingkungan pengembangan lokal, backend berjalan di:
-```text
-http://127.0.0.1:8000
-```
-Frontend React mengakses endpoint melalui modul konfigurasi [`frontend/src/config/api.js`](../frontend/src/config/api.js):
-```javascript
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-```
-Untuk deployment cloud (seperti Render, Railway, atau VPS), tetapkan variabel `VITE_API_BASE_URL` pada pengaturan lingkungan build.
+### Base URL
+* **Lingkungan Pengembangan Lokal:** `http://127.0.0.1:8000`
+* **Frontend Client Config:** [`frontend/src/config/api.js`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/frontend/src/config/api.js) membaca variabel lingkungan `VITE_API_BASE_URL`.
+
+### Kebijakan Keamanan (Security Hardening)
+1. **CORS Whitelist Terbatas:**
+   * Menolak wildcard tidak aman `*` saat menggunakan credentials.
+   * Default origins: `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:3000`, `http://localhost:8000`.
+   * Mendukung regex subdomain Vercel: `^https:\/\/.*\.vercel\.app$`.
+   * Mendukung domain kustom melalui variabel lingkungan `ALLOWED_ORIGINS` (dipisahkan tanda koma).
+2. **Pembatasan Ukuran Unggahan (Payload Size Limit):**
+   * Berkas multipart maksimum: **15 MB** (`MAX_FILE_SIZE_BYTES = 15.728.640 bytes`).
+   * String Base64 maksimum: **22 MB karakter** (~15 MB data biner citra).
+   * Pelanggaran ukuran menghasilkan respons **HTTP 413 Payload Too Large**.
+3. **Rate Limiting (Sliding Window):**
+   * Endpoint inferensi AI berat diproteksi secara in-memory: default **60 request per menit per alamat IP client** (dapat diatur via `RATE_LIMIT_AI_PER_MINUTE`).
+   * Pelanggaran laju menghasilkan **HTTP 429 Too Many Requests** disertai header standar `Retry-After: <detik>`.
+4. **Offline Resilience (Ketahanan Offline):**
+   * Seluruh endpoint katalog (`/cards`, `/sets`, `/cards/{id}/history`, `/dashboard`) otomatis fallback ke data master lokal (`backend/dataset/pokemon_cards_dataset_cleaned.csv`) jika koneksi ke Supabase terputus.
 
 ---
 
 ## 📋 3. Daftar Lengkap Endpoint REST API
 
-| No | Metode | Endpoint | Deskripsi Ringkas | Tipe Payload |
-| :---: | :---: | :--- | :--- | :---: |
-| 1 | `GET` | `/` | Informasi status layanan, versi API, dan deskripsi engine | Tidak Ada |
-| 2 | `GET` | `/health` | Healthcheck server untuk monitoring load balancer / Docker | Tidak Ada |
-| 3 | `POST` | `/identify` | Identifikasi cepat Model 1 On-Cam (khusus kamera live) | JSON (Base64) |
-| 4 | `POST` | `/upload/identify` | Identifikasi cepat Model 1 On-Cam versi unggah file multipart | Multipart Form |
-| 5 | `POST` | `/analyze` | Analisis komprehensif (Model 1 + Model 2 YOLO depan & belakang) | JSON (Base64) |
-| 6 | `POST` | `/upload/analyze` | Analisis komprehensif versi unggah file multipart dua sisi | Multipart Form |
-| 7 | `GET` | `/cards` | Eksplorasi katalog kartu (search, filter, pagination, sorting) | Query Params |
-| 8 | `GET` | `/sets` | Daftar seluruh ekspansi set rilis kartu Pokémon | Query Params |
-| 9 | `GET` | `/cards/{card_id}/history` | Riwayat transaksi harga harian untuk visualisasi grafik | Path Param |
-| 10 | `GET` | `/cards/{card_id}/forecast` | Peramalan harga 7 hari Amazon Chronos-Bolt (P10, P50, P90) | Path Param |
-| 11 | `POST` | `/cards/{card_id}/condition` | Penilaian cacat fisik kartu standalone via Base64 | JSON (Base64) |
-| 12 | `POST` | `/upload/cards/{card_id}/condition` | Penilaian cacat fisik kartu standalone via Multipart | Multipart Form |
-| 13 | `GET` | `/dashboard` | Agregasi data trending, total kartu (20.617), dan total set (172) | Tidak Ada |
-| 14 | `GET` | `/currency` | Informasi kurs live USD ke IDR dan status cache RAM | Tidak Ada |
+| No | Metode | Endpoint | Deskripsi Ringkas | Tipe Payload | Proteksi AI / Limit |
+| :---: | :---: | :--- | :--- | :---: | :---: |
+| 1 | `GET` | `/` | Informasi status layanan, versi API, dan daftar endpoint | Tidak Ada | Bebas |
+| 2 | `GET` | `/health` | Healthcheck kesiapan engine AI, database, dan kurs | Tidak Ada | Bebas |
+| 3 | `POST` | `/identify` | Identifikasi cepat Model 1 On-Cam (Live Camera HUD) | JSON (Base64) | 15 MB / Rate Limit |
+| 4 | `POST` | `/upload/identify` | Identifikasi cepat Model 1 On-Cam versi berkas multipart | Multipart Form | 15 MB / Rate Limit |
+| 5 | `POST` | `/analyze` | Analisis komprehensif dua sisi (Model 1 + Model 2 YOLO) | JSON (Base64) | 15 MB / Rate Limit |
+| 6 | `POST` | `/upload/analyze` | Analisis komprehensif dua sisi versi berkas multipart | Multipart Form | 15 MB / Rate Limit |
+| 7 | `GET` | `/cards` | Eksplorasi katalog kartu (search, filter, pagination, sorting) | Query Params | Offline CSV Fallback |
+| 8 | `GET` | `/sets` | Daftar seluruh ekspansi set rilis kartu Pokémon (172 set) | Query Params | Offline CSV Fallback |
+| 9 | `GET` | `/cards/{card_id}/history` | Riwayat transaksi harga harian untuk visualisasi grafik | Path Param | Offline CSV Fallback |
+| 10 | `GET` | `/cards/{card_id}/forecast` | Peramalan harga 7 hari Amazon Chronos-Bolt (P10, P50, P90) | Path Param | Rate Limit |
+| 11 | `POST` | `/cards/{card_id}/condition` | Penilaian cacat fisik kartu standalone via Base64 | JSON (Base64) | 15 MB / Rate Limit |
+| 12 | `POST` | `/upload/cards/{card_id}/condition` | Penilaian cacat fisik kartu standalone via Multipart | Multipart Form | 15 MB / Rate Limit |
+| 13 | `GET` | `/dashboard` | Agregasi data trending, total kartu (20.617), dan total set (172) | Tidak Ada | Offline CSV Fallback |
+| 14 | `GET` | `/currency` | Informasi status kurs live USD ke IDR dari cache RAM | Tidak Ada | Bebas |
 
 ---
 
@@ -75,29 +87,52 @@ Untuk deployment cloud (seperti Render, Railway, atau VPS), tetapkan variabel `V
 ### A. Layanan Status & Healthcheck
 
 #### 1. `GET /`
-Mengembalikan informasi dasar mengenai server API.
+Mengembalikan metadata status operasional server backend dan daftar endpoint resmi.
 * **Request:** Tanpa parameter.
 * **Response (200 OK):**
 ```json
 {
-  "message": "Regokemon Analytics & Valuation API is running!",
+  "app": "Regokemon Analytics API",
   "version": "3.1.0",
-  "docs": "/docs",
-  "redoc": "/redoc",
-  "models": {
-    "model_1": "CLIP ViT-B-32 + FAISS IndexFlatIP (20.617 Kartu)",
-    "model_2": "Local YOLO26s (800px) Dual-Side Condition Grader",
-    "model_3": "Amazon Chronos-Bolt Mini Time-Series Forecaster"
+  "status": "online",
+  "docs_url": "/docs",
+  "endpoints": {
+    "root_info": "GET /",
+    "healthcheck": "GET /health",
+    "oncam_identify": "POST /identify",
+    "upload_identify": "POST /upload/identify",
+    "full_analyze": "POST /analyze",
+    "upload_analyze": "POST /upload/analyze",
+    "cards_catalog": "GET /cards",
+    "sets_catalog": "GET /sets",
+    "card_history": "GET /cards/{card_id}/history",
+    "card_forecast": "GET /cards/{card_id}/forecast",
+    "card_condition": "POST /cards/{card_id}/condition",
+    "upload_card_condition": "POST /upload/cards/{card_id}/condition",
+    "dashboard_trending": "GET /dashboard",
+    "currency_status": "GET /currency"
   }
 }
 ```
 
 #### 2. `GET /health`
-Digunakan oleh orkestrator sistem untuk memverifikasi kesiapan server.
+Digunakan oleh sistem monitoring atau docker container healthcheck untuk memverifikasi kesiapan memori model AI dan koneksi dataset.
 * **Response (200 OK):**
 ```json
 {
-  "status": "healthy"
+  "status": "healthy",
+  "app": "Regokemon Analytics API",
+  "version": "3.1.0",
+  "models": {
+    "model_1_clip_faiss": true,
+    "model_2_yolo_grader": true,
+    "model_3_chronos_bolt": true
+  },
+  "dataset": {
+    "master_cards_count": 20617,
+    "total_sets_count": 172
+  },
+  "currency_rate_idr": 16500.0
 }
 ```
 
@@ -106,7 +141,7 @@ Digunakan oleh orkestrator sistem untuk memverifikasi kesiapan server.
 ### B. Layanan Computer Vision & Identifikasi Kartu
 
 #### 3. `POST /identify`
-Endpoint pemindaian cepat yang digunakan oleh antarmuka *Real-Time Scanner HUD*. Endpoint ini hanya menjalankan Model 1 (CLIP + FAISS + Top-8 ORB Re-Ranking) tanpa menjalankan Model 2 untuk menjaga latensi tetap sub-detik (~120 ms).
+Endpoint pemindaian kamera langsung (On-Cam). Menerima Base64 citra kartu, menjalankan Model 1 (OpenAI CLIP ViT-B-32 + FAISS + Top-8 ORB Re-Ranking) dengan latensi sub-detik (~120 ms).
 
 * **Header:** `Content-Type: application/json`
 * **Request Body:**
@@ -116,7 +151,8 @@ Endpoint pemindaian cepat yang digunakan oleh antarmuka *Real-Time Scanner HUD*.
   "expected_card_id": null
 }
 ```
-* **Response (200 OK - IdentifyResponse):**
+
+* **Response (200 OK - Kasus Berhasil):**
 ```json
 {
   "status": "success",
@@ -164,8 +200,33 @@ Endpoint pemindaian cepat yang digunakan oleh antarmuka *Real-Time Scanner HUD*.
 }
 ```
 
-#### 4. `POST /analyze`
-Endpoint evaluasi penuh untuk pemindaian foto statis. Menjalankan pipeline lengkap: Model 1 (Identifikasi Kartu) + Model 2 (Deteksi Cacat Fisik Depan & Belakang via YOLO26s) + Valuation Engine + Proyeksi Analitika.
+* **Response (200 OK - Kasus Ambigu / Confidence Gating < 60.0%):**
+Jika skor keyakinan kartu di bawah ambang batas toleransi 60%, API mengembalikan status `"ambiguous"` agar frontend dapat menginstruksikan pengguna untuk menyesuaikan posisi/pencahayaan:
+```json
+{
+  "status": "ambiguous",
+  "message": "Kartu tidak dapat diidentifikasi secara meyakinkan (Keyakinan: 54.2% < 60.0%). Silakan dekatkan kartu atau perjelas pencahayaan.",
+  "confidence_percentage": 54.2,
+  "confidence_label": "Ambiguous / Retake Needed",
+  "candidates": [
+    {
+      "rank": 1,
+      "card_id": "sv8-116",
+      "name": "Koraidon",
+      "confidence_percentage": 54.2
+    }
+  ]
+}
+```
+
+#### 4. `POST /upload/identify`
+Versi Multipart Form-Data untuk endpoint On-Cam / Identify. Berguna untuk klien HTTP atau formulir web yang mengirimkan berkas biner secara langsung.
+* **Header:** `Content-Type: multipart/form-data`
+* **Form Field:** `file` *(UploadFile, wajib, maks 15 MB)*
+* **Response (200 OK):** Identik dengan skema `IdentifyResponse` pada endpoint `/identify`.
+
+#### 5. `POST /analyze`
+Endpoint evaluasi penuh untuk pemindaian foto statis. Menjalankan pipeline komprehensif: Model 1 (Identifikasi Kartu) + Model 2 (Deteksi Cacat Fisik Depan & Belakang via YOLO26s 800px) + Valuation Engine + Proyeksi Analitika.
 
 * **Header:** `Content-Type: application/json`
 * **Request Body:**
@@ -177,9 +238,13 @@ Endpoint evaluasi penuh untuk pemindaian foto statis. Menjalankan pipeline lengk
 }
 ```
 * **Response (200 OK - AnalyzeResponse):**
-Mengembalikan seluruh atribut `IdentifyResponse` ditambah:
+Mengembalikan seluruh atribut `IdentifyResponse` ditambah objek kondisi fisik dan analitika valuasi:
 ```json
 {
+  "status": "success",
+  "message": "Kartu berhasil diidentifikasi.",
+  "card_id": "sv8-116",
+  "name": "Koraidon",
   "condition_report": {
     "condition_tier": "Lightly Played (LP)",
     "has_defects": true,
@@ -198,7 +263,7 @@ Mengembalikan seluruh atribut `IdentifyResponse` ditambah:
         "bbox": { "x": 580.0, "y": 35.0, "width": 24.0, "height": 20.0 }
       }
     ],
-    "defects": [ ... ],
+    "defects": [],
     "evaluation_status": "evaluated"
   },
   "market_analytics": {
@@ -207,30 +272,40 @@ Mengembalikan seluruh atribut `IdentifyResponse` ditambah:
     "mispricing_gap_pct": -15.0,
     "signal_reason": "Terdeteksi goresan fisik halus (-15% penyesuaian kondisi).",
     "forecast_7d": {
-      "future_dates": ["2026-11-07", "2026-11-08", "..."],
+      "future_dates": ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22"],
       "p10": [14.8, 14.5, 14.2, 14.0, 13.9, 13.8, 13.7],
       "p50": [15.7, 15.6, 15.5, 15.4, 15.3, 15.2, 15.1],
       "p90": [16.8, 17.0, 17.2, 17.3, 17.5, 17.6, 17.8]
     }
   },
   "recommendation_signal": "HOLD",
+  "estimated_price": 259380,
   "execution_time_ms": 1150.2
 }
 ```
+
+#### 6. `POST /upload/analyze`
+Versi Multipart Form-Data untuk endpoint Full Analysis. Mendukung unggahan foto tampak depan dan tampak belakang secara mandiri.
+* **Header:** `Content-Type: multipart/form-data`
+* **Form Fields:**
+  * `front_file` *(UploadFile, wajib atau via fallback `file`, maks 15 MB)*: Citra tampak depan.
+  * `back_file` *(UploadFile, opsional, maks 15 MB)*: Citra tampak belakang.
+  * `card_id` *(str, opsional)*: Override ID kartu langsung jika user sudah memilih kartu dari katalog.
+* **Response (200 OK):** Identik dengan skema `AnalyzeResponse` pada endpoint `/analyze`.
 
 ---
 
 ### C. Layanan Katalog & Eksplorasi Data
 
-#### 5. `GET /cards`
-Menampilkan daftar kartu dari database katalog resmi (20.617 kartu) dengan fitur pencarian dan filter bertingkat.
+#### 7. `GET /cards`
+Menampilkan daftar kartu resmi (20.617 entri) dengan fitur pencarian teks, filter kelangkaan, tipe kartu, set ekspansi, dan paginasi. Otomatis beralih ke CSV offline jika database Supabase tidak terjangkau.
 
 * **Query Parameters:**
   * `limit` *(int, default=20, max=100)*: Jumlah kartu per halaman.
   * `page` *(int, default=1)*: Nomor halaman paginasi.
-  * `search` *(str, opsional)*: Kata kunci pencarian nama kartu.
+  * `search` *(str, opsional)*: Kata kunci pencarian nama kartu (disanitasi dengan URL-encoding).
   * `supertype` *(str, opsional)*: Filter tipe utama (`Pokémon`, `Trainer`, `Energy`).
-  * `rarity` *(str, opsional)*: Filter tingkat kelangkaan (misal `Illustration Rare`).
+  * `rarity` *(str, opsional)*: Filter tingkat kelangkaan (misal `Illustration Rare`, `Rare Holo`, `Common`).
   * `set_id` *(str, opsional)*: Filter berdasarkan kode set (misal `sv8`).
   * `sort_by` *(str, default="newest")*: Pengurutan (`newest`, `price_desc`, `price_asc`).
 * **Response (200 OK):**
@@ -260,9 +335,9 @@ Menampilkan daftar kartu dari database katalog resmi (20.617 kartu) dengan fitur
 }
 ```
 
-#### 6. `GET /sets`
-Mengambil seluruh daftar ekspansi set resmi Pokémon TCG terurut dari edisi terbaru ke edisi klasik.
-* **Query Parameters:** `limit` *(int, default=150)*
+#### 8. `GET /sets`
+Mengambil seluruh daftar ekspansi set resmi Pokémon TCG terurut dari edisi rilis terbaru ke edisi klasik.
+* **Query Parameters:** `limit` *(int, default=250)*: Mengakomodasi seluruh **172 set** resmi tanpa terpotong.
 * **Response (200 OK):**
 ```json
 [
@@ -287,8 +362,8 @@ Mengambil seluruh daftar ekspansi set resmi Pokémon TCG terurut dari edisi terb
 
 ### D. Layanan Analitika Deret Waktu & Peramalan
 
-#### 7. `GET /cards/{card_id}/history`
-Mengambil catatan deret waktu transaksi harga harian untuk kartu tertentu.
+#### 9. `GET /cards/{card_id}/history`
+Mengambil catatan deret waktu transaksi harga harian untuk kartu tertentu guna visualisasi grafik tren pasar.
 * **Path Parameter:** `card_id` *(str, misal: `base1-4`)*
 * **Response (200 OK):**
 ```json
@@ -299,8 +374,8 @@ Mengambil catatan deret waktu transaksi harga harian untuk kartu tertentu.
 ]
 ```
 
-#### 8. `GET /cards/{card_id}/forecast`
-Endpoint peramalan harga probabilistik 7 hari ke depan menggunakan Amazon Chronos-Bolt Mini.
+#### 10. `GET /cards/{card_id}/forecast`
+Endpoint peramalan harga probabilistik 7 hari ke depan menggunakan Amazon Chronos-Bolt Mini beserta rekomendasi sinyal trading preskriptif (`BUY`, `HOLD`, atau `SELL`).
 * **Path Parameter:** `card_id` *(str, misal: `sv4-241`)*
 * **Response (200 OK - ForecastResponse):**
 ```json
@@ -314,7 +389,7 @@ Endpoint peramalan harga probabilistik 7 hari ke depan menggunakan Amazon Chrono
   "forecast": [
     {
       "day": 1,
-      "date": "2026-11-07",
+      "date": "2026-11-16",
       "predicted_price_usd": 86.20,
       "p10_usd": 82.50,
       "p50_usd": 86.20,
@@ -322,7 +397,7 @@ Endpoint peramalan harga probabilistik 7 hari ke depan menggunakan Amazon Chrono
     },
     {
       "day": 7,
-      "date": "2026-11-13",
+      "date": "2026-11-22",
       "predicted_price_usd": 91.50,
       "p10_usd": 84.00,
       "p50_usd": 91.50,
@@ -344,8 +419,8 @@ Endpoint peramalan harga probabilistik 7 hari ke depan menggunakan Amazon Chrono
 
 ### E. Layanan Penilaian Kondisi Fisik Standalone
 
-#### 9. `POST /cards/{card_id}/condition`
-Mengevaluasi kondisi fisik kartu tertentu menggunakan Model 2 YOLO26s secara independen (tanpa menjalankan Model 1).
+#### 11. `POST /cards/{card_id}/condition`
+Mengevaluasi kondisi fisik kartu tertentu menggunakan Model 2 YOLO26s (800px) secara independen melalui representasi Base64.
 * **Path Parameter:** `card_id` *(str)*
 * **Request Body:**
 ```json
@@ -366,7 +441,7 @@ Mengevaluasi kondisi fisik kartu tertentu menggunakan Model 2 YOLO26s secara ind
     "condition_tier": "Lightly Played (LP)",
     "has_defects": true,
     "defect_count": 1,
-    "front_defects": [ { "label": "Scratch", "confidence": 0.78, "bbox": { ... } } ],
+    "front_defects": [ { "label": "Scratch", "confidence": 0.78, "bbox": { "x": 300.0, "y": 420.0, "width": 85.0, "height": 12.0 } } ],
     "back_defects": []
   },
   "pricing": {
@@ -381,12 +456,21 @@ Mengevaluasi kondisi fisik kartu tertentu menggunakan Model 2 YOLO26s secara ind
 }
 ```
 
+#### 12. `POST /upload/cards/{card_id}/condition`
+Versi Multipart Form-Data untuk evaluasi kondisi fisik standalone.
+* **Path Parameter:** `card_id` *(str)*
+* **Header:** `Content-Type: multipart/form-data`
+* **Form Fields:**
+  * `front_file` *(UploadFile, opsional jika back_file ada, maks 15 MB)*
+  * `back_file` *(UploadFile, opsional jika front_file ada, maks 15 MB)*
+* **Response (200 OK):** Identik dengan skema `CardConditionResponse` pada endpoint `/cards/{card_id}/condition`.
+
 ---
 
 ### F. Layanan Dashboard & Valuta Asing
 
-#### 10. `GET /dashboard`
-Mengambil data ringkasan pasar untuk kartu trending dan total statistik katalog.
+#### 13. `GET /dashboard`
+Mengambil data kartu trending dan total agregasi statistik katalog untuk widget dashboard pasar.
 * **Response (200 OK):**
 ```json
 {
@@ -400,16 +484,17 @@ Mengambil data ringkasan pasar untuk kartu trending dan total statistik katalog.
       "price": "$ 285.50",
       "image": "https://images.pokemontcg.io/base1/4_hires.png",
       "setIcon": "/base1-logo.png",
-      "flagIcon": "🇺🇸"
+      "flagIcon": "US"
     }
   ],
   "total_cards": 20617,
-  "total_sets": 172
+  "total_sets": 172,
+  "is_offline_fallback": false
 }
 ```
 
-#### 11. `GET /currency`
-Mengambil status kurs live valuta asing USD ke IDR dari layanan in-memory cache.
+#### 14. `GET /currency`
+Mengambil informasi status kurs live USD ke IDR yang aktif digunakan dalam perhitungan sistem valuasi.
 * **Response (200 OK):**
 ```json
 {
@@ -425,10 +510,10 @@ Mengambil status kurs live valuta asing USD ke IDR dari layanan in-memory cache.
 
 ## 🧱 5. Skema Objek Data Bersama (Shared Schemas)
 
-Berikut definisi tipe Pydantic utama di [`backend/app/schemas.py`](../backend/app/schemas.py):
+Berikut definisi tipe Pydantic utama di [`backend/app/schemas.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/app/schemas.py):
 
 * **`PricingDetails`:**
-  * `base_price_usd` *(float)*: Harga acuan pasar awal.
+  * `base_price_usd` *(float)*: Harga pasar acuan awal kartu dalam kondisi mulus.
   * `base_price_idr` *(int)*: Estimasi harga dasar dalam Rupiah.
   * `condition_multiplier` *(float)*: Faktor diskon kondisi fisik ($F_{condition}$).
   * `condition_discount_pct` *(float)*: Persentase diskon terhitung.
@@ -437,7 +522,7 @@ Berikut definisi tipe Pydantic utama di [`backend/app/schemas.py`](../backend/ap
   * `currency_rate` *(float)*: Kurs acuan USD ke IDR.
 
 * **`DefectItem`:**
-  * `label` *(str)*: Jenis cacat (`Scratch`, `Corner Wear`, `Edge Wear`).
+  * `label` *(str)*: Jenis cacat fisik (`Card`, `Corner Wear`, `Edge Wear`, `Scratch`).
   * `confidence` *(float)*: Skor keyakinan model YOLO (0.0 s/d 1.0).
   * `bbox` *(dict)*: Koordinat spasial `{ "x", "y", "width", "height" }`.
 
@@ -447,8 +532,9 @@ Berikut definisi tipe Pydantic utama di [`backend/app/schemas.py`](../backend/ap
 
 API mengimplementasikan kode status HTTP standar:
 * **`200 OK`:** Permintaan berhasil dieksekusi secara normal.
-* **`400 Bad Request`:** Format data gambar tidak valid atau Base64 tidak dapat didekode.
-* **`404 Not Found`:** `card_id` atau data yang dicari tidak ditemukan di database.
+* **`400 Bad Request`:** Format data gambar tidak valid, berkas rusak, atau Base64 tidak dapat didekode.
+* **`404 Not Found`:** `card_id` atau data kartu tidak ditemukan di database dan fallback master.
+* **`413 Payload Too Large`:** Ukuran berkas unggahan atau string Base64 melebihi batas maksimum 15 MB.
 * **`422 Unprocessable Entity`:** Struktur payload JSON tidak memenuhi spesifikasi skema Pydantic.
-* **`500 Internal Server Error`:** Terjadi kegagalan internal pada server backend (koneksi database atau engine AI).
-
+* **`429 Too Many Requests`:** Melebihi kuota pemanggilan (rate limit) inferensi AI (maksimum 60 req/menit per IP). Disertai header `Retry-After`.
+* **`500 Internal Server Error`:** Terjadi kegagalan internal pada server backend atau pemrosesan model AI.
