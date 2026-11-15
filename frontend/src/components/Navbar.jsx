@@ -27,6 +27,14 @@ function Navbar({ currentPage = 'home', onNavigate }) {
           HOME
         </a>
         <a 
+          href="#upload" 
+          className="nav-link" 
+          aria-current={currentPage === 'upload' ? 'page' : undefined}
+          onClick={() => handleLinkClick('upload')}
+        >
+          SCANNER
+        </a>
+        <a 
           href="#catalog" 
           className="nav-link" 
           aria-current={currentPage === 'catalog' ? 'page' : undefined}

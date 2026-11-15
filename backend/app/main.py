@@ -460,7 +460,7 @@ def get_cards(
     # Susun query PostgREST Supabase
     url_parts = [
         f"{supabase_url}/rest/v1/cards",
-        "?select=card_id,name,supertype,rarity,image_small,sets(set_id,name,release_date),card_prices(effective_market_price)",
+        "?select=card_id,name,supertype,subtypes,types,hp,number,rarity,artist,image_small,sets(set_id,name,series,release_date),card_prices(effective_market_price)",
         f"&limit={safe_limit}",
         f"&offset={offset}"
     ]
@@ -573,10 +573,41 @@ def get_cards(
                 price_idr_str = "Belum Ada Data"
                 is_unlisted = True
 
+            # Metadata tambahan kartu
+            hp_val = item.get("hp")
+            if hp_val is not None and str(hp_val).strip() != "" and float(hp_val) > 0:
+                hp_str = str(int(float(hp_val)))
+            else:
+                hp_str = "-"
+
+            num_val = item.get("number")
+            if num_val is not None and str(num_val).strip() != "":
+                num_str = str(num_val)
+            else:
+                cid = str(item.get("card_id") or "")
+                num_str = cid.split("-")[1] if "-" in cid else "-"
+
+            set_name_val = set_info
+            series_val = "-"
+            if isinstance(item.get("sets"), dict):
+                set_name_val = item["sets"].get("name") or set_info
+                series_val = item["sets"].get("series") or "-"
+            elif isinstance(item.get("sets"), list) and len(item["sets"]) > 0:
+                set_name_val = item["sets"][0].get("name") or set_info
+                series_val = item["sets"][0].get("series") or "-"
+
             formatted_data.append({
                 "id": item.get("card_id"),
                 "name": item.get("name"),
                 "supertype": item.get("supertype") or "Pokémon",
+                "subtypes": item.get("subtypes") or "-",
+                "types": item.get("types") or "-",
+                "hp": hp_str,
+                "number": num_str,
+                "artist": item.get("artist") or "-",
+                "set": set_info,
+                "setName": set_name_val,
+                "series": series_val,
                 "price": price_usd_str,
                 "price_usd": price_usd_str,
                 "price_idr": price_idr_str,
@@ -584,7 +615,6 @@ def get_cards(
                 "is_unlisted": is_unlisted,
                 "rarityText": rarity_str,
                 "rarityIcon": rarity_icon,
-                "set": set_info,
                 "image": item.get("image_small") or "/card-result.png"
             })
             

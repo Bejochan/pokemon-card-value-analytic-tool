@@ -870,13 +870,7 @@
   padding-left: 8px;
 }
 
-/* 4. Menghilangkan garis pemisah di antara Windmill dan Flower Tornado (agar Attack menyatu seperti Canva) */
-.catalog-modal-table tr:nth-child(2) td:nth-child(3),
-.catalog-modal-table tr:nth-child(2) td:nth-child(4) {
-  background: none;
-}
-
-/* 5. Menghilangkan garis horizontal di baris paling bawah (Stage & Weight) */
+/* 4. Menghilangkan garis horizontal di baris paling bawah */
 .catalog-modal-table tr:last-child td {
   background: none;
 }

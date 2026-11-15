@@ -26,7 +26,7 @@
 
 .navbar-center {
   display: flex;
-  gap: 40px;
+  gap: clamp(18px, 2.2vw, 36px);
   justify-content: center;
   flex: 2;
 }

@@ -834,44 +834,32 @@ function CatalogPage() {
                         <tr>
                           <td className="spec-label">Rarity</td>
                           <td className="spec-value">{selectedCard.rarityText || '-'}</td>
-                          <td className="spec-label">Attack</td>
-                          <td className="spec-value">Windmill <span style={{float: 'right'}}>20</span></td>
+                          <td className="spec-label">Subtype</td>
+                          <td className="spec-value">{selectedCard.subtypes || '-'}</td>
                         </tr>
                         <tr>
                           <td className="spec-label">Holofoil type</td>
                           <td className="spec-value">{selectedCard.rarityText?.toLowerCase().includes('holo') ? 'Holofoil' : 'Standard'}</td>
-                          <td className="spec-label"></td>
-                          <td className="spec-value">Flower tornado <span style={{float: 'right'}}>60</span></td>
-                        </tr>
-                        <tr>
-                          <td className="spec-label">Language</td>
-                          <td className="spec-value">English</td>
-                          <td className="spec-label">Weakness</td>
-                          <td className="spec-value">*fire x 2</td>
+                          <td className="spec-label">Element Type</td>
+                          <td className="spec-value">{selectedCard.types || '-'}</td>
                         </tr>
                         <tr>
                           <td className="spec-label">Set code</td>
                           <td className="spec-value">{selectedCard.set || '-'}</td>
-                          <td className="spec-label">Resistance</td>
-                          <td className="spec-value">-</td>
+                          <td className="spec-label">Series</td>
+                          <td className="spec-value">{selectedCard.series || '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="spec-label">Set name</td>
+                          <td className="spec-value">{selectedCard.setName || '-'}</td>
+                          <td className="spec-label">Artist</td>
+                          <td className="spec-value">{selectedCard.artist || '-'}</td>
                         </tr>
                         <tr>
                           <td className="spec-label">Number</td>
                           <td className="spec-value">{selectedCard.number || (selectedCard.id ? selectedCard.id.split('-')[1] : '-')}</td>
-                          <td className="spec-label">Retreat</td>
-                          <td className="spec-value">*</td>
-                        </tr>
-                        <tr>
-                          <td className="spec-label">Regulation mark</td>
-                          <td className="spec-value">H</td>
-                          <td className="spec-label">Height</td>
-                          <td className="spec-value">1' 04"</td>
-                        </tr>
-                        <tr>
-                          <td className="spec-label">Stage</td>
-                          <td className="spec-value">2</td>
-                          <td className="spec-label">Weight</td>
-                          <td className="spec-value">12.8 lbs.</td>
+                          <td className="spec-label">Language</td>
+                          <td className="spec-value">English</td>
                         </tr>
                       </tbody>
                     </table>

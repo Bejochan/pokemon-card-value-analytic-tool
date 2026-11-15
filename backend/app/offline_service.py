@@ -143,10 +143,47 @@ def get_offline_cards(
 
         set_info = str(row.get("set.id") or "unknown")
 
+        # Ekstrak metadata riil kartu
+        hp_raw = row.get("hp")
+        if pd.notna(hp_raw) and str(hp_raw).strip() != "" and float(hp_raw) > 0:
+            hp_str = str(int(float(hp_raw)))
+        else:
+            hp_str = "-"
+
+        num_raw = row.get("number")
+        if pd.notna(num_raw) and str(num_raw).strip() != "":
+            num_str = str(num_raw)
+        else:
+            cid = str(row.get("card_id") or "")
+            num_str = cid.split("-")[1] if "-" in cid else "-"
+
+        subtypes_raw = row.get("subtypes")
+        subtypes_str = str(subtypes_raw) if pd.notna(subtypes_raw) and str(subtypes_raw).strip() != "" else "-"
+
+        types_raw = row.get("types")
+        types_str = str(types_raw) if pd.notna(types_raw) and str(types_raw).strip() != "" else "-"
+
+        artist_raw = row.get("artist")
+        artist_str = str(artist_raw) if pd.notna(artist_raw) and str(artist_raw).strip() != "" else "-"
+
+        set_name_raw = row.get("set.name")
+        set_name_str = str(set_name_raw) if pd.notna(set_name_raw) and str(set_name_raw).strip() != "" else set_info
+
+        series_raw = row.get("set.series")
+        series_str = str(series_raw) if pd.notna(series_raw) and str(series_raw).strip() != "" else "-"
+
         formatted_cards.append({
             "id": str(row.get("card_id")),
             "name": str(row.get("name")),
             "supertype": str(row.get("supertype") or "Pokémon"),
+            "subtypes": subtypes_str,
+            "types": types_str,
+            "hp": hp_str,
+            "number": num_str,
+            "artist": artist_str,
+            "set": set_info,
+            "setName": set_name_str,
+            "series": series_str,
             "price": price_usd_str,
             "price_usd": price_usd_str,
             "price_idr": price_idr_str,
@@ -154,7 +191,6 @@ def get_offline_cards(
             "is_unlisted": is_unlisted,
             "rarityText": rarity_str,
             "rarityIcon": rarity_icon,
-            "set": set_info,
             "image": str(row.get("images.small") or "/card-result.png")
         })
 
