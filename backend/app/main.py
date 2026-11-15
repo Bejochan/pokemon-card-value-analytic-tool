@@ -24,7 +24,7 @@ import sys
 import math
 import urllib.parse
 from typing import Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import requests
@@ -94,7 +94,7 @@ from app.offline_service import (
 )
 
 # ---------------------------------------------------------------------
-# 1. INISIALISASI FASTAPI APP & CORS
+# 1. INISIALISASI FASTAPI APP, CORS, & KEAMANAN
 # ---------------------------------------------------------------------
 
 app = FastAPI(
@@ -109,13 +109,84 @@ if "HF_HUB_OFFLINE" not in os.environ:
 if "TRANSFORMERS_OFFLINE" not in os.environ:
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
+# Konfigurasi CORS Terbatas & Aman (Whitelist + Vercel Deployment)
+raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+if raw_origins.strip():
+    allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+else:
+    allowed_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------
+# KONSTANTA KEAMANAN & RATE LIMITER (SLIDING WINDOW)
+# ---------------------------------------------------------------------
+
+MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024  # Maksimum 15 MB untuk upload berkas
+MAX_BASE64_CHARS = 22 * 1024 * 1024     # Maksimum ~15 MB representasi Base64
+
+import time
+import threading
+from collections import defaultdict
+
+_rate_limit_lock = threading.Lock()
+_ip_request_timestamps = defaultdict(list)
+AI_RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_AI_PER_MINUTE", "60"))
+
+
+def check_ai_rate_limit(request: Request = None):
+    """
+    Memeriksa laju permintaan (rate limiting) per client IP khusus untuk endpoint inferensi AI berat.
+    Mencegah pemborosan VRAM/CPU dari serangan spam request menggunakan in-memory sliding window.
+    Jika request is None (pemanggilan langsung via fungsi Python/pengujian), rate limit dilewati secara aman.
+    """
+    if request is None:
+        return
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    now = time.time()
+    window_seconds = 60.0
+
+    with _rate_limit_lock:
+        timestamps = _ip_request_timestamps[client_ip]
+        # Evict timestamp yang sudah melewati jendela 60 detik
+        valid_timestamps = [t for t in timestamps if now - t < window_seconds]
+
+        if len(valid_timestamps) >= AI_RATE_LIMIT_PER_MINUTE:
+            _ip_request_timestamps[client_ip] = valid_timestamps
+            retry_after = int(window_seconds - (now - valid_timestamps[0])) + 1
+            raise HTTPException(
+                status_code=429,
+                detail=f"Terlalu banyak permintaan inferensi AI. Kuota maksimum: {AI_RATE_LIMIT_PER_MINUTE} req/menit per IP. Coba lagi dalam {retry_after} detik.",
+                headers={"Retry-After": str(max(1, retry_after))}
+            )
+
+        valid_timestamps.append(now)
+        _ip_request_timestamps[client_ip] = valid_timestamps
+
+
+def read_upload_file_safely(file: UploadFile, max_bytes: int = MAX_FILE_SIZE_BYTES) -> bytes:
+    """Membaca berkas unggahan secara aman dan membatasi konsumsi memori jika ukuran melebihi batas."""
+    contents = file.file.read(max_bytes + 1)
+    if len(contents) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Ukuran berkas '{file.filename}' melebihi batas maksimum {max_bytes // (1024 * 1024)} MB."
+        )
+    return contents
 
 
 @app.on_event("startup")
@@ -196,13 +267,21 @@ def healthcheck():
 # ---------------------------------------------------------------------
 
 @app.post("/identify", response_model=IdentifyResponse)
-def identify_card_base64(data: ImageDataRequest):
+def identify_card_base64(data: ImageDataRequest, request: Request = None):
     """
     Endpoint pemindaian kamera langsung (On-Cam).
     Menerima Base64 gambar kartu, menjalankan Model 1 CLIP ViT-B-32 sub-milidetik,
     dan mengembalikan metadata spesifikasi kartu lengkap tanpa beban deteksi cacat fisik.
     Dieksekusi dalam threadpool FastAPI agar tidak memblokir event loop.
+    Dilindungi dengan rate limiter dan pembatasan ukuran payload.
     """
+    check_ai_rate_limit(request)
+    if len(data.image) > MAX_BASE64_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Ukuran payload gambar Base64 melebihi batas maksimum {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB."
+        )
+
     img_bgr, _ = decode_base64_to_cv2(data.image)
     if img_bgr is None:
         raise HTTPException(
@@ -218,9 +297,10 @@ def identify_card_base64(data: ImageDataRequest):
 
 
 @app.post("/upload/identify", response_model=IdentifyResponse)
-def identify_card_file(file: UploadFile = File(...)):
-    """Versi Multipart Form-Data untuk endpoint On-Cam / Identify."""
-    contents = file.file.read()
+def identify_card_file(file: UploadFile = File(...), request: Request = None):
+    """Versi Multipart Form-Data untuk endpoint On-Cam / Identify dengan proteksi payload maksimum."""
+    check_ai_rate_limit(request)
+    contents = read_upload_file_safely(file)
     img_bgr, _ = decode_bytes_to_cv2(contents)
     if img_bgr is None:
         raise HTTPException(status_code=400, detail="Berkas gambar tidak dapat dibaca.")
@@ -237,13 +317,26 @@ def identify_card_file(file: UploadFile = File(...)):
 # ---------------------------------------------------------------------
 
 @app.post("/analyze", response_model=AnalyzeResponse)
-def analyze_card_base64(data: ImageDataRequest):
+def analyze_card_base64(data: ImageDataRequest, request: Request = None):
     """
     Endpoint analisis komprehensif untuk halaman Upload Foto.
     Menjalankan Model 1 (CLIP) + Model 2 (YOLOv8 Condition Grader),
     menghitung persentase diskon kerusakan fisik, dan mengestimasi harga wajar akhir (P_final).
     Mendukung evaluasi satu sisi (image) atau dua sisi (image + back_image).
+    Dilindungi dengan rate limiter dan pembatasan ukuran payload.
     """
+    check_ai_rate_limit(request)
+    if len(data.image) > MAX_BASE64_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Ukuran payload gambar Base64 melebihi batas maksimum {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB."
+        )
+    if data.back_image and len(data.back_image) > MAX_BASE64_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Ukuran payload gambar belakang Base64 melebihi batas maksimum {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB."
+        )
+
     img_bgr, clean_b64 = decode_base64_to_cv2(data.image)
     if img_bgr is None or clean_b64 is None:
         raise HTTPException(
@@ -282,26 +375,29 @@ def analyze_card_file(
     front_file: Optional[UploadFile] = File(None, description="Foto tampak depan kartu (Model 1 Identifier & Cacat Depan)"),
     back_file: Optional[UploadFile] = File(None, description="Foto tampak belakang kartu (Cacat Belakang, opsional)"),
     file: Optional[UploadFile] = File(None, description="Fallback berkas tunggal untuk upload foto depan"),
-    card_id: Optional[str] = Form(None, description="ID kartu (opsional, jika ingin menentukan ID kartu langsung tanpa Model 1 CLIP)")
+    card_id: Optional[str] = Form(None, description="ID kartu (opsional, jika ingin menentukan ID kartu langsung tanpa Model 1 CLIP)"),
+    request: Request = None
 ):
     """
     Versi Multipart Form-Data untuk endpoint Full Analysis:
     Mendukung unggah foto tampak depan (front_file) dan tampak belakang (back_file).
     Model 1 CLIP otomatis mengenali jenis kartu dari foto depan (atau menggunakan card_id jika diisi),
     sedangkan Model 2 YOLOv8 memeriksa cacat fisik pada kedua sisi.
+    Dilindungi dengan rate limiter dan pembatasan ukuran berkas 15 MB.
     """
+    check_ai_rate_limit(request)
     actual_front = front_file or file
     if not actual_front:
         raise HTTPException(status_code=400, detail="Wajib mengunggah foto kartu tampak depan.")
 
-    front_bytes = actual_front.file.read()
+    front_bytes = read_upload_file_safely(actual_front)
     img_bgr, clean_b64 = decode_bytes_to_cv2(front_bytes)
     if img_bgr is None or clean_b64 is None:
         raise HTTPException(status_code=400, detail="Berkas gambar tampak depan tidak dapat dibaca.")
 
     back_bgr, back_b64 = None, None
     if back_file:
-        back_bytes = back_file.file.read()
+        back_bytes = read_upload_file_safely(back_file)
         back_bgr, back_b64 = decode_bytes_to_cv2(back_bytes)
 
     result = run_analyze_flow(
@@ -579,12 +675,14 @@ def get_card_history(card_id: str):
 # ---------------------------------------------------------------------
 
 @app.get("/cards/{card_id}/forecast", response_model=ForecastResponse)
-def get_card_forecast(card_id: str):
+def get_card_forecast(card_id: str, request: Request = None):
     """
     Endpoint Peramalan Harga 7 Hari & Sinyal Transaksi (Forecast Model).
     Menghasilkan multi-step recursive price forecasting untuk 7 hari ke depan
     beserta rekomendasi sinyal trading: BUY, HOLD, atau SELL.
+    Dilindungi dengan rate limiter inferensi AI.
     """
+    check_ai_rate_limit(request)
     try:
         result = forecast_7_days(card_id)
         return result
@@ -594,13 +692,15 @@ def get_card_forecast(card_id: str):
 
 
 @app.post("/cards/{card_id}/condition", response_model=CardConditionResponse)
-def evaluate_card_condition_base64(card_id: str, data: CardConditionRequest):
+def evaluate_card_condition_base64(card_id: str, data: CardConditionRequest, request: Request = None):
     """
     Endpoint Penilaian Kondisi Fisik Kartu (Card Condition Model via Base64).
     Mendukung upload foto tampak depan (front_image) dan tampak belakang (back_image).
     Mendeteksi cacat fisik (scratches, corner wear, edge wear) di kedua sisi kartu,
     serta menghitung Condition Score (0-100%) dan penyesuaian harga pasar wajar.
+    Dilindungi dengan rate limiter dan pembatasan ukuran payload.
     """
+    check_ai_rate_limit(request)
     front_raw = data.front_image
     back_raw = data.back_image
 
@@ -608,6 +708,17 @@ def evaluate_card_condition_base64(card_id: str, data: CardConditionRequest):
         raise HTTPException(
             status_code=400,
             detail="Wajib menyertakan minimal satu foto kartu (front_image dan/atau back_image)."
+        )
+
+    if front_raw and len(front_raw) > MAX_BASE64_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Ukuran payload front_image Base64 melebihi batas maksimum {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB."
+        )
+    if back_raw and len(back_raw) > MAX_BASE64_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Ukuran payload back_image Base64 melebihi batas maksimum {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB."
         )
 
     front_bgr, front_b64 = decode_base64_to_cv2(front_raw) if front_raw else (None, None)
@@ -635,12 +746,15 @@ def evaluate_card_condition_base64(card_id: str, data: CardConditionRequest):
 def evaluate_card_condition_file(
     card_id: str,
     front_file: Optional[UploadFile] = File(None, description="Foto kartu tampak depan (Wajib / Utama)"),
-    back_file: Optional[UploadFile] = File(None, description="Foto kartu tampak belakang (Opsional / Dianjurkan)")
+    back_file: Optional[UploadFile] = File(None, description="Foto kartu tampak belakang (Opsional / Dianjurkan)"),
+    request: Request = None
 ):
     """
     Versi Multipart Form-Data untuk endpoint Card Condition Model.
     Mendukung unggah berkas foto tampak depan (front_file) dan tampak belakang (back_file).
+    Dilindungi dengan rate limiter dan pembatasan ukuran berkas 15 MB.
     """
+    check_ai_rate_limit(request)
     if not front_file and not back_file:
         raise HTTPException(
             status_code=400,
@@ -651,11 +765,11 @@ def evaluate_card_condition_file(
     back_bgr, back_b64 = None, None
 
     if front_file:
-        front_bytes = front_file.file.read()
+        front_bytes = read_upload_file_safely(front_file)
         front_bgr, front_b64 = decode_bytes_to_cv2(front_bytes)
 
     if back_file:
-        back_bytes = back_file.file.read()
+        back_bytes = read_upload_file_safely(back_file)
         back_bgr, back_b64 = decode_bytes_to_cv2(back_bytes)
 
     try:
