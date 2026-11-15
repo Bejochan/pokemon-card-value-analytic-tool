@@ -266,6 +266,7 @@ pokemon-card-value-analytic-tool/
 │   ├── export_broken_links.py            # Export audit laporan broken links
 │   ├── compress_images.py                # Kompresi paralel gambar ke format JPG Lanczos
 │   ├── test_api_endpoints.py             # Uji integrasi endpoint REST API
+│   ├── test_security_hardening.py        # Uji proteksi keamanan CORS, payload limit, & rate limiter
 │   ├── test_realtime_simulation.py       # Simulasi pemindaian kamera real-time
 │   ├── requirements.txt                  # Dependensi Python Backend
 │   └── .env                              # Konfigurasi API Keys & CAMERA_SOURCE
@@ -384,6 +385,14 @@ Buka browser di: **`http://localhost:5173`**
 
 ### 5. Pengujian Model & Skrip Tambahan
 
+* **Uji Proteksi Keamanan API (CORS, 15 MB Payload Limit, Rate Limiter 60 req/min):**
+  ```powershell
+  python backend/test_security_hardening.py
+  ```
+* **Uji Integrasi Seluruh Endpoint API:**
+  ```powershell
+  python backend/test_api_endpoints.py
+  ```
 * **Uji Peramalan Amazon Chronos-Bolt:**
   ```powershell
   python backend/models/chronos_forecaster.py
