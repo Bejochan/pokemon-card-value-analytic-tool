@@ -467,6 +467,7 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
     Hanya menjalankan Model 1 (Identifikasi jenis kartu) tanpa deteksi cacat.
     Menggunakan konfigurasi fast-path (1-pass CLIP portrait + ORB focused eval)
     karena feed kamera client sudah di-crop presisi ke rasio 448x625.
+    Dilengkapi Conditional Lazy Orientation: hanya menguji variasi rotasi kartu bila posisi awal belum terkunci (< 60%).
     """
     ai_result = process_card_identification(
         img_bgr=img_bgr,
@@ -477,6 +478,27 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
         fast_mode=True
     )
     top_match = ai_result.get("top_match")
+    conf_pct = float(top_match.get("confidence_percentage") or 0.0) if top_match else 0.0
+
+    # Conditional Lazy Orientation Fallback:
+    # Jika posisi tegak 0° belum mencapai keyakinan 60% atau belum teridentifikasi,
+    # otomatis uji variasi rotasi (90°, 180°, 270°) untuk menyelamatkan kartu yang miring/terbalik
+    if not top_match or conf_pct < 60.0:
+        oriented_result = process_card_identification(
+            img_bgr=img_bgr,
+            top_k=top_k,
+            auto_align=False,
+            auto_orient=True,
+            dual_view=False,
+            fast_mode=True
+        )
+        oriented_match = oriented_result.get("top_match")
+        if oriented_match:
+            oriented_conf = float(oriented_match.get("confidence_percentage") or 0.0)
+            if oriented_conf > conf_pct:
+                ai_result = oriented_result
+                top_match = oriented_match
+                conf_pct = oriented_conf
 
     if not top_match:
         return {
@@ -485,7 +507,6 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
             "execution_time_ms": ai_result.get("execution_time_ms", 0.0)
         }
 
-    conf_pct = float(top_match.get("confidence_percentage") or 0.0)
     conf_label = str(top_match.get("confidence_label") or "Rendah")
 
     # Ambang batas keyakinan minimal 60% untuk aliran kamera live:
