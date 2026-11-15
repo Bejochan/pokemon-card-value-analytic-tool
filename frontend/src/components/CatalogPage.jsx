@@ -625,7 +625,12 @@ function CatalogPage() {
               <option value="Common">Common</option>
               <option value="Uncommon">Uncommon</option>
               <option value="Rare">Rare</option>
-              <option value="Ultra">Ultra / Secret Rare</option>
+              <option value="Holo">Rare Holo</option>
+              <option value="Ultra">Ultra Rare</option>
+              <option value="Illustration">Illustration Rare</option>
+              <option value="Secret">Secret Rare</option>
+              <option value="Shiny">Shiny Rare</option>
+              <option value="Promo">Promo</option>
             </select>
 
             <select 

@@ -355,8 +355,15 @@ def get_cards(
 
     # Filter Rarity
     if rarity and rarity.strip() and rarity.lower() != "all":
-        clean_rarity = urllib.parse.quote(rarity.strip(), safe="")
-        url_parts.append(f"&rarity=ilike.*{clean_rarity}*")
+        r = rarity.strip()
+        rl = r.lower()
+        if rl == "common":
+            url_parts.append("&rarity=eq.Common")
+        elif rl == "rare":
+            url_parts.append("&rarity=eq.Rare")
+        else:
+            clean_rarity = urllib.parse.quote(r, safe="")
+            url_parts.append(f"&rarity=ilike.*{clean_rarity}*")
 
     # Filter Holo
     if holo and holo.strip() and holo.lower() != "all":

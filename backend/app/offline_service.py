@@ -79,7 +79,13 @@ def get_offline_cards(
     # Filter Rarity
     if rarity and rarity.strip() and rarity.lower() != "all":
         r = rarity.strip()
-        df_filtered = df_filtered[df_filtered["rarity"].str.contains(r, case=False, na=False)]
+        rl = r.lower()
+        if rl == "common":
+            df_filtered = df_filtered[df_filtered["rarity"].str.lower() == "common"]
+        elif rl == "rare":
+            df_filtered = df_filtered[df_filtered["rarity"].str.lower() == "rare"]
+        else:
+            df_filtered = df_filtered[df_filtered["rarity"].str.contains(r, case=False, na=False)]
 
     # Filter Holo
     if holo and holo.strip() and holo.lower() != "all":
