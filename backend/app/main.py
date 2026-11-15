@@ -119,18 +119,20 @@ app.add_middleware(
 
 @app.on_event("startup")
 def prewarm_models_background():
-    """Memanaskan (pre-warm) Model 1 (CLIP) dan Model 2 (YOLOv8) secara asinkron di latar belakang
-    saat server pertama kali dinyalakan. Ini memastikan saat user melakukan upload manual pertama kali,
+    """Memanaskan (pre-warm) Model 1 (CLIP), Model 2 (YOLOv8), dan Model 3 (Chronos-Bolt) secara asinkron
+    di latar belakang saat server pertama kali dinyalakan. Ini memastikan saat user melakukan upload manual pertama kali,
     model sudah siap di VRAM/RAM dan respons inferensi langsung berjalan instan (~1 detik) tanpa jeda cold-start."""
     import threading
 
     def _warmup_task():
         try:
-            print("[INFO] [Startup Warmup] Memanaskan Model AI (CLIP + FAISS + YOLO) di latar belakang...")
+            print("[INFO] [Startup Warmup] Memanaskan Model AI (CLIP + FAISS + YOLO + Chronos) di latar belakang...")
             from app.cv_service import get_card_identifier, get_defect_model
+            from models.chronos_forecaster import get_chronos_pipeline
             get_card_identifier()
             get_defect_model()
-            print("[OK] [Startup Warmup] Seluruh engine AI siap melayani inferensi tanpa jeda!")
+            get_chronos_pipeline()
+            print("[OK] [Startup Warmup] Seluruh engine AI (CLIP + YOLO + Chronos) siap melayani inferensi tanpa jeda!")
         except Exception as e:
             print(f"[WARN] [Startup Warmup] Warmup non-blocking notice: {e}")
 
@@ -169,7 +171,23 @@ def read_root():
 
 @app.get("/health")
 def healthcheck():
-    return {"status": "healthy", "service": "regokemon-backend"}
+    import app.cv_service as cv
+    import models.chronos_forecaster as cf
+    return {
+        "status": "healthy",
+        "app": "Regokemon Analytics API",
+        "version": "3.1.0",
+        "models": {
+            "model_1_clip_faiss": cv._card_identifier is not None,
+            "model_2_yolo_grader": cv._defect_model is not None,
+            "model_3_chronos_bolt": cf._chronos_pipeline is not None
+        },
+        "dataset": {
+            "master_cards_count": 20617,
+            "total_sets_count": 172
+        },
+        "currency_rate_idr": get_usd_to_idr_rate()
+    }
 
 
 # ---------------------------------------------------------------------
@@ -232,7 +250,14 @@ def analyze_card_base64(data: ImageDataRequest):
             detail="Format Base64 gambar tidak valid atau gambar rusak."
         )
 
-    back_bgr, back_b64 = decode_base64_to_cv2(data.back_image) if data.back_image else (None, None)
+    back_bgr, back_b64 = None, None
+    if data.back_image:
+        back_bgr, back_b64 = decode_base64_to_cv2(data.back_image)
+        if back_bgr is None or back_b64 is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Format Base64 gambar tampak belakang tidak valid atau gambar rusak."
+            )
 
     result = run_analyze_flow(
         img_bgr,
