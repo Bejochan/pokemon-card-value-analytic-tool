@@ -1,0 +1,30 @@
+# Berkas & Direktori yang Dikecualikan dari Build Image Docker
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Dataset mentah & asset gambar berukuran gigabyte (tidak diperlukan di runtime API)
+dataset/raw_images/
+dataset/compressed_images/
+wheels/
+scratch/
+notebooks/
+
+# File debug & arsip sementara
+*.zip
+*.tar.gz
+debug_*.jpg
+debug_*.png
+
+# Git & Editor
+.git/
+.gitignore
+.vscode/
+.idea/
+
