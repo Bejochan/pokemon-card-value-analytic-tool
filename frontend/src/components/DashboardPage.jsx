@@ -562,7 +562,13 @@ function DashboardPage() {
                     top: `${hoveredPoint.pctY}%`
                   }}
                 >
-                  <div className="tooltip-era-badge" style={{ backgroundColor: hoveredPoint.eraColor }}>
+                  <div 
+                    className="tooltip-era-badge" 
+                    style={{ 
+                      backgroundColor: hoveredPoint.eraColor,
+                      color: hoveredPoint.eraKey === 'modern' ? '#1e1b4b' : '#ffffff'
+                    }}
+                  >
                     {hoveredPoint.eraLabel}
                   </div>
                   <div className="tooltip-year-text">Tahun {hoveredPoint.year}</div>
@@ -691,9 +697,7 @@ function DashboardPage() {
                                 priceIdr: Math.round(Number(era.val || 0) * 16500)
                               })}
                               onMouseLeave={() => setHoveredPoint(null)}
-                            >
-                              <title>{`${era.label} (${d.year}): $${Number(era.val || 0).toFixed(2)}`}</title>
-                            </circle>
+                            />
                           </g>
                         );
                       })}
