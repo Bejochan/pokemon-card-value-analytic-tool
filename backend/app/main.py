@@ -85,6 +85,12 @@ from app.currency_service import (
     convert_usd_to_idr,
     get_currency_status
 )
+from app.offline_service import (
+    get_offline_cards,
+    get_offline_sets,
+    get_offline_card_history,
+    get_offline_trending_cards
+)
 
 # ---------------------------------------------------------------------
 # 1. INISIALISASI FASTAPI APP & CORS
@@ -308,16 +314,26 @@ def get_cards(
     Mendukung pagination, pencarian nama kartu, filter supertype/rarity/holo/set,
     serta pengurutan harga/nama/rilis.
     """
-    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
-    supabase_key = os.getenv("SUPABASE_KEY", "")
-    
-    if not supabase_url or not supabase_key:
-        raise HTTPException(status_code=500, detail="Konfigurasi Supabase tidak ditemukan di .env")
-
     # Hitung batas limit & offset yang aman
     safe_limit = max(1, min(limit, 100))
     safe_page = max(1, page)
     offset = (safe_page - 1) * safe_limit
+
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+    
+    if not supabase_url or not supabase_key:
+        print("[API Offline] Supabase tidak dikonfigurasi. Menggunakan dataset CSV offline...")
+        return get_offline_cards(
+            limit=safe_limit,
+            page=safe_page,
+            search=search,
+            supertype=supertype,
+            rarity=rarity,
+            holo=holo,
+            set_id=set_id,
+            sort_by=sort_by
+        )
 
     # Susun query PostgREST Supabase
     url_parts = [
@@ -379,9 +395,14 @@ def get_cards(
     }
 
     try:
-        res = requests.get(full_url, headers=headers, timeout=10)
+        res = requests.get(full_url, headers=headers, timeout=4)
         res.raise_for_status()
         data = res.json()
+        
+        # Jika data kosong tapi ada query search, tetap return data kosong dari Supabase
+        # Namun jika respons bukan list, raise untuk fallback
+        if not isinstance(data, list):
+            raise ValueError("Respons Supabase tidak valid")
 
         # Baca total count dari header content-range (contoh: 0-19/209)
         content_range = res.headers.get("content-range", "")
@@ -455,8 +476,17 @@ def get_cards(
             "cards": formatted_data
         }
     except Exception as e:
-        print(f"[API] Error fetching cards from Supabase: {e}")
-        raise HTTPException(status_code=500, detail="Gagal mengambil data dari database.")
+        print(f"[API Fallback] Supabase cards tidak dapat dijangkau ({e}). Mengalihkan ke CSV offline...")
+        return get_offline_cards(
+            limit=safe_limit,
+            page=safe_page,
+            search=search,
+            supertype=supertype,
+            rarity=rarity,
+            holo=holo,
+            set_id=set_id,
+            sort_by=sort_by
+        )
 
 
 @app.get("/sets")
@@ -464,43 +494,51 @@ def get_sets(limit: int = 250):
     """
     Mengambil daftar Set Pokémon dari Supabase untuk dropdown filter katalog,
     diurutkan secara kronologis dari set rilis paling baru ke lawas.
+    Otomatis beralih ke dataset CSV offline jika Supabase tidak dapat dijangkau.
     """
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_key = os.getenv("SUPABASE_KEY", "")
     if not supabase_url or not supabase_key:
-        return []
+        return get_offline_sets(limit=limit)
     url = f"{supabase_url}/rest/v1/sets?select=set_id,name,series,release_date,release_year&limit={limit}&order=release_date.desc.nullslast"
     headers = {
         "apikey": supabase_key,
         "Authorization": f"Bearer {supabase_key}"
     }
     try:
-        res = requests.get(url, headers=headers, timeout=5)
+        res = requests.get(url, headers=headers, timeout=3)
         if res.ok:
-            return res.json()
+            data = res.json()
+            if isinstance(data, list) and len(data) > 0:
+                return data
     except Exception as e:
-        print(f"[API] Error fetching sets: {e}")
-    return []
+        print(f"[API Fallback] Supabase sets tidak dapat dijangkau ({e}). Menggunakan CSV offline...")
+    return get_offline_sets(limit=limit)
 
 
 @app.get("/cards/{card_id}/history")
 def get_card_history(card_id: str):
-    """Ambil histori harga untuk grafik"""
+    """
+    Ambil histori harga untuk grafik.
+    Otomatis beralih ke dataset CSV offline jika Supabase tidak dapat dijangkau.
+    """
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_key = os.getenv("SUPABASE_KEY", "")
     if not supabase_url or not supabase_key:
-        return []
+        return get_offline_card_history(card_id)
     
     encoded_card_id = urllib.parse.quote(card_id.strip(), safe="")
     url = f"{supabase_url}/rest/v1/card_price_history?select=recorded_date,effective_market_price&card_id=eq.{encoded_card_id}&order=recorded_date.asc"
     headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=3)
         res.raise_for_status()
-        return res.json()
+        data = res.json()
+        if isinstance(data, list) and len(data) > 0:
+            return data
     except Exception as e:
-        print(f"[API] Error fetching history: {e}")
-        return []
+        print(f"[API Fallback] Supabase history tidak dapat dijangkau ({e}). Menggunakan CSV offline...")
+    return get_offline_card_history(card_id)
 
 
 # ---------------------------------------------------------------------
@@ -611,17 +649,22 @@ def evaluate_card_condition_file(
 
 @app.get("/dashboard")
 def get_dashboard_data():
-    """Ambil data trending/top cards untuk dashboard"""
+    """Ambil data trending/top cards untuk dashboard. Otomatis beralih ke dataset CSV offline jika Supabase tidak dapat dijangkau."""
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_key = os.getenv("SUPABASE_KEY", "")
     if not supabase_url or not supabase_key:
-        return {"trending": [], "total_cards": 20617, "total_sets": 172}
+        return {
+            "trending": get_offline_trending_cards(limit=4),
+            "total_cards": 20617,
+            "total_sets": 172,
+            "is_offline_fallback": True
+        }
     
     # Ambil 4 kartu dengan limit
     url = f"{supabase_url}/rest/v1/cards?select=card_id,name,rarity,image_small,sets(set_id),card_prices(effective_market_price)&limit=4"
     headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=3)
         res.raise_for_status()
         data = res.json()
         
@@ -648,7 +691,7 @@ def get_dashboard_data():
                 "price": f"$ {price_val:.2f}",
                 "image": item.get("image_small") or "/card-result.png",
                 "setIcon": f"/{set_id}-logo.png",
-                "flagIcon": "🇺🇸"
+                "flagIcon": "US"
             })
             
         return {
@@ -657,8 +700,13 @@ def get_dashboard_data():
             "total_sets": 172
         }
     except Exception as e:
-        print(f"[API] Error fetching dashboard: {e}")
-        return {"trending": [], "total_cards": 20617, "total_sets": 172}
+        print(f"[API Fallback] Supabase dashboard tidak dapat dijangkau ({e}). Menggunakan CSV offline...")
+        return {
+            "trending": get_offline_trending_cards(limit=4),
+            "total_cards": 20617,
+            "total_sets": 172,
+            "is_offline_fallback": True
+        }
 
 
 @app.get("/currency")
