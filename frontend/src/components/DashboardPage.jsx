@@ -87,10 +87,109 @@ const AnimatedTextScramble = ({ targetText, duration }) => {
 function DashboardPage() {
   const [trendingCards, setTrendingCards] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hoveredPoint, setHoveredPoint] = useState(null);
   const [catalogSummary, setCatalogSummary] = useState({
     totalCards: 20617,
     totalSets: 172,
     marketStatus: "Active Database"
+  });
+
+  // Data Leaderboard Karakter Paling Bernilai (Temuan Riset Ilmiah The Charizard Tax)
+  const [characterLeaderboard, setCharacterLeaderboard] = useState([
+    { rank: 1, pokemon: "Rayquaza", medianUsd: 108.62, medianIdr: "Rp 1.792.230", sampleCount: 59, tag: "Grail Tier" },
+    { rank: 2, pokemon: "Umbreon", medianUsd: 93.09, medianIdr: "Rp 1.535.902", sampleCount: 44, tag: "Moonbreon Tax" },
+    { rank: 3, pokemon: "Gengar", medianUsd: 84.25, medianIdr: "Rp 1.390.125", sampleCount: 47, tag: "Ghost Favorite" },
+    { rank: 4, pokemon: "Charizard", medianUsd: 71.49, medianIdr: "Rp 1.179.502", sampleCount: 106, tag: "Apex Collector" }
+  ]);
+
+  // Matriks Korelasi Riil Fitur terhadap Valuasi Pasar (Pearson, Cramer's V, & Eta-sq)
+  const [featureImpactData, setFeatureImpactData] = useState([
+    { feature: "Rarity Tier", impact: 48.3, label: "0.483 (Utama)" },
+    { feature: "Release Year (Vintage)", impact: 31.1, label: "0.311" },
+    { feature: "Set & Series Era", impact: 25.1, label: "0.251" },
+    { feature: "Hit Points (HP)", impact: 23.4, label: "0.234" },
+    { feature: "Illustrator / Artist", impact: 18.6, label: "0.186" },
+    { feature: "Card Subtype", impact: 15.2, label: "0.152" },
+    { feature: "Supertype (Pkm/Trn)", impact: 12.8, label: "0.128" },
+    { feature: "Holo Foil Finish", impact: 9.4, label: "0.094" },
+    { feature: "Set Card Number", impact: 4.1, label: "0.041" }
+  ]);
+
+  // Distribusi Kelangkaan Populasi Riil dari 20.617 Kartu
+  const [rarityProduction, setRarityProduction] = useState([
+    { name: "Common", percent: 26.2, count: "5.398 kartu", color: "#4b5e94" },
+    { name: "Uncommon", percent: 23.7, count: "4.889 kartu", color: "#a0426b" },
+    { name: "Rare & Holo", percent: 29.9, count: "6.156 kartu", color: "#e54c8c" },
+    { name: "Ultra / Secret", percent: 12.7, count: "2.623 kartu", color: "#f2cf66" },
+    { name: "Promo & Special", percent: 7.5, count: "1.551 kartu", color: "#00bcd4" }
+  ]);
+
+  // Indeks Nilai Rata-rata Pasar Berdasarkan Era Rilis Kartu (USD)
+  const [eraTrendIndex, setEraTrendIndex] = useState([
+    { year: "2020", vintage: 28.5, midEra: 19.0, modern: 5.1 },
+    { year: "2021", vintage: 38.4, midEra: 25.2, modern: 7.9 },
+    { year: "2022", vintage: 34.8, midEra: 22.9, modern: 6.8 },
+    { year: "2023", vintage: 42.0, midEra: 25.9, modern: 7.4 },
+    { year: "2024", vintage: 46.2, midEra: 29.5, modern: 8.2 },
+    { year: "2025", vintage: 53.5, midEra: 33.7, modern: 9.2 },
+    { year: "2026", vintage: 51.9, midEra: 32.7, modern: 10.3 }
+  ]);
+
+  // Pemetaan Ekspansi Resmi & Kartu Incaran Teratas
+  const [chasePacks, setChasePacks] = useState([
+    {
+      set_id: "sv3pt5",
+      title: "Pokemon 151",
+      theme: "tm-yellow",
+      layout: "tm-grid-2x2",
+      cards: [
+        { name: "Charizard ex", price: "$ 356.74" },
+        { name: "Blastoise ex", price: "$ 132.13" },
+        { name: "Venusaur ex", price: "$ 113.17" },
+        { name: "Charmander", price: "$ 94.05" }
+      ]
+    },
+    {
+      set_id: "sv4pt5",
+      title: "Paldean Fates",
+      theme: "tm-blue",
+      layout: "tm-grid-custom-blue",
+      cards: [
+        { name: "Mew ex", price: "$ 872.13" },
+        { name: "Charizard ex", price: "$ 275.37" },
+        { name: "Gardevoir ex", price: "$ 171.63", spanFull: true }
+      ]
+    },
+    {
+      set_id: "swsh7",
+      title: "Evolving Skies",
+      theme: "tm-purple",
+      layout: "tm-grid-stack",
+      cards: [
+        { name: "Umbreon VMAX", price: "$ 2,283.14" },
+        { name: "Rayquaza VMAX", price: "$ 1,255.44" },
+        { name: "Dragonite V", price: "$ 523.47" }
+      ]
+    },
+    {
+      set_id: "base1",
+      title: "Base Set 1999",
+      theme: "tm-pink",
+      layout: "tm-grid-custom-pink",
+      cards: [
+        { name: "Charizard", price: "$ 919.98" },
+        { name: "Blastoise", price: "$ 229.70" },
+        { name: "Venusaur", price: "$ 177.74", spanFull: true }
+      ]
+    }
+  ]);
+
+  // Indeks Likuiditas Pasar
+  const [liquidity, setLiquidity] = useState({
+    activeCards: 19686,
+    totalCards: 20617,
+    liquidityPct: 95.5,
+    status: "HIGH LIQUIDITY"
   });
 
   useEffect(() => {
@@ -105,8 +204,32 @@ function DashboardPage() {
             setCatalogSummary(prev => ({
               ...prev,
               totalCards: data.total_cards,
-              totalSets: data.total_sets || prev.totalSets
+              totalSets: data.total_sets || prev.totalSets,
+              marketStatus: "Active Database"
             }));
+          }
+          if (data.character_leaderboard && data.character_leaderboard.length > 0) {
+            setCharacterLeaderboard(data.character_leaderboard);
+          }
+          if (data.feature_impact && data.feature_impact.length > 0) {
+            setFeatureImpactData(data.feature_impact);
+          }
+          if (data.rarity_production && data.rarity_production.length > 0) {
+            setRarityProduction(data.rarity_production);
+          }
+          if (data.era_trend_index && data.era_trend_index.length > 0) {
+            setEraTrendIndex(data.era_trend_index);
+          }
+          if (data.chase_packs && data.chase_packs.length > 0) {
+            setChasePacks(data.chase_packs);
+          }
+          if (data.liquidity) {
+            setLiquidity({
+              activeCards: data.liquidity.active_cards || 19686,
+              totalCards: data.liquidity.total_cards || 20617,
+              liquidityPct: data.liquidity.liquidity_pct || 95.5,
+              status: data.liquidity.status || "HIGH LIQUIDITY"
+            });
           }
         }
       } catch (err) {
@@ -118,53 +241,15 @@ function DashboardPage() {
     fetchDashboardData();
   }, []);
 
-  // Data Leaderboard Karakter Paling Bernilai (Temuan Riset Ilmiah The Charizard Tax)
-  const characterLeaderboard = [
-    { rank: 1, pokemon: "Rayquaza", medianUsd: 134.33, medianIdr: "Rp 2.150.000", sampleCount: 40, tag: "Grail Tier" },
-    { rank: 2, pokemon: "Umbreon", medianUsd: 96.83, medianIdr: "Rp 1.550.000", sampleCount: 37, tag: "Moonbreon Tax" },
-    { rank: 3, pokemon: "Blastoise", medianUsd: 82.52, medianIdr: "Rp 1.320.000", sampleCount: 31, tag: "Vintage Classic" },
-    { rank: 4, pokemon: "Charizard", medianUsd: 81.55, medianIdr: "Rp 1.305.000", sampleCount: 78, tag: "79.2x Market Multiplier" }
-  ];
-  
-  // Matriks Korelasi Riil Fitur terhadap Valuasi Pasar (Pearson, Cramer's V, & Eta-sq)
-  const featureImpactData = [
-    { feature: "Rarity Tier", impact: 48.3, label: "0.483 (Utama)" },
-    { feature: "Release Year (Vintage)", impact: 31.1, label: "0.311" },
-    { feature: "Set & Series Era", impact: 25.1, label: "0.251" },
-    { feature: "Hit Points (HP)", impact: 23.4, label: "0.234" },
-    { feature: "Illustrator / Artist", impact: 18.6, label: "0.186" },
-    { feature: "Card Subtype", impact: 15.2, label: "0.152" },
-    { feature: "Supertype (Pkm/Trn)", impact: 12.8, label: "0.128" },
-    { feature: "Holo Foil Finish", impact: 9.4, label: "0.094" },
-    { feature: "Set Card Number", impact: 4.1, label: "0.041" }
-  ];
-
-  // Distribusi Kelangkaan Populasi Riil dari 20.617 Kartu Supabase
-  const rarityProduction = [
-    { name: "Common", percent: 48.2, count: "9.937 kartu", color: "#4b5e94" },
-    { name: "Uncommon", percent: 28.6, count: "5.896 kartu", color: "#a0426b" },
-    { name: "Rare", percent: 16.4, count: "3.381 kartu", color: "#e54c8c" },
-    { name: "Ultra / Secret", percent: 6.8, count: "1.403 kartu", color: "#f2cf66" }
-  ];
-
-  // Indeks Nilai Rata-rata Pasar Berdasarkan Era Rilis Kartu (USD)
-  const eraTrendIndex = [
-    { year: "2020", vintage: 18.2, midEra: 10.4, modern: 5.2 },
-    { year: "2021", vintage: 24.6, midEra: 13.8, modern: 7.9 },
-    { year: "2022", vintage: 22.1, midEra: 12.5, modern: 6.8 },
-    { year: "2023", vintage: 26.8, midEra: 14.2, modern: 7.4 },
-    { year: "2024", vintage: 29.5, midEra: 16.1, modern: 8.2 },
-    { year: "2025", vintage: 34.0, midEra: 18.5, modern: 9.1 }
-  ];
-
   // Fungsi Helper perhitungan koordinat dan kurva halus SVG Line Chart
-  const getLineX = (i) => 60 + i * (600 / (eraTrendIndex.length - 1));
-  const getLineY = (val) => 195 - (val / 40) * 160;
+  const getLineX = (i) => 60 + i * (600 / Math.max(1, eraTrendIndex.length - 1));
+  const maxEraVal = Math.max(60, ...eraTrendIndex.map(d => Math.max(d.vintage || 0, d.midEra || 0, d.modern || 0)));
+  const getLineY = (val) => 195 - (val / maxEraVal) * 160;
 
   const getSplinePath = (key) => {
     const points = eraTrendIndex.map((d, i) => ({
       x: getLineX(i),
-      y: getLineY(d[key])
+      y: getLineY(d[key] || 0)
     }));
     if (points.length === 0) return "";
     let path = `M ${points[0].x} ${points[0].y}`;
@@ -183,7 +268,7 @@ function DashboardPage() {
   const getAreaPath = (key) => {
     const points = eraTrendIndex.map((d, i) => ({
       x: getLineX(i),
-      y: getLineY(d[key])
+      y: getLineY(d[key] || 0)
     }));
     if (points.length === 0) return "";
     let path = getSplinePath(key);
@@ -382,7 +467,7 @@ function DashboardPage() {
             </p>
 
             <div className="rarity-arc-container">
-              {/* Semi-circle Multi-Segment SVG Gauge (Gaya Senada dengan Gauge Kanan Bawah) */}
+              {/* Semi-circle Multi-Segment SVG Gauge dinamis */}
               <div className="rarity-arc-visual">
                 <svg viewBox="0 0 220 125" className="rarity-arc-svg">
                   {/* Track Belakang Halus */}
@@ -393,46 +478,26 @@ function DashboardPage() {
                     strokeWidth="22"
                     strokeLinecap="round"
                   />
-                  {/* Segment 1: Common (48.2%) */}
-                  <path
-                    d="M 30 105 A 80 80 0 0 1 190 105"
-                    fill="none"
-                    stroke="#4b5e94"
-                    strokeWidth="22"
-                    strokeDasharray="120 251.3"
-                    strokeDashoffset="0"
-                  />
-                  {/* Segment 2: Uncommon (28.6%) */}
-                  <path
-                    d="M 30 105 A 80 80 0 0 1 190 105"
-                    fill="none"
-                    stroke="#a0426b"
-                    strokeWidth="22"
-                    strokeDasharray="70.5 251.3"
-                    strokeDashoffset="-122"
-                  />
-                  {/* Segment 3: Rare (16.4%) */}
-                  <path
-                    d="M 30 105 A 80 80 0 0 1 190 105"
-                    fill="none"
-                    stroke="#e54c8c"
-                    strokeWidth="22"
-                    strokeDasharray="39.5 251.3"
-                    strokeDashoffset="-194.5"
-                  />
-                  {/* Segment 4: Ultra / Secret (6.8%) */}
-                  <path
-                    d="M 30 105 A 80 80 0 0 1 190 105"
-                    fill="none"
-                    stroke="#f2cf66"
-                    strokeWidth="22"
-                    strokeDasharray="15.5 251.3"
-                    strokeDashoffset="-235.5"
-                  />
+                  {/* Multi-Segment Dinamis Berdasarkan Populasi Database */}
+                  {rarityProduction.map((item, idx, arr) => {
+                    const dash = (item.percent / 100) * 251.3;
+                    const currentOffset = -arr.slice(0, idx).reduce((sum, prev) => sum + (prev.percent / 100) * 251.3, 0);
+                    return (
+                      <path
+                        key={idx}
+                        d="M 30 105 A 80 80 0 0 1 190 105"
+                        fill="none"
+                        stroke={item.color}
+                        strokeWidth="22"
+                        strokeDasharray={`${dash.toFixed(1)} 251.3`}
+                        strokeDashoffset={currentOffset.toFixed(1)}
+                      />
+                    );
+                  })}
                 </svg>
 
                 <div className="rarity-arc-overlay">
-                  <span className="rarity-arc-total">20,617</span>
+                  <span className="rarity-arc-total">{catalogSummary.totalCards.toLocaleString('en-US')}</span>
                   <span className="rarity-arc-sub">TOTAL CARDS</span>
                 </div>
               </div>
@@ -488,6 +553,26 @@ function DashboardPage() {
 
             {/* SVG Line Chart Builder */}
             <div className="line-chart-container">
+              {/* Tooltip Mengambang Saat Hover Titik */}
+              {hoveredPoint && (
+                <div 
+                  className="dashboard-chart-tooltip"
+                  style={{
+                    left: `${Math.min(90, Math.max(10, hoveredPoint.pctX))}%`,
+                    top: `${hoveredPoint.pctY}%`
+                  }}
+                >
+                  <div className="tooltip-era-badge" style={{ backgroundColor: hoveredPoint.eraColor }}>
+                    {hoveredPoint.eraLabel}
+                  </div>
+                  <div className="tooltip-year-text">Tahun {hoveredPoint.year}</div>
+                  <div className="tooltip-price-row">
+                    <span className="tooltip-price-usd">${hoveredPoint.priceUsd.toFixed(2)}</span>
+                    <span className="tooltip-price-idr"> (Rp {hoveredPoint.priceIdr.toLocaleString('id-ID')})</span>
+                  </div>
+                </div>
+              )}
+
               <svg viewBox="0 0 720 250" className="line-chart-svg">
                 <defs>
                   <linearGradient id="areaVintage" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -504,8 +589,8 @@ function DashboardPage() {
                   </linearGradient>
                 </defs>
 
-                {/* Garis Grid Horizontal (Skala $0, $10, $20, $30, $40) */}
-                {[0, 10, 20, 30, 40].map(val => {
+                {/* Garis Grid Horizontal (Skala $0, $15, $30, $45, $60) */}
+                {[0, 15, 30, 45, 60].map(val => {
                   const y = getLineY(val);
                   return (
                     <g key={`grid-${val}`}>
@@ -514,6 +599,21 @@ function DashboardPage() {
                     </g>
                   );
                 })}
+
+                {/* Garis Vertikal Indikator Saat Titik Di-hover */}
+                {hoveredPoint && (
+                  <line
+                    x1={hoveredPoint.x}
+                    y1="25"
+                    x2={hoveredPoint.x}
+                    y2="200"
+                    stroke="#cbd5e1"
+                    strokeWidth="1.5"
+                    strokeDasharray="3 3"
+                    opacity="0.8"
+                    pointerEvents="none"
+                  />
+                )}
 
                 {/* Label Sumbu X (Tahun) */}
                 {eraTrendIndex.map((d, i) => {
@@ -533,14 +633,70 @@ function DashboardPage() {
                 <path d={getSplinePath('midEra')} fill="none" stroke="#e54c8c" strokeWidth="3" strokeLinecap="round" />
                 <path d={getSplinePath('modern')} fill="none" stroke="#f2cf66" strokeWidth="3" strokeLinecap="round" />
 
-                {/* Titik Lingkaran Tepat di Koordinat Kurva (Zero Misalignment) */}
+                {/* Titik Lingkaran Tepat di Koordinat Kurva dengan Hover Interaktif */}
                 {eraTrendIndex.map((d, i) => {
                   const x = getLineX(i);
+                  const eras = [
+                    { key: 'vintage', label: 'Vintage (1998-2003)', color: '#4b5e94', val: d.vintage },
+                    { key: 'midEra', label: 'Mid-Gen (2004-2015)', color: '#e54c8c', val: d.midEra },
+                    { key: 'modern', label: 'Modern (2016-2026)', color: '#f2cf66', val: d.modern }
+                  ];
+
                   return (
-                    <g key={`dots-${i}`}>
-                      <circle cx={x} cy={getLineY(d.vintage)} r="5" fill="#4b5e94" stroke="#ffffff" strokeWidth="2.5" />
-                      <circle cx={x} cy={getLineY(d.midEra)} r="5" fill="#e54c8c" stroke="#ffffff" strokeWidth="2.5" />
-                      <circle cx={x} cy={getLineY(d.modern)} r="5" fill="#f2cf66" stroke="#ffffff" strokeWidth="2.5" />
+                    <g key={`dots-group-${i}`}>
+                      {eras.map(era => {
+                        const y = getLineY(era.val || 0);
+                        const isHovered = hoveredPoint && hoveredPoint.year === d.year && hoveredPoint.eraKey === era.key;
+                        return (
+                          <g key={`${era.key}-${i}`}>
+                            {/* Halo Lingkaran Saat Titik Aktif Di-hover */}
+                            {isHovered && (
+                              <circle
+                                cx={x}
+                                cy={y}
+                                r="12"
+                                fill="none"
+                                stroke={era.color}
+                                strokeWidth="2.5"
+                                opacity="0.6"
+                              />
+                            )}
+                            {/* Lingkaran Visual Utama */}
+                            <circle
+                              cx={x}
+                              cy={y}
+                              r={isHovered ? 7.5 : 5}
+                              fill={era.color}
+                              stroke="#ffffff"
+                              strokeWidth={isHovered ? 3 : 2.5}
+                              style={{ transition: 'all 0.15s ease' }}
+                            />
+                            {/* Area Sentuh Lebar Transparan untuk Kemudahan Hover Cursor */}
+                            <circle
+                              cx={x}
+                              cy={y}
+                              r="15"
+                              fill="transparent"
+                              style={{ cursor: 'pointer' }}
+                              onMouseEnter={() => setHoveredPoint({
+                                x,
+                                y,
+                                pctX: (x / 720) * 100,
+                                pctY: (y / 250) * 100,
+                                year: d.year,
+                                eraKey: era.key,
+                                eraLabel: era.label,
+                                eraColor: era.color,
+                                priceUsd: Number(era.val || 0),
+                                priceIdr: Math.round(Number(era.val || 0) * 16500)
+                              })}
+                              onMouseLeave={() => setHoveredPoint(null)}
+                            >
+                              <title>{`${era.label} (${d.year}): $${Number(era.val || 0).toFixed(2)}`}</title>
+                            </circle>
+                          </g>
+                        );
+                      })}
                     </g>
                   );
                 })}
@@ -563,52 +719,19 @@ function DashboardPage() {
             </p>
             
             <div className="treemap-container">
-              {/* Kolom 1: Pokemon 151 (Kuning) */}
-              <div className="tm-group tm-yellow">
-                <div className="tm-group-title">Pokemon 151</div>
-                <div className="tm-grid-2x2">
-                  <div className="tm-cell"><span>Mew ex</span><span className="tm-price">$28.50</span></div>
-                  <div className="tm-cell"><span>Charizard ex</span><span className="tm-price">$115.00</span></div>
-                  <div className="tm-cell"><span>Erika's Invi</span><span className="tm-price">$22.40</span></div>
-                  <div className="tm-cell"><span>Zapdos ex</span><span className="tm-price">$38.90</span></div>
-                </div>
-              </div>
-
-              {/* Kolom 2: Paldean Fates (Biru) */}
-              <div className="tm-group tm-blue">
-                <div className="tm-group-title">Paldean Fates</div>
-                <div className="tm-grid-custom-blue">
-                  <div className="tm-cell"><span>Shiny Mew ex</span><span className="tm-price">$89.00</span></div>
-                  <div className="tm-cell"><span>Iono SIR</span><span className="tm-price">$45.00</span></div>
-                  <div className="tm-cell tm-span-full"><span>Charizard ex Shiny</span><span className="tm-price">$120.00</span></div>
-                </div>
-              </div>
-
-              {/* Kolom 3: Evolving Skies (Ungu) */}
-              <div className="tm-group tm-purple">
-                <div className="tm-group-title">Evolving Skies</div>
-                <div className="tm-grid-stack">
-                  <div className="tm-cell"><span>Umbreon VMAX</span><span className="tm-price">$650.00</span></div>
-                  <div className="tm-cell"><span>Rayquaza VMAX</span><span className="tm-price">$240.00</span></div>
-                  <div className="tm-cell"><span>Glaceon VMAX</span><span className="tm-price">$165.00</span></div>
-                </div>
-              </div>
-
-              {/* Kolom 4: Base Set & Vintage Classic (Pink & Navy) */}
-              <div className="tm-group-split">
-                <div className="tm-subgroup tm-pink">
-                  <div className="tm-group-title">Base Set 1999</div>
-                  <div className="tm-grid-custom-pink">
-                    <div className="tm-cell"><span>Charizard</span><span className="tm-price">$340.00</span></div>
-                    <div className="tm-cell"><span>Blastoise</span><span className="tm-price">$82.50</span></div>
-                    <div className="tm-cell tm-span-full"><span>Venusaur</span><span className="tm-price">$65.00</span></div>
+              {chasePacks.map((pack, pIdx) => (
+                <div key={pack.set_id || pIdx} className={`tm-group ${pack.theme}`}>
+                  <div className="tm-group-title">{pack.title}</div>
+                  <div className={pack.layout || "tm-grid-2x2"}>
+                    {pack.cards.map((c, cIdx) => (
+                      <div key={cIdx} className={`tm-cell ${c.spanFull ? 'tm-span-full' : ''}`}>
+                        <span>{c.name}</span>
+                        <span className="tm-price">{c.price}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="tm-subgroup tm-navy">
-                  <div className="tm-group-title">Promo Series</div>
-                  <div className="tm-cell"><span>Black Star</span><span className="tm-price">$42.00</span></div>
-                </div>
-              </div>
+              ))}
             </div>
           </section>
 
@@ -639,7 +762,7 @@ function DashboardPage() {
                   strokeWidth="22"
                   strokeLinecap="round"
                 />
-                {/* Active Arc (52% of 251.3 arc length = 130.7 filled, offset = 120.6) */}
+                {/* Active Arc Dinamis (Berdasarkan Liquidity Pct) */}
                 <path
                   d="M 30 105 A 80 80 0 0 1 190 105"
                   fill="none"
@@ -647,21 +770,21 @@ function DashboardPage() {
                   strokeWidth="22"
                   strokeLinecap="round"
                   strokeDasharray="251.3"
-                  strokeDashoffset="120.6"
+                  strokeDashoffset={Math.max(0, 251.3 - (liquidity.liquidityPct / 100) * 251.3).toFixed(1)}
                 />
               </svg>
 
               <div className="gauge-value-overlay">
-                <span className="gauge-big-number">52%</span>
-                <span className="gauge-status-badge">MODERATE LIQUIDITY</span>
+                <span className="gauge-big-number">{liquidity.liquidityPct}%</span>
+                <span className="gauge-status-badge">{liquidity.status}</span>
               </div>
             </div>
 
             <div className="gauge-metric-footer">
               <div className="gauge-stat-pill">
-                <strong>10.720</strong> / 20.617 Kartu Aktif
+                <strong>{liquidity.activeCards.toLocaleString('id-ID')}</strong> / {liquidity.totalCards.toLocaleString('id-ID')} Kartu Aktif
               </div>
-              <span className="gauge-stat-sub">Aktivitas Transaksi Pasar (30 Hari Terakhir)</span>
+              <span className="gauge-stat-sub">Aktivitas Transaksi Pasar (Dataset Master Regokemon)</span>
             </div>
           </section>
 

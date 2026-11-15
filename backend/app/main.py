@@ -89,7 +89,8 @@ from app.offline_service import (
     get_offline_cards,
     get_offline_sets,
     get_offline_card_history,
-    get_offline_trending_cards
+    get_offline_trending_cards,
+    get_offline_dashboard_analytics
 )
 
 # ---------------------------------------------------------------------
@@ -681,64 +682,59 @@ def evaluate_card_condition_file(
 
 @app.get("/dashboard")
 def get_dashboard_data():
-    """Ambil data trending/top cards untuk dashboard. Otomatis beralih ke dataset CSV offline jika Supabase tidak dapat dijangkau."""
+    """
+    Ambil data trending & analitika pasar komprehensif untuk halaman Dashboard:
+    Character Leaderboard, Global Rarity Production, Top Packs Chase Cards,
+    Era Trend Index, Feature Impact, dan Market Liquidity Index.
+    """
+    analytics = get_offline_dashboard_analytics()
+
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_key = os.getenv("SUPABASE_KEY", "")
     if not supabase_url or not supabase_key:
-        return {
-            "trending": get_offline_trending_cards(limit=4),
-            "total_cards": 20617,
-            "total_sets": 172,
-            "is_offline_fallback": True
-        }
-    
-    # Ambil 4 kartu dengan limit
+        return analytics
+
+    # Ambil 4 kartu trending live dari Supabase jika koneksi online tersedia
     url = f"{supabase_url}/rest/v1/cards?select=card_id,name,rarity,image_small,sets(set_id),card_prices(effective_market_price)&limit=4"
     headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
     try:
         res = requests.get(url, headers=headers, timeout=3)
-        res.raise_for_status()
-        data = res.json()
-        
-        trendingCards = []
-        for i, item in enumerate(data):
-            price_val = 0.0
-            if isinstance(item.get("card_prices"), dict):
-                price_val = item["card_prices"].get("effective_market_price") or 0.0
-            elif isinstance(item.get("card_prices"), list) and len(item["card_prices"]) > 0:
-                price_val = item["card_prices"][0].get("effective_market_price") or 0.0
-                
-            set_id = "unknown"
-            if isinstance(item.get("sets"), dict):
-                set_id = item["sets"].get("set_id") or "unknown"
-            elif isinstance(item.get("sets"), list) and len(item["sets"]) > 0:
-                set_id = item["sets"][0].get("set_id") or "unknown"
-                
-            trendingCards.append({
-                "id": i + 1,
-                "card_id": item.get("card_id"),
-                "name": item.get("name"),
-                "rarity": item.get("rarity") or "Common",
-                "holo": "Normal Print",
-                "price": f"$ {price_val:.2f}",
-                "image": item.get("image_small") or "/card-result.png",
-                "setIcon": f"/{set_id}-logo.png",
-                "flagIcon": "US"
-            })
-            
-        return {
-            "trending": trendingCards,
-            "total_cards": 20617,
-            "total_sets": 172
-        }
+        if res.ok:
+            data = res.json()
+            if isinstance(data, list) and len(data) > 0:
+                trendingCards = []
+                for i, item in enumerate(data):
+                    price_val = 0.0
+                    if isinstance(item.get("card_prices"), dict):
+                        price_val = item["card_prices"].get("effective_market_price") or 0.0
+                    elif isinstance(item.get("card_prices"), list) and len(item["card_prices"]) > 0:
+                        price_val = item["card_prices"][0].get("effective_market_price") or 0.0
+
+                    set_id = "unknown"
+                    if isinstance(item.get("sets"), dict):
+                        set_id = item["sets"].get("set_id") or "unknown"
+                    elif isinstance(item.get("sets"), list) and len(item["sets"]) > 0:
+                        set_id = item["sets"][0].get("set_id") or "unknown"
+
+                    trendingCards.append({
+                        "id": i + 1,
+                        "card_id": item.get("card_id"),
+                        "name": item.get("name"),
+                        "rarity": item.get("rarity") or "Common",
+                        "holo": "Normal Print",
+                        "price": f"$ {price_val:.2f}",
+                        "image": item.get("image_small") or "/card-result.png",
+                        "setIcon": f"/{set_id}-logo.png",
+                        "flagIcon": "US"
+                    })
+                analytics_copy = dict(analytics)
+                analytics_copy["trending"] = trendingCards
+                analytics_copy["is_offline_fallback"] = False
+                return analytics_copy
     except Exception as e:
-        print(f"[API Fallback] Supabase dashboard tidak dapat dijangkau ({e}). Menggunakan CSV offline...")
-        return {
-            "trending": get_offline_trending_cards(limit=4),
-            "total_cards": 20617,
-            "total_sets": 172,
-            "is_offline_fallback": True
-        }
+        print(f"[API Fallback] Supabase dashboard tidak dapat dijangkau ({e}). Menggunakan analitika dataset lokal...")
+
+    return analytics
 
 
 @app.get("/currency")
