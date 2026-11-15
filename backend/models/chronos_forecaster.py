@@ -17,33 +17,37 @@ if "TRANSFORMERS_OFFLINE" not in os.environ:
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import numpy as np
+import threading
 import pandas as pd
 import torch
 
 _chronos_pipeline = None
+_chronos_lock = threading.Lock()
 
 
 def get_chronos_pipeline():
-    """Lazy loader untuk model Amazon Chronos-Bolt.
+    """Lazy loader untuk model Amazon Chronos-Bolt dengan proteksi thread-lock ganda.
     
     Model hanya dimuat ke memori VRAM/RAM saat inferensi pertama kali dipanggil,
-    sehingga waktu startup server FastAPI tetap instan (< 1 detik).
+    sehingga waktu startup server FastAPI tetap instan (< 1 detik) dan aman dari race condition.
     """
     global _chronos_pipeline
     if _chronos_pipeline is None:
-        try:
-            print("[INFO] [Chronos Engine] Memuat bobot model Amazon Chronos-Bolt...")
-            from chronos import ChronosBoltPipeline  # type: ignore
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            _chronos_pipeline = ChronosBoltPipeline.from_pretrained(
-                "amazon/chronos-bolt-mini",
-                device_map=device,
-                dtype=torch.float32,
-            )
-            print(f"[OK] [Chronos Engine] Amazon Chronos-Bolt siap digunakan pada device: {device.upper()}!")
-        except Exception as e:
-            print(f"[ERROR] [Chronos Engine] Gagal memuat Amazon Chronos-Bolt: {e}")
-            return None
+        with _chronos_lock:
+            if _chronos_pipeline is None:
+                try:
+                    print("[INFO] [Chronos Engine] Memuat bobot model Amazon Chronos-Bolt...")
+                    from chronos import ChronosBoltPipeline  # type: ignore
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                    _chronos_pipeline = ChronosBoltPipeline.from_pretrained(
+                        "amazon/chronos-bolt-mini",
+                        device_map=device,
+                        dtype=torch.float32,
+                    )
+                    print(f"[OK] [Chronos Engine] Amazon Chronos-Bolt siap digunakan pada device: {device.upper()}!")
+                except Exception as e:
+                    print(f"[ERROR] [Chronos Engine] Gagal memuat Amazon Chronos-Bolt: {e}")
+                    return None
     return _chronos_pipeline
 
 
