@@ -970,7 +970,7 @@
 }
 
 /* Badge Trading Signal */
-.signal-buy {
+.catalog-signal-badge.signal-buy {
   background-color: #dcfce7;
   color: #15803d !important;
   font-weight: 700 !important;
@@ -980,7 +980,7 @@
   font-size: 12px;
 }
 
-.signal-sell {
+.catalog-signal-badge.signal-sell {
   background-color: #ffe4e6;
   color: #be123c !important;
   font-weight: 700 !important;
@@ -990,7 +990,7 @@
   font-size: 12px;
 }
 
-.signal-hold {
+.catalog-signal-badge.signal-hold {
   background-color: #fef3c7;
   color: #b45309 !important;
   font-weight: 700 !important;

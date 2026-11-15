@@ -317,6 +317,57 @@
   border: 1px solid rgba(0, 210, 106, 0.25);
 }
 
+.card-thumb-header-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.card-side-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+  width: 100%;
+  max-width: 155px;
+}
+
+.side-tab-btn {
+  flex: 1;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 3px 5px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.side-tab-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.side-tab-btn.active {
+  background: #1e1b4b;
+  color: #ffffff;
+  border-color: #1e1b4b;
+}
+
+.card-img-bbox-container {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  border-radius: 8px;
+  overflow: visible;
+}
+
 .detail-card-img.user-scan-img,
 .detail-card-img.master-official-img {
   padding-top: 4px;
@@ -327,6 +378,198 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.14);
   object-fit: contain;
   background-color: #f8fafc;
+}
+
+.detail-card-img.user-scan-img {
+  display: block;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.detail-card-img.user-scan-img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.22);
+}
+
+.card-zoom-trigger {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 5px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 6;
+  padding: 0;
+}
+
+.card-zoom-trigger:hover {
+  background: #2563eb;
+  transform: scale(1.1);
+}
+
+/* =========================================
+   BOUNDING BOX OVERLAY & TAGS
+   ========================================= */
+.defect-bbox-box {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  z-index: 4;
+}
+
+.defect-bbox-box.bbox-corner {
+  border: 2px solid #ef4444;
+  background-color: rgba(239, 68, 68, 0.22);
+}
+
+.defect-bbox-box.bbox-edge {
+  border: 2px solid #f97316;
+  background-color: rgba(249, 115, 22, 0.22);
+}
+
+.defect-bbox-box.bbox-scratch {
+  border: 2px solid #a855f7;
+  background-color: rgba(168, 85, 247, 0.22);
+}
+
+.defect-bbox-box.bbox-crease {
+  border: 2px solid #f43f5e;
+  background-color: rgba(244, 63, 94, 0.22);
+}
+
+.defect-bbox-box.bbox-other {
+  border: 2px solid #06b6d4;
+  background-color: rgba(6, 182, 212, 0.22);
+}
+
+.defect-bbox-box.is-hovered {
+  border-width: 3px;
+  z-index: 10;
+  animation: bboxPulse 1.2s infinite ease-in-out;
+}
+
+.defect-bbox-box.bbox-corner.is-hovered {
+  background-color: rgba(239, 68, 68, 0.38);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.85);
+}
+
+.defect-bbox-box.bbox-edge.is-hovered {
+  background-color: rgba(249, 115, 22, 0.38);
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.85);
+}
+
+.defect-bbox-box.bbox-scratch.is-hovered {
+  background-color: rgba(168, 85, 247, 0.38);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.85);
+}
+
+.defect-bbox-box.bbox-crease.is-hovered {
+  background-color: rgba(244, 63, 94, 0.38);
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.85);
+}
+
+.defect-bbox-box.bbox-other.is-hovered {
+  background-color: rgba(6, 182, 212, 0.38);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.85);
+}
+
+@keyframes bboxPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+.defect-bbox-tag {
+  position: absolute;
+  top: -16px;
+  left: -2px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  color: #ffffff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  line-height: 1.1;
+  text-transform: capitalize;
+  z-index: 5;
+}
+
+.defect-bbox-box.near-top .defect-bbox-tag {
+  top: auto;
+  bottom: -16px;
+}
+
+.defect-bbox-box.is-hovered .defect-bbox-tag {
+  transform: scale(1.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  z-index: 12;
+}
+
+.defect-bbox-tag.tag-corner { background-color: #ef4444; }
+.defect-bbox-tag.tag-edge { background-color: #f97316; }
+.defect-bbox-tag.tag-scratch { background-color: #a855f7; }
+.defect-bbox-tag.tag-crease { background-color: #f43f5e; }
+.defect-bbox-tag.tag-other { background-color: #06b6d4; }
+
+.bbox-toggle-row {
+  margin-top: 6px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.bbox-toggle-pill {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bbox-toggle-pill:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.bbox-toggle-pill.active {
+  background: rgba(0, 210, 106, 0.12);
+  color: #008744;
+  border-color: rgba(0, 210, 106, 0.4);
+}
+
+.bbox-toggle-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  display: inline-block;
+  transition: background 0.15s ease;
+}
+
+.bbox-toggle-pill.active .bbox-toggle-indicator {
+  background: #00d26a;
+  box-shadow: 0 0 6px #00d26a;
 }
 
 .celebration-logo {
@@ -378,6 +621,38 @@
   flex-direction: column;
 }
 
+.defect-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.defect-side-pill-group {
+  display: flex;
+  gap: 3px;
+}
+
+.defect-side-pill {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.defect-side-pill.active {
+  background: #1e1b4b;
+  color: #ffffff;
+  border-color: #1e1b4b;
+}
+
 .defect-title {
   font-family: 'Montserrat', sans-serif;
   font-size: 12px;
@@ -404,15 +679,115 @@
 
 .defect-list {
   margin: 0 0 8px 0;
-  padding-left: 20px;
+  padding-left: 0;
+  list-style: none;
   font-family: 'Montserrat', sans-serif;
-  font-size: 11.5px;
+  font-size: 11px;
   color: #1e1b4b;
   font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.defect-list li {
-  margin-bottom: 4px;
+.defect-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.defect-list-item:hover,
+.defect-list-item.is-hovered {
+  transform: translateX(2px);
+  background: #f1f5f9;
+}
+
+.defect-list-item.item-corner.is-hovered {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.defect-list-item.item-edge.is-hovered {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.defect-list-item.item-scratch.is-hovered {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.defect-list-item.item-crease.is-hovered {
+  border-color: #f43f5e;
+  background: rgba(244, 63, 94, 0.08);
+}
+
+.defect-list-item.item-other.is-hovered {
+  border-color: #06b6d4;
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.defect-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.defect-color-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.defect-color-dot.dot-corner { background-color: #ef4444; }
+.defect-color-dot.dot-edge { background-color: #f97316; }
+.defect-color-dot.dot-scratch { background-color: #a855f7; }
+.defect-color-dot.dot-crease { background-color: #f43f5e; }
+.defect-color-dot.dot-other { background-color: #06b6d4; }
+
+.defect-conf {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.defect-side-clean-msg {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10.5px;
+  color: #64748b;
+  margin: 4px 0 8px 0;
+  padding: 5px 8px;
+  background: #f8fafc;
+  border-radius: 4px;
+  border: 1px dashed #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.switch-side-link {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #2563eb;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+}
+
+.switch-side-link:hover {
+  color: #1d4ed8;
 }
 
 /* WARNA KHAS UNTUK TEKS JADUAL HARGA */
@@ -499,16 +874,26 @@
   /* PERBAIKAN 3: KUNCI UTAMA! Memaksa padding agar dihitung ke dalam kotak, 
      sehingga tidak membuat kotak membengkak melewati batas */
   box-sizing: border-box; 
+  display: flex !important;
+  flex-direction: column !important;
   
   justify-content: flex-start; 
   padding-top: 15px;
   margin: 0; /* Memastikan tidak ada margin bawah yang mendorongnya keluar */
 }
 
+.stats-left .stat-card .stat-label {
+  display: block !important;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
 /* Membesarkan teks sinyal (SELL/BUY) agar epik di kotak yang besar */
 .stats-left .stat-card .stat-value {
   font-size: 30px; 
   margin: 6px 0;
+  display: block !important;
+  width: 100%;
 }
 
 /* Beri kebebasan baris lebih banyak untuk deskripsi sinyal */
@@ -701,8 +1086,10 @@
    ============================================ */
 .stat-card.signal-buy,
 .stat-card.signal-strong-buy {
-  background-color: #8ceba4;
-  border-color: #8ceba4;
+  background-color: #8ceba4 !important;
+  border-color: #8ceba4 !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 .stat-card.signal-buy .stat-label,
 .stat-card.signal-strong-buy .stat-label {
@@ -1012,4 +1399,250 @@
     width: 100%;
     overflow-x: auto;
   }
+}
+
+/* =========================================
+   MODAL INSPEKSI PEMBESARAN BOUNDING BOX
+   ========================================= */
+.zoom-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeInModal 0.2s ease-out;
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.zoom-modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 840px;
+  max-height: 90vh;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.zoom-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.zoom-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.zoom-modal-side-tag {
+  background: rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.zoom-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.zoom-side-toggle {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px;
+  border-radius: 6px;
+}
+
+.zoom-btn-side {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.zoom-btn-side.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.zoom-close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.15s ease;
+}
+
+.zoom-close-btn:hover {
+  color: #ffffff;
+}
+
+.zoom-modal-body {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  overflow-y: auto;
+  align-items: flex-start;
+}
+
+.zoom-card-wrapper {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  background: #f8fafc;
+}
+
+.zoom-card-img {
+  display: block;
+  max-width: 380px;
+  max-height: 520px;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.zoom-defect-sidebar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.zoom-sidebar-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.zoom-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.legend-chip {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: #ffffff;
+}
+
+.legend-chip.chip-corner { background-color: #ef4444; }
+.legend-chip.chip-edge { background-color: #f97316; }
+.legend-chip.chip-scratch { background-color: #a855f7; }
+
+.zoom-defect-items-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.zoom-defect-card {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.zoom-defect-card:hover,
+.zoom-defect-card.is-hovered {
+  transform: translateX(3px);
+  background: #f1f5f9;
+}
+
+.zoom-defect-card.item-corner.is-hovered {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.zoom-defect-card.item-edge.is-hovered {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.zoom-defect-card.item-scratch.is-hovered {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.zoom-defect-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zoom-defect-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+  flex: 1;
+  text-transform: capitalize;
+}
+
+.zoom-defect-badge {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.zoom-defect-coord {
+  font-family: monospace;
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: 4px;
+  padding-left: 15px;
+}
+
+.zoom-toggle-wrapper {
+  margin-top: auto;
+  padding-top: 8px;
 }

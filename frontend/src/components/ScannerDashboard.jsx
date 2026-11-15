@@ -10,6 +10,20 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   const [priceHistory, setPriceHistory] = useState([]);
   const [forecastData, setForecastData] = useState(null);
   const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [activeSide, setActiveSide] = useState('front');
+  const [showBboxOverlay, setShowBboxOverlay] = useState(true);
+  const [hoveredDefectIdx, setHoveredDefectIdx] = useState(null);
+  const [isZoomModalOpen, setIsZoomModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsZoomModalOpen(false);
+    };
+    if (isZoomModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isZoomModalOpen]);
   
   useEffect(() => {
     if (!scanResult?.card_id) return;
@@ -68,6 +82,8 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   // const hp         = scanResult?.hp            ?? '-';
   const officialImage = (scanResult?.official_image_url) || '/card-result.png';
   const userScannedImage = scanResult?.user_scanned_image || scanResult?.scanned_image || null;
+  const userScannedBackImage = scanResult?.user_scanned_back_image || scanResult?.back_image || null;
+  const hasBackImage = Boolean(userScannedBackImage);
 
   // --- Confidence AI ---
   const confidencePct   = scanResult?.confidence_percentage ?? 0;
@@ -89,7 +105,16 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   const hasDefects      = conditionReport?.has_defects     ?? false;
   const defectCount     = conditionReport?.defect_count    ?? 0;
   const defects         = conditionReport?.defects         ?? [];
+  const frontDefects    = conditionReport?.front_defects   ?? [];
+  const backDefects     = conditionReport?.back_defects    ?? [];
   const evalStatus      = conditionReport?.evaluation_status ?? 'evaluated';
+
+  // Sisi aktif (Depan / Belakang) & Data Bounding Box Cacat
+  const isBackActive = activeSide === 'back' && hasBackImage;
+  const activeImage = isBackActive ? userScannedBackImage : (userScannedImage || officialImage);
+  const activeDefects = isBackActive 
+    ? backDefects 
+    : (frontDefects.length > 0 ? frontDefects : defects);
 
   // --- Analitik Pasar (ML Forecasting) ---
   const marketAnalytics   = scanResult?.market_analytics ?? {};
@@ -246,6 +271,66 @@ function ScannerDashboard({ scanResult, onScanOther }) {
     ].join(' ');
   }
 
+  // =====================================================================
+  // HELPER BOUNDING BOX CACAT FISIK
+  // =====================================================================
+  const getDefectCategory = (label) => {
+    const l = (label || '').toLowerCase();
+    if (l.includes('corner')) return 'corner';
+    if (l.includes('edge') || l.includes('whitening')) return 'edge';
+    if (l.includes('scratch')) return 'scratch';
+    if (l.includes('crease') || l.includes('dent')) return 'crease';
+    return 'other';
+  };
+
+  const getBboxStyle = (bbox) => {
+    if (!bbox) return null;
+    let cxPct;
+    let cyPct;
+    let wPct;
+    let hPct;
+
+    if (bbox.x_pct !== undefined && bbox.y_pct !== undefined && bbox.width_pct !== undefined && bbox.height_pct !== undefined) {
+      cxPct = Number(bbox.x_pct);
+      cyPct = Number(bbox.y_pct);
+      wPct = Number(bbox.width_pct);
+      hPct = Number(bbox.height_pct);
+    } else if (bbox.img_width && bbox.img_height) {
+      cxPct = (Number(bbox.x) / Number(bbox.img_width)) * 100;
+      cyPct = (Number(bbox.y) / Number(bbox.img_height)) * 100;
+      wPct = (Number(bbox.width) / Number(bbox.img_width)) * 100;
+      hPct = (Number(bbox.height) / Number(bbox.img_height)) * 100;
+    } else if (bbox.x !== undefined && bbox.y !== undefined && bbox.width !== undefined && bbox.height !== undefined) {
+      if (bbox.x <= 1.0 && bbox.y <= 1.0 && bbox.width <= 1.0 && bbox.height <= 1.0) {
+        cxPct = Number(bbox.x) * 100;
+        cyPct = Number(bbox.y) * 100;
+        wPct = Number(bbox.width) * 100;
+        hPct = Number(bbox.height) * 100;
+      } else {
+        const baseW = 600;
+        const baseH = 837;
+        cxPct = (Number(bbox.x) / baseW) * 100;
+        cyPct = (Number(bbox.y) / baseH) * 100;
+        wPct = (Number(bbox.width) / baseW) * 100;
+        hPct = (Number(bbox.height) / baseH) * 100;
+      }
+    } else {
+      return null;
+    }
+
+    const left = Math.max(0, Math.min(95, cxPct - (wPct / 2)));
+    const top = Math.max(0, Math.min(95, cyPct - (hPct / 2)));
+    const width = Math.min(100 - left, Math.max(4, wPct));
+    const height = Math.min(100 - top, Math.max(4, hPct));
+
+    return {
+      left: `${left.toFixed(2)}%`,
+      top: `${top.toFixed(2)}%`,
+      width: `${width.toFixed(2)}%`,
+      height: `${height.toFixed(2)}%`,
+      rawTop: top
+    };
+  };
 
   return (
     /* =====================================================================
@@ -299,12 +384,99 @@ function ScannerDashboard({ scanResult, onScanOther }) {
               <div className="card-visuals">
                 {/* 1. OUTPUT ATAS: Foto Hasil Scan User */}
                 <div className="card-thumb-wrapper">
-                  <div className="card-thumb-label scan-label">Foto Pemindaian User</div>
-                  <img 
-                    src={userScannedImage || officialImage} 
-                    alt="Foto Pemindaian User" 
-                    className="detail-card-img user-scan-img" 
-                  />
+                  <div className="card-thumb-header-row">
+                    <div className="card-thumb-label scan-label">
+                      {hasBackImage 
+                        ? (isBackActive ? 'Foto User (Belakang)' : 'Foto User (Depan)')
+                        : 'Foto Pemindaian User'}
+                    </div>
+                  </div>
+
+                  {/* Dual-side switcher jika scan 2 sisi */}
+                  {hasBackImage && (
+                    <div className="card-side-tabs">
+                      <button
+                        type="button"
+                        className={`side-tab-btn ${!isBackActive ? 'active' : ''}`}
+                        onClick={() => { setActiveSide('front'); setHoveredDefectIdx(null); }}
+                      >
+                        Depan ({frontDefects.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`side-tab-btn ${isBackActive ? 'active' : ''}`}
+                        onClick={() => { setActiveSide('back'); setHoveredDefectIdx(null); }}
+                      >
+                        Belakang ({backDefects.length})
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Container Gambar dengan Bounding Box Overlay */}
+                  <div className="card-img-bbox-container">
+                    <img 
+                      src={activeImage} 
+                      alt="Foto Pemindaian User" 
+                      className="detail-card-img user-scan-img" 
+                      onClick={() => setIsZoomModalOpen(true)}
+                      title="Klik untuk memperbesar inspeksi"
+                    />
+
+                    <button 
+                      type="button"
+                      className="card-zoom-trigger"
+                      onClick={() => setIsZoomModalOpen(true)}
+                      title="Perbesar inspeksi kartu"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        <line x1="11" y1="8" x2="11" y2="14" />
+                        <line x1="8" y1="11" x2="14" y2="11" />
+                      </svg>
+                    </button>
+
+                    {showBboxOverlay && activeDefects.map((defect, index) => {
+                      const bboxStyle = getBboxStyle(defect.bbox);
+                      if (!bboxStyle) return null;
+                      const cat = getDefectCategory(defect.label);
+                      const isHovered = hoveredDefectIdx === index;
+                      const isNearTop = bboxStyle.rawTop < 14;
+
+                      return (
+                        <div
+                          key={index}
+                          className={`defect-bbox-box bbox-${cat} ${isHovered ? 'is-hovered' : ''} ${isNearTop ? 'near-top' : ''}`}
+                          style={{
+                            left: bboxStyle.left,
+                            top: bboxStyle.top,
+                            width: bboxStyle.width,
+                            height: bboxStyle.height
+                          }}
+                          onMouseEnter={() => setHoveredDefectIdx(index)}
+                          onMouseLeave={() => setHoveredDefectIdx(null)}
+                        >
+                          <span className={`defect-bbox-tag tag-${cat}`}>
+                            {defect.label} {(defect.confidence * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Toggle Switch Overlay BBox */}
+                  {activeDefects.length > 0 && (
+                    <div className="bbox-toggle-row">
+                      <button 
+                        type="button" 
+                        className={`bbox-toggle-pill ${showBboxOverlay ? 'active' : ''}`}
+                        onClick={() => setShowBboxOverlay(!showBboxOverlay)}
+                      >
+                        <span className="bbox-toggle-indicator" />
+                        {showBboxOverlay ? 'Kotak Cacat Aktif' : 'Kotak Cacat Mati'}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. OUTPUT BAWAH: Kartu Resmi Sistem */}
@@ -346,15 +518,63 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                     </>
                   ) : hasDefects ? (
                     <>
-                      <h4 className="defect-title warning">{defectCount} Defect{defectCount > 1 ? 's' : ''} Detected</h4>
-                      <ul className="defect-list">
-                        {defects.map((defect, index) => (
-                          <li key={index}>
-                            <span className="defect-label">{defect.label}</span>
-                            <span className="defect-conf">{(defect.confidence * 100).toFixed(0)}% conf.</span>
-                          </li>
-                        ))}
-                      </ul>
+                      <div className="defect-section-header">
+                        <h4 className="defect-title warning">
+                          {defectCount} Defect{defectCount > 1 ? 's' : ''} Detected
+                        </h4>
+                        {hasBackImage && (
+                          <div className="defect-side-pill-group">
+                            <button
+                              type="button"
+                              className={`defect-side-pill ${!isBackActive ? 'active' : ''}`}
+                              onClick={() => { setActiveSide('front'); setHoveredDefectIdx(null); }}
+                            >
+                              Depan ({frontDefects.length})
+                            </button>
+                            <button
+                              type="button"
+                              className={`defect-side-pill ${isBackActive ? 'active' : ''}`}
+                              onClick={() => { setActiveSide('back'); setHoveredDefectIdx(null); }}
+                            >
+                              Belakang ({backDefects.length})
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {activeDefects.length > 0 ? (
+                        <ul className="defect-list">
+                          {activeDefects.map((defect, index) => {
+                            const cat = getDefectCategory(defect.label);
+                            const isHovered = hoveredDefectIdx === index;
+                            return (
+                              <li 
+                                key={index}
+                                className={`defect-list-item item-${cat} ${isHovered ? 'is-hovered' : ''}`}
+                                onMouseEnter={() => setHoveredDefectIdx(index)}
+                                onMouseLeave={() => setHoveredDefectIdx(null)}
+                              >
+                                <div className="defect-item-left">
+                                  <span className={`defect-color-dot dot-${cat}`} />
+                                  <span className="defect-label">{defect.label}</span>
+                                </div>
+                                <span className="defect-conf">{(defect.confidence * 100).toFixed(0)}% conf.</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <div className="defect-side-clean-msg">
+                          <span>Tidak ada cacat pada tampak {isBackActive ? 'belakang' : 'depan'}.</span>
+                          <button 
+                            type="button" 
+                            className="switch-side-link"
+                            onClick={() => { setActiveSide(isBackActive ? 'front' : 'back'); setHoveredDefectIdx(null); }}
+                          >
+                            Lihat cacat di sisi {isBackActive ? 'depan' : 'belakang'}
+                          </button>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -678,6 +898,141 @@ function ScannerDashboard({ scanResult, onScanOther }) {
           </div>
         </div>
       </div>
+
+      {/* Modal Inspeksi Pembesaran Bounding Box */}
+      {isZoomModalOpen && (
+        <div className="zoom-modal-backdrop" onClick={() => setIsZoomModalOpen(false)}>
+          <div className="zoom-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="zoom-modal-header">
+              <div className="zoom-modal-title">
+                <span>Inspeksi Cacat Fisik AI</span>
+                <span className="zoom-modal-side-tag">
+                  {hasBackImage ? (isBackActive ? 'Tampak Belakang' : 'Tampak Depan') : 'Tampak Depan'}
+                </span>
+              </div>
+              <div className="zoom-modal-actions">
+                {hasBackImage && (
+                  <div className="zoom-side-toggle">
+                    <button
+                      type="button"
+                      className={`zoom-btn-side ${!isBackActive ? 'active' : ''}`}
+                      onClick={() => { setActiveSide('front'); setHoveredDefectIdx(null); }}
+                    >
+                      Depan ({frontDefects.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`zoom-btn-side ${isBackActive ? 'active' : ''}`}
+                      onClick={() => { setActiveSide('back'); setHoveredDefectIdx(null); }}
+                    >
+                      Belakang ({backDefects.length})
+                    </button>
+                  </div>
+                )}
+                <button 
+                  type="button" 
+                  className="zoom-close-btn"
+                  onClick={() => setIsZoomModalOpen(false)}
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+
+            <div className="zoom-modal-body">
+              <div className="zoom-card-wrapper">
+                <img 
+                  src={activeImage} 
+                  alt="Kartu Diperbesar" 
+                  className="zoom-card-img" 
+                />
+                {showBboxOverlay && activeDefects.map((defect, index) => {
+                  const style = getBboxStyle(defect.bbox);
+                  if (!style) return null;
+                  const cat = getDefectCategory(defect.label);
+                  const isHovered = hoveredDefectIdx === index;
+                  const isNearTop = style.rawTop < 12;
+
+                  return (
+                    <div
+                      key={index}
+                      className={`defect-bbox-box bbox-${cat} ${isHovered ? 'is-hovered' : ''} ${isNearTop ? 'near-top' : ''}`}
+                      style={{
+                        left: style.left,
+                        top: style.top,
+                        width: style.width,
+                        height: style.height
+                      }}
+                      onMouseEnter={() => setHoveredDefectIdx(index)}
+                      onMouseLeave={() => setHoveredDefectIdx(null)}
+                    >
+                      <span className={`defect-bbox-tag tag-${cat}`}>
+                        {defect.label} {(defect.confidence * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Legend dan daftar cacat di dalam modal */}
+              <div className="zoom-defect-sidebar">
+                <h5 className="zoom-sidebar-title">Daftar Cacat ({activeDefects.length})</h5>
+                {activeDefects.length > 0 && (
+                  <div className="zoom-legend-row">
+                    <span className="legend-chip chip-corner">Corner Wear</span>
+                    <span className="legend-chip chip-edge">Edge Wear</span>
+                    <span className="legend-chip chip-scratch">Scratch</span>
+                  </div>
+                )}
+
+                <div className="zoom-defect-items-scroll">
+                  {activeDefects.length > 0 ? (
+                    activeDefects.map((defect, index) => {
+                      const cat = getDefectCategory(defect.label);
+                      const isHovered = hoveredDefectIdx === index;
+                      return (
+                        <div
+                          key={index}
+                          className={`zoom-defect-card item-${cat} ${isHovered ? 'is-hovered' : ''}`}
+                          onMouseEnter={() => setHoveredDefectIdx(index)}
+                          onMouseLeave={() => setHoveredDefectIdx(null)}
+                        >
+                          <div className="zoom-defect-top">
+                            <span className={`defect-color-dot dot-${cat}`} />
+                            <span className="zoom-defect-label">{defect.label}</span>
+                            <span className="zoom-defect-badge">{(defect.confidence * 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="zoom-defect-coord">
+                            BBox: [X: {defect.bbox?.x_pct ?? defect.bbox?.x ?? 0}%, Y: {defect.bbox?.y_pct ?? defect.bbox?.y ?? 0}%]
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="defect-side-clean-msg">
+                      <span style={{ fontWeight: 700, color: '#008744', fontSize: '11.5px' }}>Kondisi Mulus (Pristine)</span>
+                      <span>Tidak ada cacat fisik pada tampak {isBackActive ? 'belakang' : 'depan'}. Kotak cacat AI hanya muncul jika terdapat cacat terdeteksi.</span>
+                    </div>
+                  )}
+                </div>
+
+                {activeDefects.length > 0 && (
+                  <div className="zoom-toggle-wrapper">
+                    <button
+                      type="button"
+                      className={`bbox-toggle-pill ${showBboxOverlay ? 'active' : ''}`}
+                      onClick={() => setShowBboxOverlay(!showBboxOverlay)}
+                    >
+                      <span className="bbox-toggle-indicator" />
+                      {showBboxOverlay ? 'Kotak Cacat Aktif' : 'Kotak Cacat Mati'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

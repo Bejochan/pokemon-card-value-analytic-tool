@@ -899,7 +899,7 @@ function CatalogPage() {
                     <div className="analytics-box-gray">
                       <span className="analytics-label">Trading signal</span>
                       <span className="analytics-value">
-                        <span className={signalClass}>{signalDisplay}</span>
+                        <span className={`catalog-signal-badge ${signalClass}`}>{signalDisplay}</span>
                       </span>
                     </div>
                   </div>

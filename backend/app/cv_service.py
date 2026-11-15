@@ -274,16 +274,27 @@ def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.20)
         # 4. Deduplikasi kotak cacat yang bertumpuk pada sudut/tepi yang sama
         deduped_dets = nms(raw_dets, iou_threshold=0.4)
 
+        h_img, w_img = send_image.shape[:2]
         defects = []
         for det in deduped_dets:
+            cx = float(det["x"])
+            cy = float(det["y"])
+            w = float(det["width"])
+            h = float(det["height"])
             defects.append({
                 "label": det["class"],
                 "confidence": round(float(det["confidence"]), 2),
                 "bbox": {
-                    "x": round(float(det["x"]), 1),
-                    "y": round(float(det["y"]), 1),
-                    "width": round(float(det["width"]), 1),
-                    "height": round(float(det["height"]), 1)
+                    "x": round(cx, 1),
+                    "y": round(cy, 1),
+                    "width": round(w, 1),
+                    "height": round(h, 1),
+                    "x_pct": round((cx / w_img) * 100, 2) if w_img > 0 else 0,
+                    "y_pct": round((cy / h_img) * 100, 2) if h_img > 0 else 0,
+                    "width_pct": round((w / w_img) * 100, 2) if w_img > 0 else 0,
+                    "height_pct": round((h / h_img) * 100, 2) if h_img > 0 else 0,
+                    "img_width": w_img,
+                    "img_height": h_img
                 }
             })
         return defects
@@ -316,16 +327,28 @@ def detect_defects_in_memory(clean_base64_data: str) -> List[Dict[str, Any]]:
         result_json = response.json()
         predictions = result_json.get("predictions", [])
 
+        img_w = float(result_json.get("image", {}).get("width") or 600)
+        img_h = float(result_json.get("image", {}).get("height") or 837)
         formatted_defects = []
         for pred in predictions:
+            cx = float(pred.get("x", 0))
+            cy = float(pred.get("y", 0))
+            w = float(pred.get("width", 0))
+            h = float(pred.get("height", 0))
             formatted_defects.append({
                 "label": pred.get("class", "defect"),
                 "confidence": round(float(pred.get("confidence", 0.0)), 2),
                 "bbox": {
-                    "x": pred.get("x"),
-                    "y": pred.get("y"),
-                    "width": pred.get("width"),
-                    "height": pred.get("height")
+                    "x": round(cx, 1),
+                    "y": round(cy, 1),
+                    "width": round(w, 1),
+                    "height": round(h, 1),
+                    "x_pct": round((cx / img_w) * 100, 2) if img_w > 0 else 0,
+                    "y_pct": round((cy / img_h) * 100, 2) if img_h > 0 else 0,
+                    "width_pct": round((w / img_w) * 100, 2) if img_w > 0 else 0,
+                    "height_pct": round((h / img_h) * 100, 2) if img_h > 0 else 0,
+                    "img_width": int(img_w),
+                    "img_height": int(img_h)
                 }
             })
         return formatted_defects
