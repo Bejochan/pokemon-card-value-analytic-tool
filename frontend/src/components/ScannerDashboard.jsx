@@ -653,9 +653,20 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                     <div className={`stat-card signal-${recommendationSignal.toLowerCase().replace(/\s+/g, '-')}`}>
                       <span className="stat-label">Trading Signal</span>
                       <span className={`stat-value ${signalColor}`}>{recommendationSignal}</span>
-                      {forecastData?.signal_reason && (
-                        <span className="stat-signal-desc" title={forecastData.signal_reason}>
-                          {forecastData.signal_reason}
+                      {(forecastData?.signal_reason || marketAnalytics?.signal_reason) ? (
+                        <span 
+                          className="stat-signal-desc" 
+                          title={forecastData?.signal_reason || marketAnalytics?.signal_reason}
+                        >
+                          {forecastData?.signal_reason || marketAnalytics?.signal_reason}
+                        </span>
+                      ) : (
+                        <span className="stat-signal-desc">
+                          {recommendationSignal === 'HOLD' 
+                            ? 'Rekomendasi menahan kartu; pantau pergerakan harga pasar.' 
+                            : (recommendationSignal.includes('BUY') 
+                                ? 'Harga berada di bawah nilai wajar; potensi beli.' 
+                                : 'Harga berada di atas nilai wajar; potensi jual.')}
                         </span>
                       )}
                     </div>
@@ -780,7 +791,7 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                       </div>
                     )}
 
-                    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="market-chart">
+                    <svg width="100%" height="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="market-chart" preserveAspectRatio="none">
                       {/* Garis Grid Horizontal & Label Sumbu Y di Sisi Kiri */}
                       {yTicks.map((tick, idx) => (
                         <g key={idx}>
@@ -878,12 +889,15 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                       })}
                     </svg>
 
-                    {/* Label Sumbu X (Waktu / Tanggal) Sejajar Titik */}
-                    <div className="chart-labels" style={{ paddingLeft: `${padLeft}px`, paddingRight: `${padRight}px` }}>
+                    {/* Label Sumbu X (Waktu / Tanggal) Sejajar Titik Secara Presisi */}
+                    <div className="chart-labels">
                       {pointsWithCoords.map((pt, i) => (
                         <span 
                           key={i} 
                           className={`chart-date-label ${pt.type}`}
+                          style={{
+                            left: `${(pt.x / svgWidth) * 100}%`
+                          }}
                         >
                           {pt.label}
                         </span>
