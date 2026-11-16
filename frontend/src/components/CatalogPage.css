@@ -722,11 +722,20 @@
   animation: fadeOut 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* Overlay saat mode 3D Spotlight fokus di tengah layar */
-.catalog-modal-overlay.mode-spotlight-active {
+/* ==========================================================================
+   DUAL-CARD MODAL: KARTU 3D DI KIRI + DETAIL KARTU DI KANAN
+   ========================================================================== */
+
+/* Overlay Latar Gelap Transparan */
+.catalog-modal-overlay.catalog-dual-overlay {
   background-color: rgba(10, 15, 30, 0.88);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
 }
 
 /* Tombol Tutup Universal di Pojok Layar */
@@ -759,46 +768,74 @@
   box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
 }
 
-/* Panggung 3D Spotlight */
-.catalog-spotlight-stage {
+/* Pembungkus Dual-Card (Dua Bagian Berdampingan) */
+.catalog-dual-modal-wrapper {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  position: relative;
-  z-index: 10;
-  animation: fadeIn 0.3s ease-out;
-}
-
-/* Kotak Pop-up Utama (Persegi Panjang Lebar) */
-.catalog-modal-content {
-  background-color: #ffffff;
-  width: 95%; 
-  max-width: 1200px; /* Lebar direntangkan agar seperti mockup */
+  gap: 32px;
+  width: 95%;
+  max-width: 1300px;
   max-height: 90vh;
-  overflow-y: auto;
-  border-radius: 16px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
-  display: flex; /* Flex row untuk membagi kiri dan kanan */
   position: relative;
-  margin-top: 130px;
-  /* PENTING: Memotong warna kuning di ujung kiri agar melengkung rapi */
-  overflow: hidden; 
-  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  padding: 0;
+  box-sizing: border-box;
 }
 
-@keyframes scaleUp {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+/* Bagian Kiri: 3D Holographic Card Melayang Bebas */
+.catalog-dual-left {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  animation: dualCardSpinEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes scaleDown {
-  from { transform: scale(1); opacity: 1; }
-  to { transform: scale(0.95); opacity: 0; }
+@keyframes dualCardSpinEntrance {
+  0% {
+    transform: perspective(1000px) scale(0.72) rotateY(180deg) rotateX(12deg);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(1000px) scale(1) rotateY(0deg) rotateX(0deg);
+    opacity: 1;
+  }
 }
 
-.catalog-modal-content.closing {
+/* Bagian Kanan: Card Putih Detail Kartu & Analitika Terpisah */
+.catalog-dual-right {
+  flex: 1 1 auto;
+  max-width: 880px;
+  background-color: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+  padding: 24px 28px;
+  box-sizing: border-box;
+  max-height: 88vh;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  animation: slideFadeInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideFadeInRight {
+  0% {
+    transform: translateX(35px) scale(0.97);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.catalog-dual-modal-wrapper.closing .catalog-dual-left {
+  animation: fadeOut 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.catalog-dual-modal-wrapper.closing .catalog-dual-right {
   animation: scaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
@@ -826,43 +863,6 @@
   color: #ef4444; 
   border-color: #fca5a5;
   transform: scale(1.08);
-}
-
-/* =========================================
-   KOLOM KIRI
-   ========================================= */
-.catalog-modal-left {
-  width: 35%; /* Proporsi area gambar */
-  background-color: #ffffff;
-  display: flex;
-  justify-content: center;
-  align-items: stretch;
-  padding: 15px; 
-  box-sizing: border-box;
-}
-
-.modal-card-img-container {
-  width: 100%;
-  display: flex;
-  justify-content: left;
-}
-
-.catalog-modal-card-img {
-  width: 100%;
-  max-width: 390px; 
-  height: auto;
-  border-radius: 0px;
-}
-
-/* =========================================
-   KOLOM KANAN (KONTEN DATA PUTIH)
-   ========================================= */
-.catalog-modal-right {
-  width: 80%; /* Sisa ruang untuk area data */
-  padding: 20px 20px 20px 10px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
 }
 
 .modal-right-content-wrapper {
@@ -1289,19 +1289,20 @@
 }
 
 /* Responsif untuk Layar Tablet / Ponsel */
-@media (max-width: 900px) {
-  .catalog-modal-content {
+@media (max-width: 1024px) {
+  .catalog-dual-modal-wrapper {
     flex-direction: column;
     max-height: 90vh;
     overflow-y: auto;
+    gap: 20px;
+    padding: 10px;
   }
-  .catalog-modal-left {
+  .catalog-dual-left {
     width: 100%;
-    padding: 30px;
   }
-  .catalog-modal-right {
+  .catalog-dual-right {
     width: 100%;
-    padding: 25px;
+    padding: 20px 18px;
   }
   .modal-top-section {
     flex-direction: column;

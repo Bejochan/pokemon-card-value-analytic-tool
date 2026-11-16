@@ -124,7 +124,6 @@ function CatalogPage() {
 
   // --- POP-UP MODAL STATE ---
   const [selectedCard, setSelectedCard] = useState(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isClosingModal, setIsClosingModal] = useState(false);
   const [cardHistory, setCardHistory] = useState([]);
   const [cardForecast, setCardForecast] = useState(null);
@@ -136,7 +135,6 @@ function CatalogPage() {
     setIsClosingModal(true);
     setTimeout(() => {
       setSelectedCard(null);
-      setIsDetailOpen(false);
       setCardHistory([]);
       setCardForecast(null);
       setHoveredPoint(null);
@@ -782,7 +780,6 @@ function CatalogPage() {
                     e.stopPropagation();
                     setIsChartLoading(true);
                     setSelectedCard(card);
-                    setIsDetailOpen(false);
                   }}
                   role="button"
                   tabIndex={0}
@@ -791,7 +788,6 @@ function CatalogPage() {
                       e.preventDefault();
                       setIsChartLoading(true);
                       setSelectedCard(card);
-                      setIsDetailOpen(false);
                     }
                   }}
                   style={{ cursor: 'pointer' }}
@@ -857,11 +853,11 @@ function CatalogPage() {
       </div>
 
       {/* =========================================
-          POP-UP MODAL (3D SPOTLIGHT & DETAIL KARTU)
+          POP-UP MODAL (DUAL-CARD: 3D KIRI + DETAIL KANAN)
           ========================================= */}
       {selectedCard && createPortal(
         <div 
-          className={`catalog-modal-overlay ${!isDetailOpen ? 'mode-spotlight-active' : 'mode-detail-active'} ${isClosingModal ? 'closing' : ''}`} 
+          className={`catalog-modal-overlay catalog-dual-overlay ${isClosingModal ? 'closing' : ''}`} 
           onClick={handleCloseModal}
         >
           {/* Tombol Tutup Global (Esc / Klik Luar) */}
@@ -876,26 +872,21 @@ function CatalogPage() {
             <span className="overlay-close-text">Tutup</span>
           </button>
 
-          {!isDetailOpen ? (
-            /* TAHAP 1: 3D SPOTLIGHT DI TENGAH LAYAR */
-            <div 
-              className="catalog-spotlight-stage" 
-              onClick={(e) => e.stopPropagation()}
-            >
+          <div 
+            className={`catalog-dual-modal-wrapper ${isClosingModal ? 'closing' : ''}`} 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Bagian Kiri: 3D Holographic Interactive Card */}
+            <div className="catalog-dual-left">
               <HoloCard3D 
-                key={`spotlight-${selectedCard.id}`}
+                key={`holo-3d-${selectedCard.id}`}
                 card={selectedCard}
                 imageUrl={getCardLargeImage(selectedCard)}
-                onCardClick={() => setIsDetailOpen(true)}
               />
             </div>
-          ) : (
-            /* TAHAP 2: DETAIL KARTU (GAMBAR 2D ASLI DI KIRI, SPESIFIKASI & CHART DI KANAN) */
-            <div 
-              className={`catalog-modal-content ${isClosingModal ? 'closing' : ''}`} 
-              onClick={(e) => e.stopPropagation()}
-            >
-              
+
+            {/* Bagian Kanan: Card Putih Detail Kartu & Analitika */}
+            <div className="catalog-dual-right">
               {/* Tombol Tutup Modal */}
               <button 
                 type="button" 
@@ -907,27 +898,6 @@ function CatalogPage() {
                 <CloseIcon />
               </button>
 
-              {/* Kolom Kiri: Gambar 2D Asli Seperti Semula */}
-              <div className="catalog-modal-left">
-                <div className="modal-card-img-container">
-                  <img 
-                    src={getCardLargeImage(selectedCard)} 
-                    alt={selectedCard.name} 
-                    className="catalog-modal-card-img"
-                    onError={(e) => { 
-                      if (e.target.src !== selectedCard.image) {
-                        e.target.src = selectedCard.image || '/card-result.png';
-                      } else {
-                        e.target.src = '/card-result.png';
-                      }
-                    }} 
-                  />
-                </div>
-              </div>
-
-              {/* Kolom Kanan (Konten Putih) */}
-              <div className="catalog-modal-right">
-              
               <div className="modal-right-content-wrapper">
                 {/* Bagian Atas Kanan: Tabel + Kotak Abu (Sejajar) */}
                 <div className="modal-top-section">
@@ -1223,10 +1193,8 @@ function CatalogPage() {
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
-        )}
         </div>,
         document.body
       )}
