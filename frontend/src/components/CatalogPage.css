@@ -750,7 +750,7 @@
   max-height: 90vh;
   position: relative;
   box-sizing: border-box;
-  transition: gap 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: gap 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Mode Fokus: Layar hanya terisi kartu 3D interaktif yang diperbesar */
@@ -768,20 +768,20 @@
   align-items: center;
   justify-content: center;
   z-index: 10;
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .catalog-dual-modal-wrapper:not(.is-focus-mode) .catalog-dual-left {
-  animation: dualCardSpinEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: dualCardEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes dualCardSpinEntrance {
+@keyframes dualCardEntrance {
   0% {
-    transform: perspective(1000px) scale(0.72) rotateY(180deg) rotateX(12deg);
+    transform: translateY(20px) scale(0.92);
     opacity: 0;
   }
   100% {
-    transform: perspective(1000px) scale(1) rotateY(0deg) rotateX(0deg);
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }
@@ -797,10 +797,36 @@
   box-sizing: border-box;
   max-height: 88vh;
   overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              max-width 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              padding 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              margin 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   animation: slideFadeInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Saat Transisi ke Mode Fokus: Detail Card Meluncur Keluar & Fade Out Mulus */
+.catalog-dual-modal-wrapper.is-focus-mode .catalog-dual-right {
+  opacity: 0;
+  transform: translateX(45px) scale(0.96);
+  pointer-events: none;
+  max-width: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  box-shadow: none;
+  overflow: hidden;
+  visibility: hidden;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              max-width 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              padding 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              margin 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0s linear 0.45s;
 }
 
 @keyframes slideFadeInRight {
@@ -1253,6 +1279,9 @@
     overflow-y: auto;
     gap: 20px;
     padding: 10px;
+  }
+  .catalog-dual-modal-wrapper.is-focus-mode .catalog-dual-right {
+    display: none;
   }
   .catalog-dual-left {
     width: 100%;

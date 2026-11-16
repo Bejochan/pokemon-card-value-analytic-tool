@@ -877,9 +877,8 @@ function CatalogPage() {
             </div>
 
             {/* Bagian Kanan: Card Putih Detail Kartu & Analitika */}
-            {!isFocusCard && (
-              <div className="catalog-dual-right">
-                <div className="modal-right-content-wrapper">
+            <div className="catalog-dual-right">
+              <div className="modal-right-content-wrapper">
                 {/* Bagian Atas Kanan: Tabel + Kotak Abu (Sejajar) */}
                 <div className="modal-top-section">
                   
@@ -1175,11 +1174,10 @@ function CatalogPage() {
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>,
-      document.body
-    )}
+          </div>
+        </div>,
+        document.body
+      )}
 
     </div>
   );

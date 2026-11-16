@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import './HoloCard3D.css';
 
 /**
@@ -41,12 +41,28 @@ const getHoloFoilType = (card) => {
 export default function HoloCard3D({
   card,
   imageUrl,
+  backImageUrl,
   isFocused = false,
   onCardClick = null
 }) {
   const containerRef = useRef(null);
   const cardRef = useRef(null);
   const animFrameRef = useRef(null);
+
+  const prevFocusedRef = useRef(null);
+  const [flipAnimClass, setFlipAnimClass] = useState('');
+
+  // Sinkronisasi animasi putaran 360 derajat (The Collector's Flip) saat mode fokus berubah
+  useEffect(() => {
+    if (prevFocusedRef.current === null) {
+      prevFocusedRef.current = isFocused;
+      return;
+    }
+    if (prevFocusedRef.current !== isFocused) {
+      setFlipAnimClass(isFocused ? 'anim-flip-to-focus' : 'anim-flip-to-dual');
+      prevFocusedRef.current = isFocused;
+    }
+  }, [isFocused]);
 
   // Nilai posisi target kursor
   const target = useRef({
@@ -226,35 +242,55 @@ export default function HoloCard3D({
       title={isFocused ? 'Klik untuk kembali ke tampilan detail' : (card?.name ? `${card.name} (Klik untuk memperbesar)` : 'Klik untuk memperbesar')}
     >
       <div className="holo-card-entrance">
-        <div
-          ref={cardRef}
-          className={`holo-card-rotator foil-${foilType}`}
-        >
-          <div className="holo-card-face">
-            <img
-              src={imageUrl || '/card-result.png'}
-              alt={card?.name || 'Pokemon Card'}
-              className="holo-card-image"
-              loading="eager"
-              onError={(e) => {
-                if (e.target.src !== card?.image && card?.image) {
-                  e.target.src = card.image;
-                } else {
-                  e.target.src = '/card-result.png';
-                }
-              }}
-            />
+        <div className={`holo-card-flipper ${flipAnimClass}`}>
+          <div
+            ref={cardRef}
+            className={`holo-card-rotator foil-${foilType}`}
+          >
+            {/* Sisi Muka Depan Kartu (0deg) */}
+            <div className="holo-card-face holo-card-front">
+              <img
+                src={imageUrl || '/card-result.png'}
+                alt={card?.name || 'Pokemon Card'}
+                className="holo-card-image"
+                loading="eager"
+                onError={(e) => {
+                  if (e.target.src !== card?.image && card?.image) {
+                    e.target.src = card.image;
+                  } else {
+                    e.target.src = '/card-result.png';
+                  }
+                }}
+              />
 
-            {/* Lapisan 1: Efek Holografik Berpendar */}
-            {isHolo && (
-              <div className={`holo-layer-foil foil-${foilType}`} aria-hidden="true" />
-            )}
+              {/* Lapisan 1: Efek Holografik Berpendar */}
+              {isHolo && (
+                <div className={`holo-layer-foil foil-${foilType}`} aria-hidden="true" />
+              )}
 
-            {/* Lapisan 2: Pantulan Cahaya (Specular Glare) */}
-            <div className="holo-layer-glare" aria-hidden="true" />
+              {/* Lapisan 2: Pantulan Cahaya (Specular Glare) */}
+              <div className="holo-layer-glare" aria-hidden="true" />
 
-            {/* Lapisan 3: Kilau Pinggiran Halus */}
-            <div className="holo-layer-edge" aria-hidden="true" />
+              {/* Lapisan 3: Kilau Pinggiran Halus */}
+              <div className="holo-layer-edge" aria-hidden="true" />
+            </div>
+
+            {/* Sisi Muka Belakang Kartu (180deg) */}
+            <div className="holo-card-face holo-card-back">
+              <img
+                src={backImageUrl || '/pokemon-card-back.png'}
+                alt="Pokemon Card Back"
+                className="holo-card-image"
+                loading="eager"
+                onError={(e) => {
+                  e.target.src = '/pokemon-card-back.png';
+                }}
+              />
+
+              {/* Pantulan Cahaya & Kilau Pinggiran untuk Sisi Belakang */}
+              <div className="holo-layer-glare" aria-hidden="true" />
+              <div className="holo-layer-edge" aria-hidden="true" />
+            </div>
           </div>
         </div>
       </div>
