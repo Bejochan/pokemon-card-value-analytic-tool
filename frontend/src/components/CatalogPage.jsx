@@ -15,6 +15,30 @@ const CloseIcon = () => (
   </svg>
 );
 
+// Helper untuk mengambil URL gambar kartu resolusi tinggi (images.large / HD)
+const getCardLargeImage = (card) => {
+  if (!card) return '/card-result.png';
+
+  // 1. Jika backend sudah menyediakan properti image_large / images_large
+  if (card.image_large) return card.image_large;
+  if (card.images_large) return card.images_large;
+  if (card['images.large']) return card['images.large'];
+
+  // 2. Fallback cerdas: Sesuai struktur dataset CSV, URL pokemontcg.io 
+  //    menggunakan akhiran '_hires.png' dan scrydex menggunakan '/large'
+  if (card.image) {
+    if (card.image.includes('pokemontcg.io') && card.image.endsWith('.png') && !card.image.endsWith('_hires.png')) {
+      return card.image.replace('.png', '_hires.png');
+    }
+    if (card.image.includes('scrydex.com')) {
+      return card.image.replace('/small', '/large');
+    }
+    return card.image;
+  }
+
+  return '/card-result.png';
+};
+
 function CatalogPage() {
   const [cardsData, setCardsData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -796,14 +820,22 @@ function CatalogPage() {
               <CloseIcon />
             </button>
 
-            {/* Kolom Kiri (Latar Kuning Penuh) */}
+            {/* Kolom Kiri */}
             <div className="catalog-modal-left">
               <div className="modal-card-img-container">
                 <img 
-                  src={selectedCard.image} 
+                  src={getCardLargeImage(selectedCard)} 
                   alt={selectedCard.name} 
                   className="catalog-modal-card-img"
-                  onError={(e) => { e.target.src = '/card-result.png'; }} 
+                  onError={(e) => { 
+                    // Jika gambar besar/hires gagal dimuat (misal offline/koneksi lambat),
+                    // fallback otomatis ke gambar reguler, lalu ke placeholder default
+                    if (e.target.src !== selectedCard.image) {
+                      e.target.src = selectedCard.image || '/card-result.png';
+                    } else {
+                      e.target.src = '/card-result.png';
+                    }
+                  }} 
                 />
               </div>
             </div>

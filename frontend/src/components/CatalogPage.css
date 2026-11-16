@@ -912,10 +912,10 @@
   border: none;
   border-radius: 10px;
   padding: 8px 10px;
-  min-height: 62px;
+  min-height: 77px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   gap: 3px;
   box-sizing: border-box;
 }
@@ -936,7 +936,7 @@
 /* Label Teks di dalam Kotak */
 .analytics-label {
   font-family: 'Montserrat', sans-serif;
-  font-size: 10.5px;
+  font-size: 13px;
   color: #64748b;              /* Abu-abu medium agar kontras dengan nilai */
   font-weight: 600;
   letter-spacing: -0.1px;
@@ -945,84 +945,33 @@
 /* Nilai / Angka Utama di dalam Kotak */
 .analytics-value {
   font-family: 'Montserrat', sans-serif;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 500;
   color: #0f172a;              /* Hitam pekat */
   line-height: 1.2;
-  margin-bottom: 0;
+  margin-bottom: 4px;
 }
 
 /* Pewarnaan Dinamis Kotak Analitika */
-.trend-positive {
-  color: #16a34a !important; /* Hijau tegas */
-  font-weight: 700 !important;
-}
-
-.trend-negative {
-  color: #dc2626 !important; /* Merah tegas */
-  font-weight: 700 !important;
-}
-
-/* Badge Trading Signal */
-.catalog-signal-badge.signal-buy {
-  background-color: #dcfce7;
-  color: #15803d !important;
-  font-weight: 700 !important;
-  padding: 2px 7px;
-  border-radius: 6px;
-  display: inline-block;
-  font-size: 12px;
-}
-
-.catalog-signal-badge.signal-sell {
-  background-color: #ffe4e6;
-  color: #be123c !important;
-  font-weight: 700 !important;
-  padding: 2px 7px;
-  border-radius: 6px;
-  display: inline-block;
-  font-size: 12px;
-}
-
-.catalog-signal-badge.signal-hold {
-  background-color: #fef3c7;
-  color: #b45309 !important;
-  font-weight: 700 !important;
-  padding: 2px 7px;
-  border-radius: 6px;
-  display: inline-block;
-  font-size: 12px;
-}
-
-/* Badge Price Valuation */
-.val-undervalued {
-  background-color: #dcfce7;
-  color: #15803d !important;
-  font-weight: 700 !important;
-  padding: 2px 7px;
-  border-radius: 6px;
-  display: inline-block;
-  font-size: 12px;
-}
-
-.val-overvalued {
-  background-color: #ffe4e6;
-  color: #be123c !important;
-  font-weight: 700 !important;
-  padding: 2px 7px;
-  border-radius: 6px;
-  display: inline-block;
-  font-size: 12px;
-}
-
+.signal-buy, 
+.signal-sell, 
+.signal-hold,
+.val-undervalued, 
+.val-overvalued, 
 .val-fair {
-  background-color: #e0f2fe;
-  color: #0369a1 !important;
-  font-weight: 700 !important;
-  padding: 2px 7px;
-  border-radius: 6px;
-  display: inline-block;
-  font-size: 12px;
+  background: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  display: inline !important;
+  font-size: 16px !important;
+  color: #0f172a !important;      /* Teks bersih tanpa background kotak merah/pink */
+  font-weight: 500 !important;
+}
+/* Mengembalikan teks trend agar warnanya seragam dengan teks lainnya */
+.trend-positive, 
+.trend-negative {
+  color: #0f172a !important;
+  font-weight: 500 !important;
 }
 
 /* --- Area Grafik Garis & Forecasting --- */
