@@ -123,13 +123,96 @@ function CatalogPage() {
   const [cardForecast, setCardForecast] = useState(null);
   const [isChartLoading, setIsChartLoading] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [cardOrigin, setCardOrigin] = useState(null);
+  const [isSplitReady, setIsSplitReady] = useState(false);
+  const [isInteractive, setIsInteractive] = useState(false);
+  const [centerShiftX, setCenterShiftX] = useState(440);
+
+  const modalWrapperRef = useRef(null);
+  const leftCardRef = useRef(null);
+
+  // Mengatur tahapan animasi 3D cinematic
+  useEffect(() => {
+    if (!selectedCard) return;
+
+    // Tahap 1: 0.0s - 1.1s -> Terbang ke tengah layar & berputar 360 derajat bertenaga
+    // Tahap 2: 1.1s - 1.4s -> Berhenti tenang tepat di tengah layar (preview tampak depan kartu 0.3s)
+    // Tahap 3: 1.4s - 1.9s -> Split meluncur ke kiri (0.5s) dan panel detail kanan terbuka seketika tanpa delay
+    const splitTimer = setTimeout(() => {
+      setIsSplitReady(true);
+    }, 1400);
+
+    // Tahap 4: 1.95s -> Transisi selesai penuh, aktifkan sensor pointer tilt dan interaktivitas
+    const interactiveTimer = setTimeout(() => {
+      setIsInteractive(true);
+    }, 1950);
+
+    return () => {
+      clearTimeout(splitTimer);
+      clearTimeout(interactiveTimer);
+    };
+  }, [selectedCard]);
+
+  // Hitung pergeseran split saat panel kanan mulai aktif di DOM
+  useEffect(() => {
+    if (!selectedCard || !isSplitReady) return;
+    const timer = setTimeout(() => {
+      if (window.innerWidth >= 1025 && modalWrapperRef.current && leftCardRef.current) {
+        const wrapperRect = modalWrapperRef.current.getBoundingClientRect();
+        const cardRect = leftCardRef.current.getBoundingClientRect();
+        const wrapperCenterX = wrapperRect.left + (wrapperRect.width / 2);
+        const cardCenterX = cardRect.left + (cardRect.width / 2);
+        const shift = Math.round(wrapperCenterX - cardCenterX);
+        if (shift > 50) {
+          setCenterShiftX(shift);
+        }
+      } else {
+        setCenterShiftX(0);
+      }
+    }, 20);
+    return () => clearTimeout(timer);
+  }, [selectedCard, isSplitReady]);
+
+  const handleCardSelect = useCallback((card, e) => {
+    setIsChartLoading(true);
+    setCardHistory([]);
+    setCardForecast(null);
+    setIsFocusCard(false);
+    setIsClosingModal(false);
+    setIsSplitReady(false);
+    setIsInteractive(false);
+
+    const screenW = window.innerWidth;
+    const modalW = Math.min(screenW * 0.95, 1300);
+    const initialShift = screenW >= 1025 ? Math.round((modalW / 2) - 160) : 0;
+    setCenterShiftX(initialShift > 50 ? initialShift : 440);
+
+    if (e && e.currentTarget) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      const cardCenterX = rect.left + rect.width / 2;
+      const cardCenterY = rect.top + rect.height / 2;
+      const startDeltaX = Math.round(cardCenterX - centerX);
+      const startDeltaY = Math.round(cardCenterY - centerY);
+      const startScale = Math.min(1, Math.max(0.4, Number((rect.width / 320).toFixed(3))));
+      setCardOrigin({ startDeltaX, startDeltaY, startScale });
+    } else {
+      setCardOrigin({ startDeltaX: 0, startDeltaY: 0, startScale: 0.65 });
+    }
+
+    setSelectedCard(card);
+  }, []);
 
   const handleCloseModal = useCallback(() => {
     if (isClosingModal) return;
     setIsClosingModal(true);
+    setIsInteractive(false);
     setTimeout(() => {
       setSelectedCard(null);
       setIsFocusCard(false);
+      setIsSplitReady(false);
+      setIsInteractive(false);
       setCardHistory([]);
       setCardForecast(null);
       setHoveredPoint(null);
@@ -476,7 +559,7 @@ function CatalogPage() {
   const padLeft = 65;
   const padRight = 20;
   const padTop = 16;
-  const padBottom = 24;
+  const padBottom = 28;
   const usableW = svgWidth - padLeft - padRight;
   const usableH = svgHeight - padTop - padBottom;
 
@@ -777,18 +860,14 @@ function CatalogPage() {
                   className="gallery-card-item"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsChartLoading(true);
-                    setSelectedCard(card);
-                    setIsFocusCard(false);
+                    handleCardSelect(card, e);
                   }}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      setIsChartLoading(true);
-                      setSelectedCard(card);
-                      setIsFocusCard(false);
+                      handleCardSelect(card, e);
                     }
                   }}
                   style={{ cursor: 'pointer' }}
@@ -862,22 +941,38 @@ function CatalogPage() {
           onClick={handleCloseModal}
         >
           <div 
-            className={`catalog-dual-modal-wrapper ${isFocusCard ? 'is-focus-mode' : ''} ${isClosingModal ? 'closing' : ''}`} 
+            ref={modalWrapperRef}
+            className={`catalog-dual-modal-wrapper ${isFocusCard ? 'is-focus-mode' : ''} ${!isSplitReady ? 'is-centering-stage' : 'is-split-stage'} ${isClosingModal ? 'closing' : ''}`} 
+            style={{
+              '--start-x': cardOrigin?.startDeltaX ? `${cardOrigin.startDeltaX}px` : '0px',
+              '--start-y': cardOrigin?.startDeltaY ? `${cardOrigin.startDeltaY}px` : '0px',
+              '--start-scale': cardOrigin?.startScale || 0.65,
+              '--split-shift': `${centerShiftX}px`
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Bagian Kiri: 3D Holographic Interactive Card */}
-            <div className={`catalog-dual-left ${isFocusCard ? 'is-focused' : ''}`}>
+            <div 
+              ref={leftCardRef}
+              className={`catalog-dual-left ${isFocusCard ? 'is-focused' : ''}`}
+            >
               <HoloCard3D 
                 key={`holo-3d-${selectedCard.id}`}
                 card={selectedCard}
                 imageUrl={getCardLargeImage(selectedCard)}
                 isFocused={isFocusCard}
-                onCardClick={() => setIsFocusCard(prev => !prev)}
+                isInteractive={isInteractive}
+                isSpinning={!isSplitReady}
+                onCardClick={() => {
+                  if (isSplitReady) {
+                    setIsFocusCard(prev => !prev);
+                  }
+                }}
               />
             </div>
 
             {/* Bagian Kanan: Card Putih Detail Kartu & Analitika */}
-            <div className="catalog-dual-right">
+            <div className={`catalog-dual-right ${!isSplitReady ? 'is-hidden-loading' : 'is-visible-revealed'}`}>
               <div className="modal-right-content-wrapper">
                 {/* Bagian Atas Kanan: Tabel + Kotak Abu (Sejajar) */}
                 <div className="modal-top-section">
@@ -1055,30 +1150,32 @@ function CatalogPage() {
                       </div>
                     )}
 
+                    {/* Label Ticks Sumbu Y (HTML agar font tegak tajam dan bebas distorsi aspek rasio) */}
+                    <div className="catalog-chart-y-labels" aria-hidden="true">
+                      {yTicks.map((tick, idx) => (
+                        <span 
+                          key={`ytick-${idx}`}
+                          className="catalog-chart-y-label"
+                          style={{ top: `${(tick.y / svgHeight) * 100}%` }}
+                        >
+                          ${tick.valUsd >= 10 ? tick.valUsd.toFixed(1) : tick.valUsd.toFixed(2)}
+                        </span>
+                      ))}
+                    </div>
+
                     <svg width="100%" height="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} preserveAspectRatio="none">
                       {/* Grid Lines Horizontal Sumbu Y */}
                       {yTicks.map((tick, idx) => (
-                        <g key={idx}>
-                          <line 
-                            x1={padLeft} 
-                            y1={tick.y} 
-                            x2={svgWidth - padRight} 
-                            y2={tick.y} 
-                            stroke="#f1f5f9" 
-                            strokeWidth="1.2" 
-                            strokeDasharray="3 3"
-                          />
-                          <text 
-                            x={padLeft - 6} 
-                            y={tick.y + 3.5} 
-                            fontSize="9" 
-                            fill="#94a3b8" 
-                            textAnchor="end" 
-                            fontWeight="600"
-                          >
-                            ${tick.valUsd >= 10 ? tick.valUsd.toFixed(1) : tick.valUsd.toFixed(2)}
-                          </text>
-                        </g>
+                        <line 
+                          key={idx}
+                          x1={padLeft} 
+                          y1={tick.y} 
+                          x2={svgWidth - padRight} 
+                          y2={tick.y} 
+                          stroke="#f1f5f9" 
+                          strokeWidth="1.2" 
+                          strokeDasharray="3 3"
+                        />
                       ))}
 
                       {/* Selubung Pita Kuantil Probabilitas (Pita Melengkung Halus P10 - P90) */}
@@ -1149,27 +1246,25 @@ function CatalogPage() {
                           </g>
                         );
                       })}
+                    </svg>
 
-                      {/* Label Sumbu X */}
+                    {/* Label Sumbu X Tanggal (HTML Container agar teks tegak, tajam, dan tidak cemet/gepeng) */}
+                    <div className="catalog-chart-x-labels" aria-hidden="true">
                       {pointsWithCoords.map((pt, i) => {
                         const total = pointsWithCoords.length;
                         const shouldShow = i === 0 || i === historyItems.length || i === total - 1 || (total > 6 && i === Math.floor(historyItems.length + (forecastItems.length / 2)));
                         if (!shouldShow) return null;
                         return (
-                          <text 
+                          <span 
                             key={`lbl-${i}`} 
-                            x={pt.x} 
-                            y={svgHeight - 8} 
-                            fontSize="9" 
-                            fill={pt.type === 'anchor' ? '#1e293b' : '#94a3b8'} 
-                            textAnchor="middle" 
-                            fontWeight={pt.type === 'anchor' ? '700' : '600'}
+                            className={`catalog-chart-x-label ${pt.type === 'anchor' ? 'is-today' : ''}`}
+                            style={{ left: `${(pt.x / svgWidth) * 100}%` }}
                           >
                             {pt.label}
-                          </text>
+                          </span>
                         );
                       })}
-                    </svg>
+                    </div>
                   </div>
                 </div>
               </div>

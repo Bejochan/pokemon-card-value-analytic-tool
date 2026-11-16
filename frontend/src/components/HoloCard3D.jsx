@@ -43,6 +43,8 @@ export default function HoloCard3D({
   imageUrl,
   backImageUrl,
   isFocused = false,
+  isInteractive = false,
+  isSpinning = false,
   onCardClick = null
 }) {
   const containerRef = useRef(null);
@@ -137,7 +139,7 @@ export default function HoloCard3D({
 
   // Handler interaksi pointer pada kontainer stasioner
   const handlePointerMove = useCallback((e) => {
-    if (!containerRef.current) return;
+    if (!isInteractive || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
@@ -161,9 +163,10 @@ export default function HoloCard3D({
     target.current.opacity = 1;
 
     startAnimationLoop();
-  }, [startAnimationLoop]);
+  }, [isInteractive, startAnimationLoop]);
 
   const handlePointerLeave = useCallback(() => {
+    if (!isInteractive) return;
     // Easing halus kembali ke posisi tegak
     target.current.rotX = 0;
     target.current.rotY = 0;
@@ -172,11 +175,11 @@ export default function HoloCard3D({
     target.current.opacity = 0;
 
     startAnimationLoop();
-  }, [startAnimationLoop]);
+  }, [isInteractive, startAnimationLoop]);
 
   // Handler sentuh untuk smartphone / tablet
   const handleTouchMove = useCallback((e) => {
-    if (!containerRef.current || !e.touches || e.touches.length === 0) return;
+    if (!isInteractive || !containerRef.current || !e.touches || e.touches.length === 0) return;
     const touch = e.touches[0];
     const rect = containerRef.current.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
@@ -194,10 +197,12 @@ export default function HoloCard3D({
     target.current.opacity = 1;
 
     startAnimationLoop();
-  }, [startAnimationLoop]);
+  }, [isInteractive, startAnimationLoop]);
 
   // Dukungan sensor fisik ponsel (Gyroscope)
   useEffect(() => {
+    if (!isInteractive) return;
+
     const handleOrientation = (e) => {
       if (e.gamma === null || e.beta === null) return;
       const rotY = Math.min(11, Math.max(-11, e.gamma * 0.35));
@@ -220,12 +225,15 @@ export default function HoloCard3D({
         window.removeEventListener('deviceorientation', handleOrientation);
       }
     };
-  }, [startAnimationLoop]);
+  }, [isInteractive, startAnimationLoop]);
 
   return (
     <div
       ref={containerRef}
-      className={`holo-card-container ${isFocused ? 'is-focused' : ''}`}
+      className={`holo-card-container ${isFocused ? 'is-focused' : ''} ${isInteractive ? 'is-interactive' : 'is-animating'}`}
+      style={{
+        pointerEvents: isInteractive ? 'auto' : 'none'
+      }}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
       onTouchMove={handleTouchMove}
@@ -241,7 +249,7 @@ export default function HoloCard3D({
       }}
       title={isFocused ? 'Klik untuk kembali ke tampilan detail' : (card?.name ? `${card.name} (Klik untuk memperbesar)` : 'Klik untuk memperbesar')}
     >
-      <div className="holo-card-entrance">
+      <div className={`holo-card-entrance ${isSpinning ? 'is-spinning' : ''}`}>
         <div className={`holo-card-flipper ${flipAnimClass}`}>
           <div
             ref={cardRef}

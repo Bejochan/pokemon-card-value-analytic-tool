@@ -753,6 +753,14 @@
   transition: gap 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Tahap 1 & 2: Kartu terbang dari koordinat grid ke tengah layar dan berputar 360 derajat */
+.catalog-dual-modal-wrapper.is-centering-stage {
+  justify-content: center;
+  align-items: center;
+  width: auto;
+  gap: 0;
+}
+
 /* Mode Fokus: Layar hanya terisi kartu 3D interaktif yang diperbesar */
 .catalog-dual-modal-wrapper.is-focus-mode {
   justify-content: center;
@@ -771,18 +779,34 @@
   transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.catalog-dual-modal-wrapper:not(.is-focus-mode) .catalog-dual-left {
-  animation: dualCardEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+/* Tahap 1 (0.0s - 1.1s): Kartu meluncur dari posisi grid kartu ke tepat tengah layar */
+.catalog-dual-modal-wrapper.is-centering-stage .catalog-dual-left {
+  animation: flightToDeadCenter 1.1s cubic-bezier(0.2, 0.7, 0.1, 1.0) forwards;
+  z-index: 30;
 }
 
-@keyframes dualCardEntrance {
+@keyframes flightToDeadCenter {
   0% {
-    transform: translateY(20px) scale(0.92);
-    opacity: 0;
+    transform: translate(var(--start-x, 0px), var(--start-y, 0px)) scale(var(--start-scale, 0.65));
+    opacity: 0.6;
   }
   100% {
-    transform: translateY(0) scale(1);
+    transform: translate(0, 0) scale(1.0);
     opacity: 1;
+  }
+}
+
+/* Tahap 3 (1.4s - 1.9s): Meluncur ke kiri (split) untuk membuka ruang panel kanan */
+.catalog-dual-modal-wrapper.is-split-stage:not(.is-focus-mode) .catalog-dual-left {
+  animation: glideToLeftSplit 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes glideToLeftSplit {
+  0% {
+    transform: translateX(var(--split-shift, 440px));
+  }
+  100% {
+    transform: translateX(0);
   }
 }
 
@@ -806,38 +830,59 @@
               max-width 0.6s cubic-bezier(0.16, 1, 0.3, 1),
               padding 0.45s cubic-bezier(0.16, 1, 0.3, 1),
               margin 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-  animation: slideFadeInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Selama tahap sentralisasi (0.0s - 1.4s), sembunyikan panel kanan secara absolute di luar layar tanpa delay */
+.catalog-dual-modal-wrapper.is-centering-stage .catalog-dual-right,
+.catalog-dual-right.is-hidden-loading {
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+/* Tahap 3 (1.4s - 1.9s): Panel kanan muncul seketika meluncur dari belakang kartu */
+.catalog-dual-right.is-visible-revealed:not(.closing) {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  display: flex !important;
+  visibility: visible !important;
+  animation: splitRevealRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+@keyframes splitRevealRight {
+  0% {
+    opacity: 0;
+    transform: translateX(-40px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 /* Saat Transisi ke Mode Fokus: Detail Card Meluncur Keluar & Fade Out Mulus */
 .catalog-dual-modal-wrapper.is-focus-mode .catalog-dual-right {
-  opacity: 0;
-  transform: translateX(45px) scale(0.96);
-  pointer-events: none;
-  max-width: 0;
-  padding: 0;
-  margin: 0;
-  border: none;
-  box-shadow: none;
-  overflow: hidden;
-  visibility: hidden;
+  animation: none !important;
+  opacity: 0 !important;
+  transform: translateX(45px) scale(0.96) !important;
+  pointer-events: none !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
   transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
               transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
               max-width 0.6s cubic-bezier(0.16, 1, 0.3, 1),
               padding 0.35s cubic-bezier(0.16, 1, 0.3, 1),
               margin 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-              visibility 0s linear 0.45s;
-}
-
-@keyframes slideFadeInRight {
-  0% {
-    transform: translateX(35px) scale(0.97);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0) scale(1);
-    opacity: 1;
-  }
+              visibility 0s linear 0.45s !important;
 }
 
 .catalog-dual-modal-wrapper.closing .catalog-dual-left {
@@ -1269,6 +1314,55 @@
 .catalog-modal-chart-area text {
   font-family: 'Montserrat', sans-serif !important;
   letter-spacing: -0.2px;
+}
+
+/* Label Ticks Sumbu Y & Sumbu X (HTML Overlay untuk ketajaman font bebas distorsi SVG) */
+.catalog-chart-y-labels {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 58px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.catalog-chart-y-label {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.catalog-chart-x-labels {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 18px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.catalog-chart-x-label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.catalog-chart-x-label.is-today {
+  color: #1e293b;
+  font-weight: 700;
 }
 
 /* Responsif untuk Layar Tablet / Ponsel */
