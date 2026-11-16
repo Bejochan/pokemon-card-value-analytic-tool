@@ -750,6 +750,15 @@
   max-height: 90vh;
   position: relative;
   box-sizing: border-box;
+  transition: gap 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Mode Fokus: Layar hanya terisi kartu 3D interaktif yang diperbesar */
+.catalog-dual-modal-wrapper.is-focus-mode {
+  justify-content: center;
+  width: auto;
+  max-width: 90vw;
+  gap: 0;
 }
 
 /* Bagian Kiri: 3D Holographic Card Melayang Bebas */
@@ -759,6 +768,10 @@
   align-items: center;
   justify-content: center;
   z-index: 10;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.catalog-dual-modal-wrapper:not(.is-focus-mode) .catalog-dual-left {
   animation: dualCardSpinEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 

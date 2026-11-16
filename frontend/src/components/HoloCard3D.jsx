@@ -41,6 +41,7 @@ const getHoloFoilType = (card) => {
 export default function HoloCard3D({
   card,
   imageUrl,
+  isFocused = false,
   onCardClick = null
 }) {
   const containerRef = useRef(null);
@@ -208,7 +209,7 @@ export default function HoloCard3D({
   return (
     <div
       ref={containerRef}
-      className="holo-card-container"
+      className={`holo-card-container ${isFocused ? 'is-focused' : ''}`}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
       onTouchMove={handleTouchMove}
@@ -222,7 +223,7 @@ export default function HoloCard3D({
           onCardClick && onCardClick();
         }
       }}
-      title={card?.name || 'Kartu Pokémon'}
+      title={isFocused ? 'Klik untuk kembali ke tampilan detail' : (card?.name ? `${card.name} (Klik untuk memperbesar)` : 'Klik untuk memperbesar')}
     >
       <div className="holo-card-entrance">
         <div

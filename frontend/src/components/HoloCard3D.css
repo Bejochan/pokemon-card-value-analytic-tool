@@ -23,6 +23,15 @@
   cursor: pointer;
   touch-action: none;
   border-radius: 4.8% / 3.6%;
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Mode Fokus Diperbesar */
+.holo-card-container.is-focused {
+  width: 400px;
+  max-width: 88vw;
+  max-height: 82vh;
 }
 
 /* --------------------------------------------------------------------------

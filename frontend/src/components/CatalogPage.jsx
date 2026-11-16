@@ -117,6 +117,7 @@ function CatalogPage() {
 
   // --- POP-UP MODAL STATE ---
   const [selectedCard, setSelectedCard] = useState(null);
+  const [isFocusCard, setIsFocusCard] = useState(false);
   const [isClosingModal, setIsClosingModal] = useState(false);
   const [cardHistory, setCardHistory] = useState([]);
   const [cardForecast, setCardForecast] = useState(null);
@@ -128,6 +129,7 @@ function CatalogPage() {
     setIsClosingModal(true);
     setTimeout(() => {
       setSelectedCard(null);
+      setIsFocusCard(false);
       setCardHistory([]);
       setCardForecast(null);
       setHoveredPoint(null);
@@ -147,7 +149,11 @@ function CatalogPage() {
       if (event.key === 'Escape') {
         setIsSetMenuOpen(false);
         if (selectedCard) {
-          handleCloseModal();
+          if (isFocusCard) {
+            setIsFocusCard(false);
+          } else {
+            handleCloseModal();
+          }
         }
       }
     };
@@ -161,7 +167,7 @@ function CatalogPage() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isSetMenuOpen, selectedCard, handleCloseModal]);
+  }, [isSetMenuOpen, selectedCard, isFocusCard, handleCloseModal]);
 
   const [availableSets, setAvailableSets] = useState([
     { set_id: 'all', name: 'All Sets', logo: '/pokemon-logo.png' }
@@ -773,6 +779,7 @@ function CatalogPage() {
                     e.stopPropagation();
                     setIsChartLoading(true);
                     setSelectedCard(card);
+                    setIsFocusCard(false);
                   }}
                   role="button"
                   tabIndex={0}
@@ -781,6 +788,7 @@ function CatalogPage() {
                       e.preventDefault();
                       setIsChartLoading(true);
                       setSelectedCard(card);
+                      setIsFocusCard(false);
                     }
                   }}
                   style={{ cursor: 'pointer' }}
@@ -854,21 +862,24 @@ function CatalogPage() {
           onClick={handleCloseModal}
         >
           <div 
-            className={`catalog-dual-modal-wrapper ${isClosingModal ? 'closing' : ''}`} 
+            className={`catalog-dual-modal-wrapper ${isFocusCard ? 'is-focus-mode' : ''} ${isClosingModal ? 'closing' : ''}`} 
             onClick={(e) => e.stopPropagation()}
           >
             {/* Bagian Kiri: 3D Holographic Interactive Card */}
-            <div className="catalog-dual-left">
+            <div className={`catalog-dual-left ${isFocusCard ? 'is-focused' : ''}`}>
               <HoloCard3D 
                 key={`holo-3d-${selectedCard.id}`}
                 card={selectedCard}
                 imageUrl={getCardLargeImage(selectedCard)}
+                isFocused={isFocusCard}
+                onCardClick={() => setIsFocusCard(prev => !prev)}
               />
             </div>
 
             {/* Bagian Kanan: Card Putih Detail Kartu & Analitika */}
-            <div className="catalog-dual-right">
-              <div className="modal-right-content-wrapper">
+            {!isFocusCard && (
+              <div className="catalog-dual-right">
+                <div className="modal-right-content-wrapper">
                 {/* Bagian Atas Kanan: Tabel + Kotak Abu (Sejajar) */}
                 <div className="modal-top-section">
                   
@@ -1164,10 +1175,11 @@ function CatalogPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          )}
+        </div>
+      </div>,
+      document.body
+    )}
 
     </div>
   );
