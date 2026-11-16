@@ -1,0 +1,199 @@
+/* ==========================================================================
+   HoloCard3D.css - Reverse-engineered from Simon Goellner (poke-holo.simey.me)
+   - Zero-overhead GPU rendering via CSS Custom Properties
+   - Controlled 3D tilt with smooth spring damping (requestAnimationFrame)
+   - Refined iridescent foil and specular light layers
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Kontainer Stasioner (Stationary Hit Container)
+   Kontainer ini tetap diam di layar agar perhitungan koordinat kursor stabil
+   -------------------------------------------------------------------------- */
+.holo-card-container {
+  position: relative;
+  width: 320px;
+  max-width: 82vw;
+  aspect-ratio: 63 / 88;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  perspective: 800px;
+  cursor: pointer;
+  touch-action: none;
+  border-radius: 4.8% / 3.6%;
+}
+
+/* --------------------------------------------------------------------------
+   Entrance Animation (Flip Masuk Halus)
+   -------------------------------------------------------------------------- */
+.holo-card-entrance {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+  animation: holoEntranceFlip 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes holoEntranceFlip {
+  0% {
+    transform: perspective(800px) scale(0.82) rotateY(180deg);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(800px) scale(1) rotateY(0deg);
+    opacity: 1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   3D Rotator
+   Transformasi 3D murni dikontrol via CSS Custom Properties dari requestAnimationFrame
+   -------------------------------------------------------------------------- */
+.holo-card-rotator {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  transform-style: preserve-3d;
+  will-change: transform;
+  transform: perspective(800px) 
+             rotateX(var(--rotate-x, 0deg)) 
+             rotateY(var(--rotate-y, 0deg));
+  box-shadow: 
+    0 15px 35px -10px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(232, 62, 140, calc(var(--card-opacity, 0) * 0.2));
+  transition: box-shadow 0.2s ease;
+}
+
+/* --------------------------------------------------------------------------
+   Muka Kartu & Gambar
+   -------------------------------------------------------------------------- */
+.holo-card-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  background-color: #0f172a;
+  transform: translateZ(1px);
+}
+
+.holo-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  border-radius: inherit;
+}
+
+/* --------------------------------------------------------------------------
+   Lapisan 1: Holo Foil Iridescent Reflection (Pelangi Mengikuti Kursor)
+   -------------------------------------------------------------------------- */
+.holo-layer-foil {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  opacity: calc(var(--card-opacity, 0) * 0.82);
+  will-change: background-position, opacity;
+  z-index: 2;
+}
+
+/* Foil Standar (Holo, EX, GX, VSTAR) */
+.holo-layer-foil.foil-holo {
+  background: 
+    linear-gradient(
+      calc(var(--pointer-x, 50%) * 1.5deg + 45deg),
+      rgba(255, 0, 128, 0.42) 0%,
+      rgba(255, 140, 0, 0.38) 20%,
+      rgba(255, 230, 0, 0.38) 40%,
+      rgba(0, 230, 150, 0.38) 60%,
+      rgba(0, 190, 255, 0.42) 80%,
+      rgba(190, 0, 255, 0.42) 100%
+    );
+  background-size: 160% 160%;
+  background-position: var(--pointer-x, 50%) var(--pointer-y, 50%);
+}
+
+/* Foil Rainbow / Secret Rare */
+.holo-layer-foil.foil-rainbow {
+  background: 
+    repeating-linear-gradient(
+      calc(var(--pointer-y, 50%) * 1.5deg + 45deg),
+      rgba(255, 0, 128, 0.35) 0px,
+      rgba(255, 140, 0, 0.35) 20px,
+      rgba(255, 240, 0, 0.35) 40px,
+      rgba(0, 240, 150, 0.35) 60px,
+      rgba(0, 200, 255, 0.35) 80px,
+      rgba(180, 0, 255, 0.35) 100px,
+      rgba(255, 0, 128, 0.35) 120px
+    );
+  background-size: 150% 150%;
+  background-position: var(--pointer-x, 50%) var(--pointer-y, 50%);
+}
+
+/* Foil Sparkle / Radiant */
+.holo-layer-foil.foil-sparkle {
+  background:
+    radial-gradient(
+      circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(255, 230, 130, 0.45) 25%,
+      rgba(130, 220, 255, 0.25) 50%,
+      transparent 70%
+    );
+  background-size: 100% 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Lapisan 2: Specular Glare (Pantulan Cahaya Kaca)
+   -------------------------------------------------------------------------- */
+.holo-layer-glare {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: calc(var(--card-opacity, 0) * 0.65);
+  will-change: background-position, opacity;
+  z-index: 3;
+  background: radial-gradient(
+    farthest-corner circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+    rgba(255, 255, 255, 0.85) 5%,
+    rgba(255, 255, 255, 0.35) 30%,
+    transparent 70%
+  );
+}
+
+/* --------------------------------------------------------------------------
+   Lapisan 3: Border Edge Sheen
+   -------------------------------------------------------------------------- */
+.holo-layer-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 4;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+/* --------------------------------------------------------------------------
+   Responsif Layar Kecil
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .holo-card-container {
+    width: 270px;
+  }
+}

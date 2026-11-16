@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { API_BASE_URL } from '../config/api';
+import HoloCard3D from './HoloCard3D';
 import './CatalogPage.css';
 
 const formatIDR = (val) => {
@@ -123,6 +124,7 @@ function CatalogPage() {
 
   // --- POP-UP MODAL STATE ---
   const [selectedCard, setSelectedCard] = useState(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isClosingModal, setIsClosingModal] = useState(false);
   const [cardHistory, setCardHistory] = useState([]);
   const [cardForecast, setCardForecast] = useState(null);
@@ -134,6 +136,7 @@ function CatalogPage() {
     setIsClosingModal(true);
     setTimeout(() => {
       setSelectedCard(null);
+      setIsDetailOpen(false);
       setCardHistory([]);
       setCardForecast(null);
       setHoveredPoint(null);
@@ -779,6 +782,7 @@ function CatalogPage() {
                     e.stopPropagation();
                     setIsChartLoading(true);
                     setSelectedCard(card);
+                    setIsDetailOpen(false);
                   }}
                   role="button"
                   tabIndex={0}
@@ -787,6 +791,7 @@ function CatalogPage() {
                       e.preventDefault();
                       setIsChartLoading(true);
                       setSelectedCard(card);
+                      setIsDetailOpen(false);
                     }
                   }}
                   style={{ cursor: 'pointer' }}
@@ -852,51 +857,76 @@ function CatalogPage() {
       </div>
 
       {/* =========================================
-          POP-UP MODAL (DETAIL KARTU) - LAYOUT REVISI
+          POP-UP MODAL (3D SPOTLIGHT & DETAIL KARTU)
           ========================================= */}
       {selectedCard && createPortal(
         <div 
-          className={`catalog-modal-overlay ${isClosingModal ? 'closing' : ''}`} 
+          className={`catalog-modal-overlay ${!isDetailOpen ? 'mode-spotlight-active' : 'mode-detail-active'} ${isClosingModal ? 'closing' : ''}`} 
           onClick={handleCloseModal}
         >
-          <div 
-            className={`catalog-modal-content ${isClosingModal ? 'closing' : ''}`} 
-            onClick={(e) => e.stopPropagation()}
+          {/* Tombol Tutup Global (Esc / Klik Luar) */}
+          <button 
+            type="button" 
+            className="catalog-modal-overlay-close" 
+            onClick={handleCloseModal}
+            title="Tutup (Esc)"
+            aria-label="Tutup"
           >
-            
-            {/* Tombol Tutup */}
-            <button 
-              type="button" 
-              className="catalog-modal-close" 
-              onClick={handleCloseModal}
-              title="Tutup (Esc)"
-              aria-label="Tutup"
+            <CloseIcon />
+            <span className="overlay-close-text">Tutup</span>
+          </button>
+
+          {!isDetailOpen ? (
+            /* TAHAP 1: 3D SPOTLIGHT DI TENGAH LAYAR */
+            <div 
+              className="catalog-spotlight-stage" 
+              onClick={(e) => e.stopPropagation()}
             >
-              <CloseIcon />
-            </button>
-
-            {/* Kolom Kiri */}
-            <div className="catalog-modal-left">
-              <div className="modal-card-img-container">
-                <img 
-                  src={getCardLargeImage(selectedCard)} 
-                  alt={selectedCard.name} 
-                  className="catalog-modal-card-img"
-                  onError={(e) => { 
-                    // Jika gambar besar/hires gagal dimuat (misal offline/koneksi lambat),
-                    // fallback otomatis ke gambar reguler, lalu ke placeholder default
-                    if (e.target.src !== selectedCard.image) {
-                      e.target.src = selectedCard.image || '/card-result.png';
-                    } else {
-                      e.target.src = '/card-result.png';
-                    }
-                  }} 
-                />
-              </div>
+              <HoloCard3D 
+                key={`spotlight-${selectedCard.id}`}
+                card={selectedCard}
+                imageUrl={getCardLargeImage(selectedCard)}
+                onCardClick={() => setIsDetailOpen(true)}
+              />
             </div>
+          ) : (
+            /* TAHAP 2: DETAIL KARTU (GAMBAR 2D ASLI DI KIRI, SPESIFIKASI & CHART DI KANAN) */
+            <div 
+              className={`catalog-modal-content ${isClosingModal ? 'closing' : ''}`} 
+              onClick={(e) => e.stopPropagation()}
+            >
+              
+              {/* Tombol Tutup Modal */}
+              <button 
+                type="button" 
+                className="catalog-modal-close" 
+                onClick={handleCloseModal}
+                title="Tutup (Esc)"
+                aria-label="Tutup"
+              >
+                <CloseIcon />
+              </button>
 
-            {/* Kolom Kanan (Konten Putih) */}
-            <div className="catalog-modal-right">
+              {/* Kolom Kiri: Gambar 2D Asli Seperti Semula */}
+              <div className="catalog-modal-left">
+                <div className="modal-card-img-container">
+                  <img 
+                    src={getCardLargeImage(selectedCard)} 
+                    alt={selectedCard.name} 
+                    className="catalog-modal-card-img"
+                    onError={(e) => { 
+                      if (e.target.src !== selectedCard.image) {
+                        e.target.src = selectedCard.image || '/card-result.png';
+                      } else {
+                        e.target.src = '/card-result.png';
+                      }
+                    }} 
+                  />
+                </div>
+              </div>
+
+              {/* Kolom Kanan (Konten Putih) */}
+              <div className="catalog-modal-right">
               
               <div className="modal-right-content-wrapper">
                 {/* Bagian Atas Kanan: Tabel + Kotak Abu (Sejajar) */}
@@ -1003,7 +1033,7 @@ function CatalogPage() {
                     <div className="analytics-box-gray">
                       <div className="analytics-box-content">
                         <span className="analytics-label">Price valuation</span>
-                        <span className="analytics-value">{valuationLabel}</span>
+                        <span className={`analytics-value ${valuationClass}`}>{valuationLabel}</span>
                       </div>
                       <div className="analytics-box-icon">
                         <img src="/icon-valuation.png" alt="Valuation icon" />
@@ -1196,6 +1226,7 @@ function CatalogPage() {
 
             </div>
           </div>
+        )}
         </div>,
         document.body
       )}
