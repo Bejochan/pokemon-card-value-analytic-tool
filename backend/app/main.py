@@ -460,7 +460,7 @@ def get_cards(
     # Susun query PostgREST Supabase
     url_parts = [
         f"{supabase_url}/rest/v1/cards",
-        "?select=card_id,name,supertype,subtypes,types,hp,number,rarity,artist,image_small,sets(set_id,name,series,release_date),card_prices(effective_market_price)",
+        "?select=card_id,name,supertype,subtypes,types,hp,number,rarity,artist,image_small,sets(set_id,name,series,release_date,release_year),card_prices(effective_market_price)",
         f"&limit={safe_limit}",
         f"&offset={offset}"
     ]
@@ -589,12 +589,15 @@ def get_cards(
 
             set_name_val = set_info
             series_val = "-"
+            release_year_val = None
             if isinstance(item.get("sets"), dict):
                 set_name_val = item["sets"].get("name") or set_info
                 series_val = item["sets"].get("series") or "-"
+                release_year_val = item["sets"].get("release_year")
             elif isinstance(item.get("sets"), list) and len(item["sets"]) > 0:
                 set_name_val = item["sets"][0].get("name") or set_info
                 series_val = item["sets"][0].get("series") or "-"
+                release_year_val = item["sets"][0].get("release_year")
 
             formatted_data.append({
                 "id": item.get("card_id"),
@@ -608,6 +611,7 @@ def get_cards(
                 "set": set_info,
                 "setName": set_name_val,
                 "series": series_val,
+                "release_year": release_year_val,
                 "price": price_usd_str,
                 "price_usd": price_usd_str,
                 "price_idr": price_idr_str,

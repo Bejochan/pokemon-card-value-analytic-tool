@@ -544,14 +544,14 @@ function CatalogPage() {
   const trendText = `${trendPct >= 0 ? '+' : ''}${trendPct.toFixed(1)}%`;
   const trendClass = trendPct >= 0 ? 'trend-positive' : 'trend-negative';
 
-  let ageText = '7 Thn';
+  let ageText = '-';
   if (selectedCard?.release_year) {
-    const age = Math.max(1, new Date().getFullYear() - Number(selectedCard.release_year));
-    ageText = `${age} Thn`;
+    const age = Math.max(0, new Date().getFullYear() - Number(selectedCard.release_year));
+    ageText = age === 0 ? '< 1 Thn' : `${age} Thn`;
   } else if (activeSet?.name && activeSet.name.match(/\b(19\d\d|20\d\d)\b/)) {
     const matchYear = activeSet.name.match(/\b(19\d\d|20\d\d)\b/)[0];
-    const age = Math.max(1, new Date().getFullYear() - Number(matchYear));
-    ageText = `${age} Thn`;
+    const age = Math.max(0, new Date().getFullYear() - Number(matchYear));
+    ageText = age === 0 ? '< 1 Thn' : `${age} Thn`;
   }
 
   let valuationLabel;
