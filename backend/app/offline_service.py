@@ -172,6 +172,11 @@ def get_offline_cards(
         series_raw = row.get("set.series")
         series_str = str(series_raw) if pd.notna(series_raw) and str(series_raw).strip() != "" else "-"
 
+        year_raw = row.get("release_year")
+        release_year_val = None
+        if pd.notna(year_raw) and str(year_raw).replace(".0", "").isdigit():
+            release_year_val = int(float(year_raw))
+
         formatted_cards.append({
             "id": str(row.get("card_id")),
             "name": str(row.get("name")),
@@ -184,6 +189,7 @@ def get_offline_cards(
             "set": set_info,
             "setName": set_name_str,
             "series": series_str,
+            "release_year": release_year_val,
             "price": price_usd_str,
             "price_usd": price_usd_str,
             "price_idr": price_idr_str,
