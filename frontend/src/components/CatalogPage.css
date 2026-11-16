@@ -738,36 +738,6 @@
   overflow-y: auto;
 }
 
-/* Tombol Tutup Universal di Pojok Layar */
-.catalog-modal-overlay-close {
-  position: fixed;
-  top: 24px;
-  right: 28px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 9999px;
-  color: #ffffff;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  z-index: 100000;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.catalog-modal-overlay-close:hover {
-  background: rgba(239, 68, 68, 0.85);
-  border-color: #ef4444;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
-}
-
 /* Pembungkus Dual-Card (Dua Bagian Berdampingan) */
 .catalog-dual-modal-wrapper {
   display: flex;
@@ -837,32 +807,6 @@
 
 .catalog-dual-modal-wrapper.closing .catalog-dual-right {
   animation: scaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-/* Tombol Tutup (X) Pada Modal */
-.catalog-modal-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #64748b;
-  cursor: pointer;
-  z-index: 100;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.catalog-modal-close:hover {
-  background: #fee2e2;
-  color: #ef4444; 
-  border-color: #fca5a5;
-  transform: scale(1.08);
 }
 
 .modal-right-content-wrapper {

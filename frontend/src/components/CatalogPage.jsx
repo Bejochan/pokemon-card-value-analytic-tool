@@ -9,13 +9,6 @@ const formatIDR = (val) => {
   return `Rp ${Math.round(val).toLocaleString('id-ID')}`;
 };
 
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
-
 // Helper untuk mengambil URL gambar kartu resolusi tinggi (images.large / HD)
 const getCardLargeImage = (card) => {
   if (!card) return '/card-result.png';
@@ -860,18 +853,6 @@ function CatalogPage() {
           className={`catalog-modal-overlay catalog-dual-overlay ${isClosingModal ? 'closing' : ''}`} 
           onClick={handleCloseModal}
         >
-          {/* Tombol Tutup Global (Esc / Klik Luar) */}
-          <button 
-            type="button" 
-            className="catalog-modal-overlay-close" 
-            onClick={handleCloseModal}
-            title="Tutup (Esc)"
-            aria-label="Tutup"
-          >
-            <CloseIcon />
-            <span className="overlay-close-text">Tutup</span>
-          </button>
-
           <div 
             className={`catalog-dual-modal-wrapper ${isClosingModal ? 'closing' : ''}`} 
             onClick={(e) => e.stopPropagation()}
@@ -887,17 +868,6 @@ function CatalogPage() {
 
             {/* Bagian Kanan: Card Putih Detail Kartu & Analitika */}
             <div className="catalog-dual-right">
-              {/* Tombol Tutup Modal */}
-              <button 
-                type="button" 
-                className="catalog-modal-close" 
-                onClick={handleCloseModal}
-                title="Tutup (Esc)"
-                aria-label="Tutup"
-              >
-                <CloseIcon />
-              </button>
-
               <div className="modal-right-content-wrapper">
                 {/* Bagian Atas Kanan: Tabel + Kotak Abu (Sejajar) */}
                 <div className="modal-top-section">
