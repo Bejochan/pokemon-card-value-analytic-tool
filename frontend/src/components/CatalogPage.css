@@ -913,11 +913,99 @@
   border-radius: 10px;
   padding: 8px 10px;
   min-height: 77px;
+  position: relative;
+  /* overflow: hidden; */
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 3px;
   box-sizing: border-box;
+}
+
+.analytics-box-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  position: relative;
+  z-index: 2;                   /* Teks selalu tajam di depan icon */
+}
+
+/* Wadah Ikon di Sisi Kanan Kotak */
+.analytics-box-icon {
+  position: absolute;
+  right: 0px;                    /* Jarak dari tepi kanan kotak */
+  top: 50%;
+  transform: translateY(-50%);   /* Posisikan tepat di tengah secara vertikal */
+  z-index: 1;                    /* Berada di belakang teks */
+  pointer-events: none;          /* Agar tidak bisa diklik/menghalangi kursor */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Styling Khusus untuk File Gambar Icon Buatan Sendiri */
+.analytics-box-icon img {
+  width: 50px;                   /* Ukuran asli icon kamu */
+  height: 50px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  /* Jika icon terasa terlalu pekat/terang, kamu bisa atur opacity di sini: */
+  /* opacity: 0.85; */
+}
+
+/* =========================================================
+   PENYESUAIAN POSISI INDIVIDUAL MASING-MASING ICON
+   ========================================================= */
+
+/* 1. Icon All-time high (Turun ke bawah agar diagram menempel ke dasar) */
+.analytics-box-gray:nth-child(1) .analytics-box-icon {
+  top: auto;
+  bottom: 0px;                   /* Diturunkan ke bawah */
+  right: 0px;
+  transform: none;
+}
+
+/* 2. Icon Market AVG (Digeser sedikit ke kiri agar < > tidak terpotong tepi) */
+.analytics-box-gray:nth-child(2) .analytics-box-icon {
+  right: 0px;                   /* Memberi ruang agar sisi kanan tidak terpotong */
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* 3. Icon 30-day trend (Panah diagonal berada pas di kanan tengah) */
+.analytics-box-gray:nth-child(3) .analytics-box-icon {
+  right: 5px;
+  top: 65%;
+  transform: translateY(-50%);
+}
+
+.analytics-box-gray:nth-child(3) .analytics-box-icon img {
+  width: 70px;  /* Ubah angka ini untuk mengatur kebesaran (default 50px) */
+  height: 70px; /* Ubah angka ini untuk mengatur kebesaran (default 50px) */
+}
+
+/* 4. Icon Age to market (Digeser lebih ke kanan & bawah seperti watermark) */
+.analytics-box-gray:nth-child(4) .analytics-box-icon {
+  top: auto;
+  bottom: 12px;                  /* Sedikit menembus sudut bawah */
+  right: -6px;                   /* Digeser lebih ke kanan sesuai permintaan */
+  transform: none;
+}
+
+/* 5. Icon Price valuation (Menempel rapi di sudut kanan bawah) */
+.analytics-box-gray:nth-child(5) .analytics-box-icon {
+  top: auto;
+  bottom: 15px;
+  right: -4px;
+  transform: none;
+}
+
+.analytics-box-gray:nth-child(5) .analytics-box-icon img {
+  width: 45px;  /* Ubah angka ini untuk mengatur kebesaran (default 50px) */
+  height: 45px; /* Ubah angka ini untuk mengatur kebesaran (default 50px) */
 }
 
 /* Pola Selang-Seling (5 kolom : 7 kolom) */
@@ -972,6 +1060,32 @@
 .trend-negative {
   color: #0f172a !important;
   font-weight: 500 !important;
+}
+
+/* Khusus Kotak Trading Signal (Warna Dinamis Sesuai Sinyal) */
+.analytics-box-gray.signal-box-highlight {
+  background-color: #e6f9ed; /* Default fallback */
+}
+/* Jika Sinyal BUY (Strong Buy / Buy) -> Hijau pastel yang sama persis dengan sekarang */
+.analytics-box-gray.signal-box-highlight.signal-box-buy {
+  background-color: #e6f9ed;
+}
+/* Jika Sinyal SELL (Strong Sell / Sell) -> Merah pastel lembut */
+.analytics-box-gray.signal-box-highlight.signal-box-sell {
+  background-color: #fde8e8;
+}
+/* Jika Sinyal HOLD -> Kuning pastel lembut */
+.analytics-box-gray.signal-box-highlight.signal-box-hold {
+  background-color: #fef9c3;
+}
+
+.signal-bold-text {
+  font-family: 'Anton', sans-serif !important;
+  font-size: 26px !important;
+  font-weight: 600 !important;
+  color: #4b5563 !important;
+  letter-spacing: 1px;
+  line-height: 1.1 !important;
 }
 
 /* --- Area Grafik Garis & Forecasting --- */

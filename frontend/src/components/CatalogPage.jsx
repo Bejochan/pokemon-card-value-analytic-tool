@@ -39,6 +39,68 @@ const getCardLargeImage = (card) => {
   return '/card-result.png';
 };
 
+// Helper 1: Menghasilkan kurva lengkung Bézier halus melalui sekumpulan titik
+const getSmoothPath = (pts, tension = 0.2) => {
+  if (!pts || pts.length === 0) return '';
+  if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  if (pts.length === 2) {
+    return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} L ${pts[1].x.toFixed(1)} ${pts[1].y.toFixed(1)}`;
+  }
+
+  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = i > 0 ? pts[i - 1] : pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = i < pts.length - 2 ? pts[i + 2] : p2;
+
+    const cp1x = p1.x + ((p2.x - p0.x) * tension);
+    const cp1y = p1.y + ((p2.y - p0.y) * tension);
+    const cp2x = p2.x - ((p3.x - p1.x) * tension);
+    const cp2y = p2.y - ((p3.y - p1.y) * tension);
+
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+
+  return d;
+};
+
+// Helper 2: Menghasilkan selubung pita forecast (P10 - P90) yang melengkung halus
+const getSmoothRibbonPath = (todayPt, forecastPts, tension = 0.2) => {
+  if (!todayPt || !forecastPts || forecastPts.length === 0) return '';
+
+  const upperPts = [
+    { x: todayPt.x, y: todayPt.y },
+    ...forecastPts.map(p => ({ x: p.x, y: p.yP90 }))
+  ];
+
+  const lowerPts = [
+    { x: todayPt.x, y: todayPt.y },
+    ...forecastPts.map(p => ({ x: p.x, y: p.yP10 }))
+  ];
+
+  const upperPath = getSmoothPath(upperPts, tension);
+  const lowerReversedPts = [...lowerPts].reverse();
+  const lastLower = lowerPts[lowerPts.length - 1];
+
+  let lowerD = ` L ${lastLower.x.toFixed(1)} ${lastLower.y.toFixed(1)}`;
+  for (let i = 0; i < lowerReversedPts.length - 1; i++) {
+    const p0 = i > 0 ? lowerReversedPts[i - 1] : lowerReversedPts[i];
+    const p1 = lowerReversedPts[i];
+    const p2 = lowerReversedPts[i + 1];
+    const p3 = i < lowerReversedPts.length - 2 ? lowerReversedPts[i + 2] : p2;
+
+    const cp1x = p1.x + ((p2.x - p0.x) * tension);
+    const cp1y = p1.y + ((p2.y - p0.y) * tension);
+    const cp2x = p2.x - ((p3.x - p1.x) * tension);
+    const cp2y = p2.y - ((p3.y - p1.y) * tension);
+
+    lowerD += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+
+  return `${upperPath}${lowerD} Z`;
+};
+
 function CatalogPage() {
   const [cardsData, setCardsData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -456,22 +518,15 @@ function CatalogPage() {
     return { ...pt, x, y, yP10, yP90 };
   });
 
-  const historyCoords = pointsWithCoords.slice(0, historyItems.length + 1).map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const forecastCoords = pointsWithCoords.slice(historyItems.length).map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  // Menghasilkan kurva Bézier melengkung halus untuk riwayat dan prediksi
+  const historyPoints = pointsWithCoords.slice(0, historyItems.length + 1);
+  const forecastPoints = pointsWithCoords.slice(historyItems.length);
+  const historySmoothPath = getSmoothPath(historyPoints, 0.2);
+  const forecastSmoothPath = getSmoothPath(forecastPoints, 0.2);
 
   const ribbonTodayPoint = pointsWithCoords[historyItems.length];
   const ribbonForecastPts = pointsWithCoords.slice(historyItems.length + 1);
-  let ribbonPolygonPoints = '';
-  if (ribbonTodayPoint && ribbonForecastPts.length > 0) {
-    const upperLine = ribbonForecastPts.map(p => `${p.x.toFixed(1)},${p.yP90.toFixed(1)}`);
-    const lowerLine = [...ribbonForecastPts].reverse().map(p => `${p.x.toFixed(1)},${p.yP10.toFixed(1)}`);
-    ribbonPolygonPoints = [
-      `${ribbonTodayPoint.x.toFixed(1)},${ribbonTodayPoint.y.toFixed(1)}`,
-      ...upperLine,
-      ...lowerLine,
-      `${ribbonTodayPoint.x.toFixed(1)},${ribbonTodayPoint.y.toFixed(1)}`
-    ].join(' ');
-  }
+  const ribbonSmoothPath = getSmoothRibbonPath(ribbonTodayPoint, ribbonForecastPts, 0.2);
 
   // 6 Metrik Kotak Analitika
   const allTimeHighVal = allPrices.length > 0 ? Math.max(...allPrices) : currentPriceUsd;
@@ -897,38 +952,73 @@ function CatalogPage() {
                     </table>
                   </div>
 
-                  {/* Kanan dari Bagian Atas: Grid Kotak Abu-abu */}
+                  {/* Kanan dari Bagian Atas: Grid Kotak Abu-abu dengan Icon Buatan Sendiri */}
                   <div className="catalog-modal-analytics-grid">
-                    <div className="analytics-box-gray">
-                      <span className="analytics-label">All-time high</span>
-                      <span className="analytics-value">${allTimeHighVal.toFixed(2)}</span>
-                    </div>
-                    <div className="analytics-box-gray">
-                      <span className="analytics-label">Market AVG</span>
-                      <span className="analytics-value">${avgVal.toFixed(2)}</span>
-                    </div>
-                    <div className="analytics-box-gray">
-                      <span className="analytics-label">30 day trend</span>
-                      <span className={`analytics-value ${trendClass}`}>{trendText}</span>
-                    </div>
-                    <div className="analytics-box-gray">
-                      <span className="analytics-label">Age to market</span>
-                      <span className="analytics-value">{ageText}</span>
-                    </div>
-                    <div className="analytics-box-gray">
-                      <span className="analytics-label">Price valuation</span>
-                      <span className="analytics-value">
-                        <span className={valuationClass}>{valuationLabel}</span>
-                      </span>
-                    </div>
-                    <div className="analytics-box-gray">
-                      <span className="analytics-label">Trading signal</span>
-                      <span className="analytics-value">
-                        <span className={`catalog-signal-badge ${signalClass}`}>{signalDisplay}</span>
-                      </span>
-                    </div>
-                  </div>
 
+                    {/* 1. Kotak All-time high */}
+                    <div className="analytics-box-gray">
+                      <div className="analytics-box-content">
+                        <span className="analytics-label">All-time high</span>
+                        <span className="analytics-value">${allTimeHighVal.toFixed(2)}</span>
+                      </div>
+                      <div className="analytics-box-icon">
+                        <img src="/icon-ath.png" alt="All-time high icon" />
+                      </div>
+                    </div>
+
+                    {/* 2. Kotak Market AVG */}
+                    <div className="analytics-box-gray">
+                      <div className="analytics-box-content">
+                        <span className="analytics-label">Market AVG</span>
+                        <span className="analytics-value">${avgVal.toFixed(2)}</span>
+                      </div>
+                      <div className="analytics-box-icon">
+                        <img src="/icon-avg.png" alt="Market AVG icon" />
+                      </div>
+                    </div>
+
+                    {/* 3. Kotak 30-day trend */}
+                    <div className="analytics-box-gray">
+                      <div className="analytics-box-content">
+                        <span className="analytics-label">30-day trend</span>
+                        <span className="analytics-value">{trendText}</span>
+                      </div>
+                      <div className="analytics-box-icon">
+                        <img src="/icon-trend.png" alt="Trend icon" />
+                      </div>
+                    </div>
+
+                    {/* 4. Kotak Age to market */}
+                    <div className="analytics-box-gray">
+                      <div className="analytics-box-content">
+                        <span className="analytics-label">Age to market</span>
+                        <span className="analytics-value">{ageText}</span>
+                      </div>
+                      <div className="analytics-box-icon">
+                        <img src="/icon-age.png" alt="Age icon" />
+                      </div>
+                    </div>
+
+                    {/* 5. Kotak Price valuation */}
+                    <div className="analytics-box-gray">
+                      <div className="analytics-box-content">
+                        <span className="analytics-label">Price valuation</span>
+                        <span className="analytics-value">{valuationLabel}</span>
+                      </div>
+                      <div className="analytics-box-icon">
+                        <img src="/icon-valuation.png" alt="Valuation icon" />
+                      </div>
+                    </div>
+
+                    {/* 6. Kotak Trading signal (Dinamis: Hijau / Merah / Kuning) */}
+                    <div className={`analytics-box-gray signal-box-highlight ${signalClass === 'signal-buy' ? 'signal-box-buy' : signalClass === 'signal-sell' ? 'signal-box-sell' : 'signal-box-hold'}`}>
+                      <div className="analytics-box-content">
+                        <span className="analytics-label">Trading signal</span>
+                        <span className="analytics-value signal-bold-text">{signalDisplay}</span>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
 
                 {/* Bagian Bawah Kanan: Grafik Garis Riil + Forecasting Band */}
@@ -1011,10 +1101,10 @@ function CatalogPage() {
                         </g>
                       ))}
 
-                      {/* Selubung Pita Kuantil Probabilitas (Quantile Ribbon P10 - P90) */}
-                      {ribbonPolygonPoints && (
-                        <polygon
-                          points={ribbonPolygonPoints}
+                      {/* Selubung Pita Kuantil Probabilitas (Pita Melengkung Halus P10 - P90) */}
+                      {ribbonSmoothPath && (
+                        <path
+                          d={ribbonSmoothPath}
                           fill="rgba(0, 210, 106, 0.22)"
                           stroke="rgba(0, 210, 106, 0.45)"
                           strokeWidth="1.2"
@@ -1022,28 +1112,28 @@ function CatalogPage() {
                         />
                       )}
 
-                      {/* Segmen 1: Garis Riwayat Pasar (Solid Line) */}
-                      {historyCoords && (
-                        <polyline
+                      {/* Segmen 1: Garis Riwayat Pasar (Kurva Lengkung Halus Magenta) */}
+                      {historySmoothPath && (
+                        <path
+                          d={historySmoothPath}
                           fill="none"
                           stroke="#c2185b"
                           strokeWidth="2.5"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          points={historyCoords}
                         />
                       )}
 
-                      {/* Segmen 2: Garis Prediksi AI 7 Hari (Dashed Line) */}
-                      {forecastCoords && (
-                        <polyline
+                      {/* Segmen 2: Garis Prediksi AI 7 Hari (Kurva Lengkung Halus Putus-putus Hijau) */}
+                      {forecastSmoothPath && (
+                        <path
+                          d={forecastSmoothPath}
                           fill="none"
                           stroke="#00d26a"
                           strokeWidth="2.5"
                           strokeDasharray="5 3"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          points={forecastCoords}
                         />
                       )}
 
