@@ -1,6 +1,6 @@
-# Pokemon Card Value Analytic Tool (REGOKEMON) 🎴📊
+# Pokemon Card Value Analytic Tool | REGOKEMON 🎴📊
 
-> **Dashboard Analitika Data, Triple-Engine AI (Vision & Time-Series) & Estimasi Harga Wajar Kartu Pokémon untuk Marketplace**
+> **Platform Cerdas Valuasi & Prediksi Harga Kartu Pokémon**
 
 [![Python](https://img.shields.io/badge/Python-3.10--3.12-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org/)
