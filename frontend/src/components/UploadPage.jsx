@@ -90,28 +90,50 @@ function formatPriceInfo(priceUsd, priceIdr) {
   };
 }
 
-// Helper: Estimasi Ketajaman Sensor dari Area Tengah Kartu (Laplacian gradient variance)
+// Helper: Estimasi Ketajaman Sensor Multi-Zona (Header, Ilustrasi, & Footer Teks)
 function calculateSharpness(ctx, width, height) {
   try {
-    const sampleW = Math.min(width, 160);
-    const sampleH = Math.min(height, 160);
-    const startX = Math.max(0, Math.round((width - sampleW) / 2));
-    const startY = Math.max(0, Math.round((height - sampleH) / 2));
-    const imgData = ctx.getImageData(startX, startY, sampleW, sampleH);
-    const data = imgData.data;
-    let sumDiff = 0;
-    let count = 0;
-    const step = 4;
-    for (let i = 0; i < data.length - step * 4; i += step * 4) {
-      const g1 = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      const g2 = 0.299 * data[i + 4] + 0.587 * data[i + 5] + 0.114 * data[i + 6];
-      sumDiff += Math.abs(g1 - g2);
-      count++;
+    // Evaluasi 3 zona strategis pada kartu:
+    // 1. Header (Nama Kartu, HP, Simbol Elemen) - tepi teks kontras tinggi
+    // 2. Center (Art / Ilustrasi Karakter)
+    // 3. Footer (Teks Serangan, Biaya Energi, Nomor Seri) - teks hitam tajam
+    const zones = [
+      { x: Math.round(width * 0.12), y: Math.round(height * 0.06), w: Math.round(width * 0.76), h: Math.round(height * 0.18) },
+      { x: Math.round(width * 0.18), y: Math.round(height * 0.28), w: Math.round(width * 0.64), h: Math.round(height * 0.28) },
+      { x: Math.round(width * 0.12), y: Math.round(height * 0.62), w: Math.round(width * 0.76), h: Math.round(height * 0.22) }
+    ];
+
+    let maxZoneScore = 0;
+    let sumZoneScores = 0;
+
+    for (const z of zones) {
+      if (z.w <= 0 || z.h <= 0) continue;
+      const imgData = ctx.getImageData(z.x, z.y, z.w, z.h);
+      const d = imgData.data;
+      let diff = 0;
+      let count = 0;
+      const step = 4; // sampling tiap 4 piksel untuk kecepatan instan (< 1ms)
+      const rowStride = z.w * 4;
+
+      for (let i = 0; i < d.length - rowStride - step * 4; i += step * 8) {
+        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const lumH = 0.299 * d[i + step * 4] + 0.587 * d[i + step * 4 + 1] + 0.114 * d[i + step * 4 + 2];
+        const lumV = 0.299 * d[i + rowStride] + 0.587 * d[i + rowStride + 1] + 0.114 * d[i + rowStride + 2];
+
+        diff += Math.abs(lum - lumH) + Math.abs(lum - lumV);
+        count++;
+      }
+
+      const zoneScore = count > 0 ? (diff / count) * 4.2 : 0;
+      if (zoneScore > maxZoneScore) maxZoneScore = zoneScore;
+      sumZoneScores += zoneScore;
     }
-    const score = count > 0 ? (sumDiff / count) * 6.5 : 85;
-    return Math.min(Math.round(score), 350);
+
+    const avgScore = zones.length > 0 ? sumZoneScores / zones.length : 0;
+    const finalScore = Math.round(maxZoneScore * 0.75 + avgScore * 0.25);
+    return Math.min(finalScore, 350);
   } catch {
-    return 95;
+    return 80;
   }
 }
 
@@ -489,9 +511,8 @@ function UploadPage({ onUploadComplete }) {
       const sharpness = calculateSharpness(ctx, targetW, targetH);
       setLiveSharpness(sharpness);
 
-      // Smart Focus Gating: Tahan pengiriman request jika citra buram / tangan bergerak cepat
-      // Nilai ambang batas 35 ramah terhadap kamera laptop 720p namun efektif menahan frame gerak
-      if (sharpness < 35) {
+      // Smart Focus Gating: Tahan pengiriman frame hanya jika buram parah / tangan bergerak cepat (< 14)
+      if (sharpness < 14) {
         return;
       }
 
@@ -513,7 +534,7 @@ function UploadPage({ onUploadComplete }) {
 
         if (res.ok) {
           const data = await res.json();
-          if (data.status === 'success' && data.card_id && (data.confidence_percentage >= 60)) {
+          if (data.status === 'success' && data.card_id && (data.confidence_percentage >= 48)) {
             // Masukkan prediksi valid ke ring buffer 3 frame terakhir
             consensusHistoryRef.current.push(data);
             if (consensusHistoryRef.current.length > 3) {
@@ -546,7 +567,7 @@ function UploadPage({ onUploadComplete }) {
               }
             }
           } else {
-            // Jika status ambiguous (keyakinan < 60%) atau kartu dilepas:
+            // Jika status ambiguous (keyakinan < 48%) atau kartu dilepas:
             // Masukkan null ke buffer agar kartu lama perlahan mereda jika memang sudah tidak ada kartu di kamera
             consensusHistoryRef.current.push(null);
             if (consensusHistoryRef.current.length > 3) {
@@ -558,13 +579,16 @@ function UploadPage({ onUploadComplete }) {
               setPrediction(null);
             }
           }
+        } else if (res.status === 429) {
+          // Backend rate limiter backoff: log warning tanpa mereset kartu yang sudah terkunci
+          console.warn("Realtime identify rate limited (429), skipping this frame.");
         }
       } catch (err) {
         console.debug('Polling error (normal if camera moving):', err);
       } finally {
         isRequestInProgress.current = false;
       }
-    }, 350);
+    }, 400);
 
 
     return () => {
@@ -610,7 +634,7 @@ function UploadPage({ onUploadComplete }) {
   // --- PROPS & DATA BINDING UNTUK HUD ---
   const confPct = prediction?.confidence_percentage || 0;
   const confLabel = prediction?.confidence_label || 'Uncertain';
-  const isLocked = Boolean(prediction && prediction.card_id && confPct >= 60);
+  const isLocked = Boolean(prediction && prediction.card_id && confPct >= 48);
   const hasCard = isLocked;
   
   // Warna Guide Frame & Status Dinamis
@@ -626,7 +650,7 @@ function UploadPage({ onUploadComplete }) {
     guideClass = 'guide-neon';
     guideTagText = '✓ KARTU TERKUNCI';
     guideTagClass = 'tag-neon';
-  } else if (liveSharpness < 35) {
+  } else if (liveSharpness < 14) {
     guideClass = 'guide-amber';
     guideTagText = 'GERAKKAN PERLAHAN';
     guideTagClass = 'tag-amber';
@@ -642,7 +666,7 @@ function UploadPage({ onUploadComplete }) {
   const priceInfo = formatPriceInfo(topPriceUsd, topPriceIdr);
 
   // Status Ketajaman Sensor
-  const isSharp = liveSharpness >= 60;
+  const isSharp = liveSharpness >= 22;
   const sharpTag = isSharp ? "FOKUS TAJAM" : "KURANG FOKUS";
   const sharpClass = isSharp ? "sensor-sharp" : "sensor-blur";
 

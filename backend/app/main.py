@@ -145,13 +145,17 @@ from collections import defaultdict
 
 _rate_limit_lock = threading.Lock()
 _ip_request_timestamps = defaultdict(list)
+_ip_identify_timestamps = defaultdict(list)
 AI_RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_AI_PER_MINUTE", "60"))
+IDENTIFY_RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_IDENTIFY_PER_MINUTE", "300"))
 
 
-def check_ai_rate_limit(request: Request = None):
+def check_ai_rate_limit(request: Request = None, endpoint_type: str = "heavy"):
     """
-    Memeriksa laju permintaan (rate limiting) per client IP khusus untuk endpoint inferensi AI berat.
-    Mencegah pemborosan VRAM/CPU dari serangan spam request menggunakan in-memory sliding window.
+    Memeriksa laju permintaan (rate limiting) per client IP menggunakan in-memory sliding window.
+    - endpoint_type="heavy": untuk pipeline analisis lengkap (/analyze, /cards/.../condition) dengan batas 60 req/menit.
+    - endpoint_type="identify": untuk streaming kamera live (/identify) yang ringan (CLIP ViT-B-32 sub-milidetik),
+      dengan batas 300 req/menit (5 req/detik) agar pemindaian realtime lancar tanpa terputus HTTP 429.
     Jika request is None (pemanggilan langsung via fungsi Python/pengujian), rate limit dilewati secara aman.
     """
     if request is None:
@@ -161,21 +165,24 @@ def check_ai_rate_limit(request: Request = None):
     window_seconds = 60.0
 
     with _rate_limit_lock:
-        timestamps = _ip_request_timestamps[client_ip]
+        storage = _ip_identify_timestamps if endpoint_type == "identify" else _ip_request_timestamps
+        limit = IDENTIFY_RATE_LIMIT_PER_MINUTE if endpoint_type == "identify" else AI_RATE_LIMIT_PER_MINUTE
+
+        timestamps = storage[client_ip]
         # Evict timestamp yang sudah melewati jendela 60 detik
         valid_timestamps = [t for t in timestamps if now - t < window_seconds]
 
-        if len(valid_timestamps) >= AI_RATE_LIMIT_PER_MINUTE:
-            _ip_request_timestamps[client_ip] = valid_timestamps
+        if len(valid_timestamps) >= limit:
+            storage[client_ip] = valid_timestamps
             retry_after = int(window_seconds - (now - valid_timestamps[0])) + 1
             raise HTTPException(
                 status_code=429,
-                detail=f"Terlalu banyak permintaan inferensi AI. Kuota maksimum: {AI_RATE_LIMIT_PER_MINUTE} req/menit per IP. Coba lagi dalam {retry_after} detik.",
+                detail=f"Terlalu banyak permintaan {endpoint_type}. Kuota maksimum: {limit} req/menit per IP. Coba lagi dalam {retry_after} detik.",
                 headers={"Retry-After": str(max(1, retry_after))}
             )
 
         valid_timestamps.append(now)
-        _ip_request_timestamps[client_ip] = valid_timestamps
+        storage[client_ip] = valid_timestamps
 
 
 def read_upload_file_safely(file: UploadFile, max_bytes: int = MAX_FILE_SIZE_BYTES) -> bytes:
@@ -275,7 +282,7 @@ def identify_card_base64(data: ImageDataRequest, request: Request = None):
     Dieksekusi dalam threadpool FastAPI agar tidak memblokir event loop.
     Dilindungi dengan rate limiter dan pembatasan ukuran payload.
     """
-    check_ai_rate_limit(request)
+    check_ai_rate_limit(request, endpoint_type="identify")
     if len(data.image) > MAX_BASE64_CHARS:
         raise HTTPException(
             status_code=413,
@@ -299,7 +306,7 @@ def identify_card_base64(data: ImageDataRequest, request: Request = None):
 @app.post("/upload/identify", response_model=IdentifyResponse)
 def identify_card_file(file: UploadFile = File(...), request: Request = None):
     """Versi Multipart Form-Data untuk endpoint On-Cam / Identify dengan proteksi payload maksimum."""
-    check_ai_rate_limit(request)
+    check_ai_rate_limit(request, endpoint_type="identify")
     contents = read_upload_file_safely(file)
     img_bgr, _ = decode_bytes_to_cv2(contents)
     if img_bgr is None:
@@ -325,7 +332,7 @@ def analyze_card_base64(data: ImageDataRequest, request: Request = None):
     Mendukung evaluasi satu sisi (image) atau dua sisi (image + back_image).
     Dilindungi dengan rate limiter dan pembatasan ukuran payload.
     """
-    check_ai_rate_limit(request)
+    check_ai_rate_limit(request, endpoint_type="heavy")
     if len(data.image) > MAX_BASE64_CHARS:
         raise HTTPException(
             status_code=413,
@@ -385,7 +392,7 @@ def analyze_card_file(
     sedangkan Model 2 YOLOv8 memeriksa cacat fisik pada kedua sisi.
     Dilindungi dengan rate limiter dan pembatasan ukuran berkas 15 MB.
     """
-    check_ai_rate_limit(request)
+    check_ai_rate_limit(request, endpoint_type="heavy")
     actual_front = front_file or file
     if not actual_front:
         raise HTTPException(status_code=400, detail="Wajib mengunggah foto kartu tampak depan.")
@@ -716,7 +723,7 @@ def get_card_forecast(card_id: str, request: Request = None):
     beserta rekomendasi sinyal trading: BUY, HOLD, atau SELL.
     Dilindungi dengan rate limiter inferensi AI.
     """
-    check_ai_rate_limit(request)
+    check_ai_rate_limit(request, endpoint_type="heavy")
     try:
         result = forecast_7_days(card_id)
         return result
@@ -734,7 +741,7 @@ def evaluate_card_condition_base64(card_id: str, data: CardConditionRequest, req
     serta menghitung Condition Score (0-100%) dan penyesuaian harga pasar wajar.
     Dilindungi dengan rate limiter dan pembatasan ukuran payload.
     """
-    check_ai_rate_limit(request)
+    check_ai_rate_limit(request, endpoint_type="heavy")
     front_raw = data.front_image
     back_raw = data.back_image
 
@@ -788,7 +795,7 @@ def evaluate_card_condition_file(
     Mendukung unggah berkas foto tampak depan (front_file) dan tampak belakang (back_file).
     Dilindungi dengan rate limiter dan pembatasan ukuran berkas 15 MB.
     """
-    check_ai_rate_limit(request)
+    check_ai_rate_limit(request, endpoint_type="heavy")
     if not front_file and not back_file:
         raise HTTPException(
             status_code=400,

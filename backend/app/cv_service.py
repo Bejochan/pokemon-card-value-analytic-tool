@@ -481,9 +481,9 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
     conf_pct = float(top_match.get("confidence_percentage") or 0.0) if top_match else 0.0
 
     # Conditional Lazy Orientation Fallback:
-    # Jika posisi tegak 0° belum mencapai keyakinan 60% atau belum teridentifikasi,
-    # otomatis uji variasi rotasi (90°, 180°, 270°) untuk menyelamatkan kartu yang miring/terbalik
-    if not top_match or conf_pct < 60.0:
+    # Hanya uji variasi rotasi (90°, 180°, 270°) jika keyakinan posisi awal sangat rendah (< 48%)
+    # Menghemat 75% waktu inferensi streaming kamera saat kartu diposisikan tegak normal
+    if not top_match or conf_pct < 48.0:
         oriented_result = process_card_identification(
             img_bgr=img_bgr,
             top_k=top_k,
@@ -509,9 +509,9 @@ def run_identify_flow(img_bgr: np.ndarray, top_k: int = 4) -> Dict[str, Any]:
 
     conf_label = str(top_match.get("confidence_label") or "Rendah")
 
-    # Ambang batas keyakinan minimal 60% untuk aliran kamera live:
-    # Mencegah kemunculan false-positive ketika kartu belum pas di kotak panduan
-    if conf_pct < 60.0:
+    # Ambang batas keyakinan minimal 45% untuk aliran kamera live:
+    # Cukup toleran untuk pencahayaan ruangan & kamera laptop tanpa memicu false-positive kosong
+    if conf_pct < 45.0:
         return {
             "status": "ambiguous",
             "message": "Kartu belum teridentifikasi jelas. Posisikan kartu tegak lurus di tengah kotak panduan.",
