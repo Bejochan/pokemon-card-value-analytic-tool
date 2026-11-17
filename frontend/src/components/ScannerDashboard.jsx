@@ -131,11 +131,6 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   const formatIDR = (amount) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
 
-  // --- Warna sinyal transaksi ---
-  let signalColor = 'text-yellow';
-  if (recommendationSignal === 'BUY' || recommendationSignal === 'STRONG BUY') signalColor = 'text-green';
-  if (recommendationSignal === 'SELL') signalColor = 'text-pink';
-
   // =====================================================================
   // PERHITUNGAN GRAFIK TREN HARGA & FORECAST 7 HARI
   // =====================================================================
@@ -643,78 +638,39 @@ function ScannerDashboard({ scanResult, onScanOther }) {
 
               <div className="stats-container">
                 
-                {/* LAYOUT BARU: Kiri (Sinyal Besar) & Kanan (2 Baris Data) */}
-                <div className="stats-split-layout">
-                  
-                  {/* ======================================= */}
-                  {/* KOLOM KIRI: Kotak Trading Signal Besar  */}
-                  {/* ======================================= */}
-                  <div className="stats-left">
-                    <div className={`stat-card signal-${recommendationSignal.toLowerCase().replace(/\s+/g, '-')}`}>
-                      <span className="stat-label">Trading Signal</span>
-                      <span className={`stat-value ${signalColor}`}>{recommendationSignal}</span>
-                      {(forecastData?.signal_reason || marketAnalytics?.signal_reason) ? (
-                        <span 
-                          className="stat-signal-desc" 
-                          title={forecastData?.signal_reason || marketAnalytics?.signal_reason}
-                        >
-                          {forecastData?.signal_reason || marketAnalytics?.signal_reason}
-                        </span>
-                      ) : (
-                        <span className="stat-signal-desc">
-                          {recommendationSignal === 'HOLD' 
-                            ? 'Rekomendasi menahan kartu; pantau pergerakan harga pasar.' 
-                            : (recommendationSignal.includes('BUY') 
-                                ? 'Harga berada di bawah nilai wajar; potensi beli.' 
-                                : 'Harga berada di atas nilai wajar; potensi jual.')}
-                        </span>
-                      )}
-                    </div>
+                {/* 6 Kotak Statistik Sejajar (2 Baris x 3 Kolom) - Gepeng & Estetik */}
+                <div className="stats-grid">
+                  <div className={`stat-card signal-${recommendationSignal.toLowerCase().replace(/\s+/g, '-')}`}>
+                    <span className="stat-label">TRADING SIGNAL</span>
+                    <span className="stat-value">{recommendationSignal}</span>
                   </div>
-
-                  {/* ======================================= */}
-                  {/* KOLOM KANAN: Sisa Kotak Statistik       */}
-                  {/* ======================================= */}
-                  <div className="stats-right">
-                    
-                    {/* Kanan Atas: 3 Kotak Berjejer */}
-                    <div className="stats-row">
-                      <div className="stat-card">
-                        <span className="stat-label">AI Confidence</span>
-                        <span className={`stat-value ${confidencePct >= 70 ? 'text-green' : confidencePct >= 40 ? 'text-yellow' : 'text-pink'}`}>
-                          {confidencePct.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="stat-card">
-                        <span className="stat-label">Condition Score</span>
-                        <span className={`stat-value ${conditionMultiplier >= 0.95 ? 'text-green' : conditionMultiplier >= 0.80 ? 'text-yellow' : 'text-pink'}`}>
-                          {(conditionMultiplier * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="stat-card">
-                        {/* Tambahan style whiteSpace normal agar teks judul yang panjang bisa turun ke baris kedua */}
-                        <span className="stat-label text-yellow" style={{ whiteSpace: 'normal', lineHeight: '1.2' }}>Predicted Fair Value (ML)</span>
-                        <span className="stat-value text-green">{formatIDR(predictedPriceIdr)}</span>
-                      </div>
-                    </div>
-
-                    {/* Kanan Bawah: 2 Kotak (Mengikuti permintaanmu: Mispricing & Market Price) */}
-                    <div className="stats-row">
-                      <div className="stat-card">
-                        <span className="stat-label text-yellow">Mispricing Gap</span>
-                        <span className={`stat-value ${mispricingGap < 0 ? 'text-green' : mispricingGap > 0 ? 'text-pink' : 'text-yellow'}`}>
-                          {mispricingGap > 0 ? '+' : ''}{mispricingGap.toFixed(2)}%
-                        </span>
-                      </div>
-                      <div className="stat-card">
-                        <span className="stat-label">Market Price</span>
-                        <span className="stat-value text-green">{formatIDR(basePriceIdr)}</span>
-                      </div>
-                    </div>
-
+                  <div className="stat-card">
+                    <span className="stat-label">AI Confidence</span>
+                    <span className={`stat-value ${confidencePct >= 70 ? 'text-green' : confidencePct >= 40 ? 'text-yellow' : 'text-pink'}`}>
+                      {confidencePct.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label">Condition Score</span>
+                    <span className={`stat-value ${conditionMultiplier >= 0.95 ? 'text-green' : conditionMultiplier >= 0.80 ? 'text-yellow' : 'text-pink'}`}>
+                      {(conditionMultiplier * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label text-yellow" style={{ whiteSpace: 'normal', lineHeight: '1.2' }}>Predicted Fair Value (ML)</span>
+                    <span className="stat-value text-green">{formatIDR(predictedPriceIdr)}</span>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label text-yellow">Mispricing Gap</span>
+                    <span className={`stat-value ${mispricingGap < 0 ? 'text-green' : mispricingGap > 0 ? 'text-pink' : 'text-yellow'}`}>
+                      {mispricingGap > 0 ? '+' : ''}{mispricingGap.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label">Market Price</span>
+                    <span className="stat-value text-green">{formatIDR(basePriceIdr)}</span>
                   </div>
                 </div>
-                {/* AKHIR DARI LAYOUT SPLIT */}
 
                 {/* Kandidat Alternatif AI (Tetap di bawah) */}
                 {candidates.length > 0 && (

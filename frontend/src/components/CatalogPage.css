@@ -1129,13 +1129,13 @@
   margin-bottom: 4px;
 }
 
-/* Pewarnaan Dinamis Kotak Analitika */
-.signal-buy, 
-.signal-sell, 
-.signal-hold,
-.val-undervalued, 
-.val-overvalued, 
-.val-fair {
+/* Pewarnaan Dinamis Kotak Analitika Modal Katalog */
+.catalog-modal .signal-buy, 
+.catalog-modal .signal-sell, 
+.catalog-modal .signal-hold,
+.catalog-modal .val-undervalued, 
+.catalog-modal .val-overvalued, 
+.catalog-modal .val-fair {
   background: none !important;
   padding: 0 !important;
   border-radius: 0 !important;

@@ -847,100 +847,36 @@
 }
 
 /* =========================================
-   LAYOUT STATISTIK SPLIT (KIRI BESAR & KANAN)
+   GRID STATISTIK HARMONIS (2 BARIS X 3 KOLOM)
+   - Seluruh kartu sejajar dengan proporsi estetik seragam (gepeng & proporsional)
    ========================================= */
-.stats-split-layout {
-  display: flex;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   width: 100%;
-}
-
-/* KOLOM KIRI (Trading Signal) */
-.stats-left {
-  display: flex;
-  /* PERBAIKAN 1: Tambahkan ini agar kartu di dalamnya bisa melar ke bawah */
-  flex-direction: column; 
-  flex: 1.1; 
-  min-width: 120px; 
-}
-
-/* Memaksa kartu agar memanjang penuh mengikuti tinggi 2 baris di kanan */
-.stats-left .stat-card {
-  width: 100%;
-  
-  /* PERBAIKAN 2: Hapus height: 100% dan ganti dengan flex: 1 */
-  flex: 1; 
-  
-  /* PERBAIKAN 3: KUNCI UTAMA! Memaksa padding agar dihitung ke dalam kotak, 
-     sehingga tidak membuat kotak membengkak melewati batas */
-  box-sizing: border-box; 
-  display: flex !important;
-  flex-direction: column !important;
-  
-  justify-content: center; 
-  align-items: center;
-  text-align: center;
-  padding: 12px 14px;
-  margin: 0; /* Memastikan tidak ada margin bawah yang mendorongnya keluar */
-  border-radius: 14px !important;
-  overflow: hidden;
-}
-
-.stats-left .stat-card .stat-label {
-  display: block !important;
-  width: 100%;
-  text-align: center;
-  margin-bottom: 2px;
-}
-
-/* Membesarkan teks sinyal (SELL/BUY/HOLD) agar epik di kotak yang besar */
-.stats-left .stat-card .stat-value {
-  font-size: 30px; 
-  margin: 2px 0 6px 0;
-  display: block !important;
-  width: 100%;
-  text-align: center;
-}
-
-/* Wadah bubble semi-transparan untuk deskripsi sinyal agar rapi & tajam */
-.stats-left .stat-card .stat-signal-desc {
-  font-size: 8.5px;
-  line-height: 1.25;
-  margin-top: 4px;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: center;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* KOLOM KANAN (2 Baris Data) */
-.stats-right {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 2.6; /* Proporsi lebar dominan untuk 2 baris di kanan */
-  min-width: 0; /* Mencegah overflow horizontal pada teks panjang */
 }
 
 .stat-card {
-  flex: 1;
   min-width: 0;
   background-color: #f8f9fa;
   border: 1px solid #eaeaea;
-  border-radius: 8px;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+  min-height: 52px;
+  box-sizing: border-box;
   overflow: hidden;
 }
 
 .stat-label {
+  display: block !important;
+  width: 100% !important;
+  text-align: left !important;
   font-family: 'Montserrat', sans-serif;
   font-size: 10px;
   font-weight: 700;
@@ -953,6 +889,9 @@
 }
 
 .stat-value {
+  display: block !important;
+  width: 100% !important;
+  text-align: left !important;
   font-family: 'Anton', sans-serif;
   font-size: 20px;
   letter-spacing: 0.5px;
@@ -960,6 +899,8 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.15;
+  margin: 0;
 }
 
 .stat-sub {
@@ -1094,75 +1035,62 @@
 
 /* ============================================
    SIGNAL CARD COLORS (Trading Signal)
-   Tema harmonis:
-   - Background pastel lembut yang sepadan dengan tema
-   - Teks sinyal tebal kontras tinggi agar tidak menyatu dengan background
-   - Label dan deskripsi putih bersih
+   Sesuai mockup asli Scanner:
+   - Buy / Strong Buy: Hijau (#00d26a)
+   - Hold: Kuning Amber (#f59e0b)
+   - Sell / Strong Sell: Pink (#fb0276)
+   - Teks putih bersih #ffffff kontras tinggi
+   - Ukuran & proporsi seragam dengan kartu statistik sampingnya
    ============================================ */
 .stat-card.signal-buy,
 .stat-card.signal-strong-buy {
-  background: linear-gradient(145deg, #a7f3d0 0%, #8ceba4 100%) !important;
-  border: 1px solid #6ee7b7 !important;
-  border-radius: 14px !important;
-  box-shadow: 0 6px 18px -2px rgba(16, 185, 129, 0.28) !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-.stat-card.signal-buy .stat-label,
-.stat-card.signal-strong-buy .stat-label {
-  color: #065f46 !important;
-  font-weight: 700 !important;
-  font-size: 10px !important;
-  letter-spacing: 0.6px !important;
-  text-transform: uppercase !important;
-  opacity: 0.9;
-}
-.stat-card.signal-buy .stat-value,
-.stat-card.signal-strong-buy .stat-value {
-  color: #047857 !important;
-  font-weight: 800 !important;
+  background-color: #00d26a !important;
+  background: #00d26a !important;
+  border: 1px solid #00d26a !important;
+  border-radius: 10px !important;
+  box-shadow: 0 3px 10px rgba(0, 210, 106, 0.22) !important;
 }
 
 .stat-card.signal-hold {
-  background: linear-gradient(145deg, #fef08a 0%, #fcd34d 100%) !important;
-  border: 1px solid #fde047 !important;
-  border-radius: 14px !important;
-  box-shadow: 0 6px 18px -2px rgba(245, 158, 11, 0.28) !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-.stat-card.signal-hold .stat-label {
-  color: #78350f !important;
-  font-weight: 700 !important;
-  font-size: 10px !important;
-  letter-spacing: 0.6px !important;
-  text-transform: uppercase !important;
-  opacity: 0.9;
-}
-.stat-card.signal-hold .stat-value {
-  color: #92400e !important;
-  font-weight: 800 !important;
+  background-color: #f59e0b !important;
+  background: #f59e0b !important;
+  border: 1px solid #f59e0b !important;
+  border-radius: 10px !important;
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.22) !important;
 }
 
-.stat-card.signal-sell {
-  background: linear-gradient(145deg, #fbcfe8 0%, #f8a5cb 100%) !important;
-  border: 1px solid #f472b6 !important;
-  border-radius: 14px !important;
-  box-shadow: 0 6px 18px -2px rgba(244, 63, 94, 0.28) !important;
-  display: flex !important;
-  flex-direction: column !important;
+.stat-card.signal-sell,
+.stat-card.signal-strong-sell {
+  background-color: #fb0276 !important;
+  background: #fb0276 !important;
+  border: 1px solid #fb0276 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 3px 10px rgba(251, 2, 118, 0.22) !important;
 }
-.stat-card.signal-sell .stat-label {
-  color: #831843 !important;
-  font-weight: 700 !important;
-  font-size: 10px !important;
-  letter-spacing: 0.6px !important;
-  text-transform: uppercase !important;
-  opacity: 0.9;
-}
-.stat-card.signal-sell .stat-value {
-  color: #be123c !important;
+
+.stat-card[class*="signal-"] .stat-label {
+  display: block !important;
+  width: 100% !important;
+  text-align: left !important;
+  color: #ffffff !important;
   font-weight: 800 !important;
+  font-size: 10px !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  opacity: 0.95;
+  margin-bottom: 2px;
+}
+
+.stat-card[class*="signal-"] .stat-value {
+  display: block !important;
+  width: 100% !important;
+  text-align: left !important;
+  color: #ffffff !important;
+  font-family: 'Anton', sans-serif !important;
+  font-size: 22px !important;
+  letter-spacing: 0.5px;
+  line-height: 1.15 !important;
+  margin: 0;
 }
 
 /* GRAFIK SVG & PERAMALAN HARGA */
@@ -1260,47 +1188,7 @@
   color: #64748b;
 }
 
-.stat-signal-desc {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 8px;
-  font-weight: 600;
-  color: #64748b;
-  margin-top: 2px;
-  line-height: 1.15;
-  white-space: normal;
-  display: -webkit-box;
-  line-clamp: 2;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
 
-.stat-card.signal-buy .stat-signal-desc,
-.stat-card.signal-hold .stat-signal-desc,
-.stat-card.signal-sell .stat-signal-desc {
-  background: rgba(255, 255, 255, 0.52) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
-  border-radius: 8px !important;
-  padding: 5px 8px !important;
-  font-size: 8.5px !important;
-  line-height: 1.25 !important;
-  text-shadow: none !important;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03) !important;
-}
-
-.stat-card.signal-buy .stat-signal-desc {
-  color: #065f46 !important;
-}
-
-.stat-card.signal-hold .stat-signal-desc {
-  color: #78350f !important;
-}
-
-.stat-card.signal-sell .stat-signal-desc {
-  color: #831843 !important;
-}
 
 .svg-wrapper {
   width: 100%;
