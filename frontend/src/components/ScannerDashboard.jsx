@@ -199,13 +199,13 @@ function ScannerDashboard({ scanResult, onScanOther }) {
   // Gabungan seluruh titik untuk rendering garis kontinu
   const combinedPoints = [...historyItems, todayItem, ...forecastItems];
 
-  // Hitung skala koordinat SVG (viewBox 560 x 165) dengan ruang Sumbu Y di kiri
-  const svgWidth = 560;
-  const svgHeight = 165;
-  const padLeft = 76; // Ruang teks label harga Sumbu Y
+  // Hitung skala koordinat SVG (viewBox 680 x 145) dengan ruang Sumbu Y di kiri
+  const svgWidth = 680;
+  const svgHeight = 145;
+  const padLeft = 72; // Ruang teks label harga Sumbu Y
   const padRight = 20;
-  const padTop = 18;
-  const padBottom = 25;
+  const padTop = 16;
+  const padBottom = 20;
   const usableW = svgWidth - padLeft - padRight;
   const usableH = svgHeight - padTop - padBottom;
 
@@ -747,11 +747,25 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                       </div>
                     )}
 
-                    <svg width="100%" height="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="market-chart" preserveAspectRatio="none">
-                      {/* Garis Grid Horizontal & Label Sumbu Y di Sisi Kiri */}
-                      {yTicks.map((tick, idx) => (
-                        <g key={idx}>
+                    <div className="scanner-chart-viewport">
+                      {/* Label Ticks Sumbu Y (HTML Overlay untuk font tegak tajam bebas distorsi) */}
+                      <div className="scanner-chart-y-labels" aria-hidden="true">
+                        {yTicks.map((tick, idx) => (
+                          <span 
+                            key={`ytick-${idx}`}
+                            className="scanner-chart-y-label"
+                            style={{ top: `${(tick.y / svgHeight) * 100}%` }}
+                          >
+                            {formatIDR(tick.valIdr)}
+                          </span>
+                        ))}
+                      </div>
+
+                      <svg width="100%" height="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="market-chart" preserveAspectRatio="none">
+                        {/* Garis Grid Horizontal Sumbu Y */}
+                        {yTicks.map((tick, idx) => (
                           <line 
+                            key={idx}
                             x1={padLeft} 
                             y1={tick.y} 
                             x2={svgWidth - padRight} 
@@ -759,91 +773,71 @@ function ScannerDashboard({ scanResult, onScanOther }) {
                             stroke="#f1f5f9" 
                             strokeWidth="1.2" 
                             strokeDasharray="3 3" 
+                            vectorEffect="non-scaling-stroke"
                           />
-                          <text
-                            x={padLeft - 6}
-                            y={tick.y + 3.5}
-                            textAnchor="end"
-                            fill="#94a3b8"
-                            fontSize="9"
-                            fontFamily="'Montserrat', sans-serif"
-                            fontWeight="600"
-                          >
-                            {formatIDR(tick.valIdr)}
-                          </text>
-                        </g>
-                      ))}
+                        ))}
 
-                      {/* Selubung Pita Kuantil Probabilitas (Quantile Ribbon P10 - P90) */}
-                      {ribbonPolygonPoints && (
-                        <polygon
-                          points={ribbonPolygonPoints}
-                          fill="rgba(0, 210, 106, 0.22)"
-                          stroke="rgba(0, 210, 106, 0.45)"
-                          strokeWidth="1.2"
-                          strokeDasharray="3 3"
-                        />
-                      )}
+                        {/* Selubung Pita Kuantil Probabilitas (Quantile Ribbon P10 - P90) */}
+                        {ribbonPolygonPoints && (
+                          <polygon
+                            points={ribbonPolygonPoints}
+                            fill="rgba(0, 210, 106, 0.22)"
+                            stroke="rgba(0, 210, 106, 0.45)"
+                            strokeWidth="1.2"
+                            strokeDasharray="3 3"
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        )}
 
-                      {/* Segmen 1: Garis Riwayat Pasar (Solid Line) */}
-                      {historyCoords && (
-                        <polyline
-                          fill="none"
-                          stroke="#c2185b"
-                          strokeWidth="3.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          points={historyCoords}
-                        />
-                      )}
+                        {/* Segmen 1: Garis Riwayat Pasar (Solid Line) */}
+                        {historyCoords && (
+                          <polyline
+                            fill="none"
+                            stroke="#c2185b"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            points={historyCoords}
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        )}
 
-                      {/* Segmen 2: Garis Prediksi AI 7 Hari (Dashed Line) */}
-                      {forecastCoords && (
-                        <polyline
-                          fill="none"
-                          stroke="#00d26a"
-                          strokeWidth="3.5"
-                          strokeDasharray="6 4"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          points={forecastCoords}
-                        />
-                      )}
+                        {/* Segmen 2: Garis Prediksi AI 7 Hari (Dashed Line) */}
+                        {forecastCoords && (
+                          <polyline
+                            fill="none"
+                            stroke="#00d26a"
+                            strokeWidth="3"
+                            strokeDasharray="6 4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            points={forecastCoords}
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        )}
+                      </svg>
 
-                      {/* Titik-Titik Lingkaran & Area Interaktif */}
-                      {pointsWithCoords.map((pt, i) => {
-                        const isHistory = pt.type === 'history';
-                        const isAnchor = pt.type === 'anchor';
-                        const fillColor = isAnchor ? '#ffffff' : (isHistory ? '#c2185b' : '#00d26a');
-                        const strokeColor = isAnchor ? '#00d26a' : '#ffffff';
-                        const radius = isAnchor ? 6.5 : 5;
+                      {/* Titik-Titik Data (HTML Overlay agar selalu bulat sempurna 100%, bebas distorsi elips) */}
+                      <div className="scanner-chart-dots-overlay">
+                        {pointsWithCoords.map((pt, i) => {
+                          const isHovered = hoveredPoint?.x === pt.x && hoveredPoint?.y === pt.y;
 
-                        return (
-                          <g key={i}>
-                            {/* Titik Visual */}
-                            <circle
-                              cx={pt.x}
-                              cy={pt.y}
-                              r={radius}
-                              fill={fillColor}
-                              stroke={strokeColor}
-                              strokeWidth={isAnchor ? 3 : 2}
-                              className="chart-dot"
-                            />
-                            {/* Area Hit Sentuh Mouse Lebih Luas */}
-                            <circle
-                              cx={pt.x}
-                              cy={pt.y}
-                              r={18}
-                              fill="transparent"
-                              style={{ cursor: 'pointer' }}
+                          return (
+                            <div
+                              key={`dot-${i}`}
+                              className={`scanner-chart-dot ${pt.type} ${isHovered ? 'is-hovered' : ''}`}
+                              style={{
+                                left: `${(pt.x / svgWidth) * 100}%`,
+                                top: `${(pt.y / svgHeight) * 100}%`
+                              }}
                               onMouseEnter={() => setHoveredPoint(pt)}
                               onMouseLeave={() => setHoveredPoint(null)}
+                              aria-label={`${pt.label}: ${formatIDR(pt.priceIdr)}`}
                             />
-                          </g>
-                        );
-                      })}
-                    </svg>
+                          );
+                        })}
+                      </div>
+                    </div>
 
                     {/* Label Sumbu X (Waktu / Tanggal) Sejajar Titik Secara Presisi */}
                     <div className="chart-labels">

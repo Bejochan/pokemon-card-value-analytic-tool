@@ -1200,6 +1200,13 @@
   flex-direction: column;
 }
 
+.scanner-chart-viewport {
+  position: relative;
+  width: 100%;
+  height: 145px;
+  margin: 4px 0 2px 0;
+}
+
 .chart-hover-card {
   position: absolute;
   top: -10px;
@@ -1211,7 +1218,7 @@
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
   font-family: 'Montserrat', sans-serif;
   pointer-events: none;
-  z-index: 20;
+  z-index: 30;
   white-space: nowrap;
 }
 
@@ -1242,20 +1249,100 @@
   font-weight: 500;
 }
 
+/* Label Ticks Sumbu Y (HTML Overlay untuk ketajaman font bebas distorsi SVG) */
+.scanner-chart-y-labels {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 68px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.scanner-chart-y-label {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .market-chart {
   width: 100%;
-  height: 140px; 
+  height: 100%; 
   display: block; 
   overflow: visible;
-  margin: 4px 0 2px 0;
 }
 
-.chart-dot {
-  transition: transform 0.15s ease, r 0.15s ease;
+/* Titik Data HTML Overlay (Selalu bulat sempurna di setiap resolusi layar) */
+.scanner-chart-dots-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
 }
 
-.chart-dot:hover {
-  r: 8;
+.scanner-chart-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  box-sizing: border-box;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Area sentuh mouse yang luas (invisible hit area) */
+.scanner-chart-dot::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+/* Gaya titik riwayat pasar (magenta) */
+.scanner-chart-dot.history {
+  width: 8px;
+  height: 8px;
+  background-color: #c2185b;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(194, 24, 91, 0.35);
+}
+
+/* Gaya titik prediksi AI (hijau) */
+.scanner-chart-dot.forecast {
+  width: 8px;
+  height: 8px;
+  background-color: #00d26a;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 210, 106, 0.35);
+}
+
+/* Gaya titik jangkar 'Hari Ini' (putih berbingkai hijau tebal) */
+.scanner-chart-dot.anchor {
+  width: 12px;
+  height: 12px;
+  background-color: #ffffff;
+  border: 2.5px solid #00d26a;
+  box-shadow: 0 2px 6px rgba(0, 210, 106, 0.45);
+}
+
+.scanner-chart-dot:hover,
+.scanner-chart-dot.is-hovered {
+  transform: translate(-50%, -50%) scale(1.35);
+  z-index: 20;
 }
 
 .chart-labels {
