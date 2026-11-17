@@ -23,7 +23,7 @@ import os
 import sys
 import math
 import urllib.parse
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -832,16 +832,22 @@ def evaluate_card_condition_file(
 
 
 # ---------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # 7. ROUTE DASHBOARD & CURRENCY
 # ---------------------------------------------------------------------
+
+_dashboard_trending_live_cache: Optional[List[Dict[str, Any]]] = None
+_dashboard_trending_live_time: float = 0.0
+
 
 @app.get("/dashboard")
 def get_dashboard_data():
     """
     Ambil data trending & analitika pasar komprehensif untuk halaman Dashboard:
-    Character Leaderboard, Global Rarity Production, Top Packs Chase Cards,
-    Era Trend Index, Feature Impact, dan Market Liquidity Index.
+    Top Weekly Price Gainers, Character Leaderboard, Global Rarity Production,
+    Top Packs Chase Cards, Era Trend Index, Feature Impact, dan Market Liquidity Index.
     """
+    global _dashboard_trending_live_cache, _dashboard_trending_live_time
     analytics = get_offline_dashboard_analytics()
 
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
@@ -849,43 +855,83 @@ def get_dashboard_data():
     if not supabase_url or not supabase_key:
         return analytics
 
-    # Ambil 4 kartu trending live dari Supabase jika koneksi online tersedia
-    url = f"{supabase_url}/rest/v1/cards?select=card_id,name,rarity,image_small,sets(set_id),card_prices(effective_market_price)&limit=4"
+    # Gunakan cache memori (TTL 1 jam) jika sudah dihitung sebelumnya untuk kecepatan sub-milidetik
+    now = time.time()
+    if _dashboard_trending_live_cache and (now - _dashboard_trending_live_time < 3600):
+        analytics_copy = dict(analytics)
+        analytics_copy["trending"] = _dashboard_trending_live_cache
+        analytics_copy["is_offline_fallback"] = False
+        return analytics_copy
+
+    # Ambil kandidat kartu dengan likuiditas mingguan aktif dari Supabase
+    url = (
+        f"{supabase_url}/rest/v1/card_prices"
+        "?select=card_id,effective_market_price,cardmarket_trend,cardmarket_avg7,"
+        "cards(name,rarity,image_small,set_id)"
+        "&cardmarket_avg7=gt.10"
+        "&order=cardmarket_trend.desc.nullslast"
+        "&limit=60"
+    )
     headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
     try:
-        res = requests.get(url, headers=headers, timeout=3)
+        res = requests.get(url, headers=headers, timeout=4)
         if res.ok:
             data = res.json()
             if isinstance(data, list) and len(data) > 0:
-                trendingCards = []
-                for i, item in enumerate(data):
-                    price_val = 0.0
-                    if isinstance(item.get("card_prices"), dict):
-                        price_val = item["card_prices"].get("effective_market_price") or 0.0
-                    elif isinstance(item.get("card_prices"), list) and len(item["card_prices"]) > 0:
-                        price_val = item["card_prices"][0].get("effective_market_price") or 0.0
+                candidates = []
+                for item in data:
+                    card_info = item.get("cards")
+                    if not card_info or not isinstance(card_info, dict):
+                        continue
 
-                    set_id = "unknown"
-                    if isinstance(item.get("sets"), dict):
-                        set_id = item["sets"].get("set_id") or "unknown"
-                    elif isinstance(item.get("sets"), list) and len(item["sets"]) > 0:
-                        set_id = item["sets"][0].get("set_id") or "unknown"
+                    name = card_info.get("name")
+                    if not name:
+                        continue
 
-                    trendingCards.append({
-                        "id": i + 1,
-                        "card_id": item.get("card_id"),
-                        "name": item.get("name"),
-                        "rarity": item.get("rarity") or "Common",
-                        "holo": "Normal Print",
-                        "price": f"$ {price_val:.2f}",
-                        "image": item.get("image_small") or "/card-result.png",
-                        "setIcon": f"/{set_id}-logo.png",
-                        "flagIcon": "US"
-                    })
-                analytics_copy = dict(analytics)
-                analytics_copy["trending"] = trendingCards
-                analytics_copy["is_offline_fallback"] = False
-                return analytics_copy
+                    rarity = str(card_info.get("rarity") or "Rare Holo")
+                    rarity_lower = rarity.lower()
+                    if not any(k in rarity_lower for k in ["rare", "ultra", "secret", "holo", "star", "special"]):
+                        continue
+
+                    try:
+                        avg7 = float(item.get("cardmarket_avg7") or 0.0)
+                        trend = float(item.get("cardmarket_trend") or 0.0)
+                        price_val = float(item.get("effective_market_price") or 0.0)
+                    except (ValueError, TypeError):
+                        continue
+
+                    # Hitung persentase Weekly Price Gainers
+                    if avg7 >= 10.0 and trend > avg7 and price_val >= 15.0:
+                        gain_pct = ((trend - avg7) / avg7) * 100.0
+                        set_id = str(card_info.get("set_id") or "unknown")
+                        candidates.append({
+                            "card_id": str(item.get("card_id")),
+                            "name": name,
+                            "rarity": rarity,
+                            "holo": "Holo Print" if any(k in rarity_lower for k in ["holo", "star", "ultra", "secret"]) else "Normal Print",
+                            "price": f"$ {price_val:.2f}",
+                            "gain_pct": f"+{gain_pct:.1f}%",
+                            "image": str(card_info.get("image_small") or "/card-result.png"),
+                            "setIcon": f"/{set_id}-logo.png",
+                            "flagIcon": "US",
+                            "gain_numeric": gain_pct
+                        })
+
+                if candidates:
+                    candidates.sort(key=lambda x: x["gain_numeric"], reverse=True)
+                    trending_cards = []
+                    for idx, c in enumerate(candidates[:4]):
+                        c_dict = dict(c)
+                        c_dict["id"] = idx + 1
+                        trending_cards.append(c_dict)
+
+                    _dashboard_trending_live_cache = trending_cards
+                    _dashboard_trending_live_time = now
+
+                    analytics_copy = dict(analytics)
+                    analytics_copy["trending"] = trending_cards
+                    analytics_copy["is_offline_fallback"] = False
+                    return analytics_copy
     except Exception as e:
         print(f"[API Fallback] Supabase dashboard tidak dapat dijangkau ({e}). Menggunakan analitika dataset lokal...")
 

@@ -189,11 +189,32 @@
   display: block;
 }
 
+.t-row-flag-price {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+}
+
 /* BENDERA (Jika menggunakan gambar nanti, ubah tag span menjadi img) */
 .t-row-flag {
   font-size: 15px;
   /* Ukuran emoji bendera */
   line-height: 1;
+}
+
+.t-row-gain-pill {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: #00a854;
+  background: rgba(0, 210, 106, 0.12);
+  border: 1px solid rgba(0, 210, 106, 0.3);
+  padding: 1px 6px;
+  border-radius: 10px;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 /* HARGA */

@@ -359,6 +359,9 @@ function DashboardPage() {
                   
                   <div className="t-row-flag-price">
                     <span className="t-row-flag">{card.flagIcon}</span>
+                    {card.gain_pct && (
+                      <span className="t-row-gain-pill">{card.gain_pct}</span>
+                    )}
                   </div>
                   
                   <span className="t-row-price">{card.price}</span>
