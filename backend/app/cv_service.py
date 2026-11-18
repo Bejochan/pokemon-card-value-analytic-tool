@@ -251,7 +251,14 @@ def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.20)
             send_image = enhance_card_for_defect(cropped_card, verbose=False)
 
             # 3. Inferensi pada resolusi native training V6.1 (imgsz=800)
-            results = model.predict(send_image, conf=conf_threshold, imgsz=DEFAULT_IMGSZ, verbose=False)
+            # Dilengkapi auto-fallback ke CPU jika CUDA torchvision pada perangkat bermasalah (missing CUDA NMS)
+            try:
+                results = model.predict(send_image, conf=conf_threshold, imgsz=DEFAULT_IMGSZ, verbose=False)
+            except Exception as pred_err:
+                if "nms" in str(pred_err).lower() or "cuda" in str(pred_err).lower():
+                    results = model.predict(send_image, conf=conf_threshold, imgsz=DEFAULT_IMGSZ, device="cpu", verbose=False)
+                else:
+                    raise pred_err
             result = results[0]
 
         raw_dets = []

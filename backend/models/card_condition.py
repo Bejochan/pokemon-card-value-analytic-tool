@@ -325,7 +325,13 @@ def auto_detect_card(
     if best is None:
         try:
             active_model = model if model is not None else get_local_defect_model()
-            yolo_res = active_model.predict(image_np, conf=0.15, imgsz=imgsz, verbose=False)[0]
+            try:
+                yolo_res = active_model.predict(image_np, conf=0.15, imgsz=imgsz, verbose=False)[0]
+            except Exception as e_nms:
+                if "nms" in str(e_nms).lower() or "cuda" in str(e_nms).lower():
+                    yolo_res = active_model.predict(image_np, conf=0.15, imgsz=imgsz, device="cpu", verbose=False)[0]
+                else:
+                    raise e_nms
             card_boxes = []
             for box in yolo_res.boxes:
                 cls_name = yolo_res.names[int(box.cls[0])]
@@ -428,7 +434,13 @@ def get_yolo_predictions(
     try:
         active_model = model if model is not None else get_local_defect_model()
         # Gunakan conf=0.01 agar filter manual (LOW_THRESH/HIGH_THRESH) di script ini tetap berfungsi sama
-        results = active_model.predict(image, conf=0.01, imgsz=imgsz, verbose=False)
+        try:
+            results = active_model.predict(image, conf=0.01, imgsz=imgsz, verbose=False)
+        except Exception as e_nms:
+            if "nms" in str(e_nms).lower() or "cuda" in str(e_nms).lower():
+                results = active_model.predict(image, conf=0.01, imgsz=imgsz, device="cpu", verbose=False)
+            else:
+                raise e_nms
         result = results[0]
         
         predictions = []
