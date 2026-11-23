@@ -72,6 +72,8 @@ class ConditionReport(BaseModel):
     back_defects: List[DefectItem] = Field(default_factory=list, description="Daftar cacat fisik pada tampak belakang kartu.")
     defects: List[DefectItem] = Field(default_factory=list, description="Daftar gabungan seluruh cacat fisik terperinci.")
     evaluation_status: str = Field("evaluated", description="Status evaluasi: evaluated, bypassed_oncam, atau error.")
+    front_warped_image: Optional[str] = Field(None, description="Gambar tampak depan hasil perspective alignment (Data URL Base64).")
+    back_warped_image: Optional[str] = Field(None, description="Gambar tampak belakang hasil perspective alignment (Data URL Base64).")
 
 
 class ForecastQuantileRibbon(BaseModel):

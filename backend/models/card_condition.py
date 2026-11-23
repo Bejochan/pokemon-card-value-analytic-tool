@@ -70,7 +70,7 @@ SHARPNESS_THRESHOLD = 70.0
 CARD_ASPECT_RATIO = 63.0 / 88.0
 CARD_OUT_SIZE = (600, 837)  # Ukuran kartu asli (belum termasuk margin)
 
-def nms(detections: list[dict], iou_threshold: float = 0.4, cross_class_iou: float = 0.75) -> list[dict]:
+def nms(detections: list[dict], iou_threshold: float = 0.4, cross_class_iou: float = 0.90) -> list[dict]:
     if not detections:
         return []
 
@@ -102,7 +102,7 @@ def nms(detections: list[dict], iou_threshold: float = 0.4, cross_class_iou: flo
                 if iou(a, b) > iou_threshold:
                     suppressed.add(j)
 
-    # Deduplikasi lintas kelas khusus untuk kotak defect yang hampir identik (IoU > 0.75)
+    # Deduplikasi lintas kelas khusus untuk kotak defect yang hampir identik (IoU > 0.90)
     cards = [d for d in kept if d["class"] == "Card"]
     defects = [d for d in kept if d["class"] != "Card"]
     defects.sort(key=lambda d: d["confidence"], reverse=True)
@@ -382,7 +382,7 @@ def auto_detect_card(
     # 1. Gunakan mask rounded-rectangle sesuai lengkung sudut kartu asli (menghilangkan segitiga putih di 4 sudut)
     # 2. Normalkan kabut kontras (veiling glare) dari piksel internal kartu sebelum menggelapkan margin luar
     if is_bright_bg:
-        card_mask = _make_rounded_card_mask(warped.shape[0], warped.shape[1], margin, width, height, shrink=1)
+        card_mask = _make_rounded_card_mask(warped.shape[0], warped.shape[1], margin, width, height, shrink=-6)
         lab_pre = cv2.cvtColor(warped, cv2.COLOR_BGR2LAB)
         l_ch, a_ch, b_ch = cv2.split(lab_pre)
         card_l = l_ch[card_mask == 255]

@@ -111,10 +111,13 @@ function ScannerDashboard({ scanResult, onScanOther }) {
 
   // Sisi aktif (Depan / Belakang) & Data Bounding Box Cacat
   const isBackActive = activeSide === 'back' && hasBackImage;
-  const activeImage = isBackActive ? userScannedBackImage : (userScannedImage || officialImage);
-  const activeDefects = isBackActive 
-    ? backDefects 
-    : (frontDefects.length > 0 ? frontDefects : defects);
+  const frontDisplayImage = conditionReport?.front_warped_image || userScannedImage || officialImage;
+  const backDisplayImage = conditionReport?.back_warped_image || userScannedBackImage;
+  const activeImage = isBackActive ? backDisplayImage : frontDisplayImage;
+  const hasDualSideLists = Array.isArray(conditionReport?.front_defects);
+  const activeDefects = isBackActive
+    ? backDefects
+    : (hasDualSideLists ? frontDefects : defects);
 
   // --- Analitik Pasar (ML Forecasting) ---
   const marketAnalytics   = scanResult?.market_analytics ?? {};

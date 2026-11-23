@@ -259,7 +259,7 @@ function UploadPage({ onUploadComplete }) {
     if (!selectedFile) return;
     setIsProcessingFront(true);
     try {
-      const base64String = await compressAndResizeImage(selectedFile, 1280, 0.88);
+      const base64String = await compressAndResizeImage(selectedFile, 2048, 0.94);
       setFrontImage(base64String);
     } catch (err) {
       alert(err.message || 'Gagal memproses foto tampak depan.');
@@ -272,7 +272,7 @@ function UploadPage({ onUploadComplete }) {
     if (!selectedFile) return;
     setIsProcessingBack(true);
     try {
-      const base64String = await compressAndResizeImage(selectedFile, 1280, 0.88);
+      const base64String = await compressAndResizeImage(selectedFile, 2048, 0.94);
       setBackImage(base64String);
     } catch (err) {
       alert(err.message || 'Gagal memproses foto tampak belakang.');

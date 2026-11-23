@@ -155,7 +155,7 @@ def get_live_price(card_id: str, default_price: float) -> float:
 # FUNGSI HELPER DECODING & RESIZING GAMBAR DI RAM
 # =====================================================================
 
-def resize_image_if_oversized(img_bgr: np.ndarray, max_dim: int = 1280) -> np.ndarray:
+def resize_image_if_oversized(img_bgr: np.ndarray, max_dim: int = 2048) -> np.ndarray:
     """Membatasi resolusi maksimum gambar agar efisiensi memori dan komputasi OpenCV tetap optimal."""
     if img_bgr is None:
         return img_bgr
@@ -169,11 +169,7 @@ def resize_image_if_oversized(img_bgr: np.ndarray, max_dim: int = 1280) -> np.nd
     return img_bgr
 
 
-def decode_base64_to_cv2(image_b64: str) -> Tuple[Optional[np.ndarray], Optional[str]]:
-    """
-    Mendekode string Base64 langsung menjadi gambar OpenCV BGR (np.ndarray) di RAM.
-    Mengembalikan (img_bgr, clean_base64_string).
-    """
+def decode_base64_to_cv2(image_b64: str, max_dim: int = 2048) -> Tuple[Optional[np.ndarray], Optional[str]]:
     try:
         if not image_b64:
             return None, None
@@ -190,14 +186,15 @@ def decode_base64_to_cv2(image_b64: str) -> Tuple[Optional[np.ndarray], Optional
         if img_bgr is None:
             return None, None
 
-        img_bgr = resize_image_if_oversized(img_bgr, max_dim=1280)
+        # Baris ~186: ubah dari 1280 ke max_dim (default 2048)
+        img_bgr = resize_image_if_oversized(img_bgr, max_dim=max_dim)
         return img_bgr, clean_b64
     except Exception as e:
         print(f"[CV Service] Gagal mendekode Base64: {e}")
         return None, None
 
 
-def decode_bytes_to_cv2(image_bytes: bytes) -> Tuple[Optional[np.ndarray], Optional[str]]:
+def decode_bytes_to_cv2(image_bytes: bytes, max_dim: int = 2048) -> Tuple[Optional[np.ndarray], Optional[str]]:
     """Mendekode raw bytes menjadi gambar OpenCV BGR di RAM."""
     try:
         if not image_bytes:
@@ -208,7 +205,7 @@ def decode_bytes_to_cv2(image_bytes: bytes) -> Tuple[Optional[np.ndarray], Optio
         if img_bgr is None:
             return None, None
 
-        img_bgr = resize_image_if_oversized(img_bgr, max_dim=1280)
+        img_bgr = resize_image_if_oversized(img_bgr, max_dim=max_dim)
         clean_b64 = base64.b64encode(image_bytes).decode("utf-8")
         return img_bgr, clean_b64
     except Exception as e:
@@ -219,8 +216,17 @@ def decode_bytes_to_cv2(image_bytes: bytes) -> Tuple[Optional[np.ndarray], Optio
 # =====================================================================
 # DETEKSI CACAT FISIK KARTU (MODEL 2 YOLO LOKAL & ROBOFLOW FALLBACK)
 # =====================================================================
+def _encode_cv2_to_data_url(img_bgr: np.ndarray, quality: int = 90) -> Optional[str]:
+    ok, buf = cv2.imencode(".jpg", img_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
+    if not ok:
+        return None
+    b64 = base64.b64encode(buf.tobytes()).decode("utf-8")
+    return f"data:image/jpeg;base64,{b64}"
 
-def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.20) -> List[Dict[str, Any]]:
+def detect_defects_from_image(
+        img_bgr: np.ndarray,
+        conf_threshold: float = 0.20,
+        return_warped: bool = False) -> List[Dict[str, Any]]:
     """
     Mendeteksi cacat fisik (Corner Wear, Edge Wear, Scratch) menggunakan Model 2 YOLO lokal.
     Menjalankan pipeline khusus Model 2 di RAM (auto_detect_card perspective alignment +
@@ -230,7 +236,7 @@ def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.20)
     """
     model = get_defect_model()
     if model is None or img_bgr is None:
-        return []
+        return ([], None) if return_warped else []
 
     try:
         from models.card_condition import (
@@ -304,10 +310,12 @@ def detect_defects_from_image(img_bgr: np.ndarray, conf_threshold: float = 0.20)
                     "img_height": h_img
                 }
             })
+        if return_warped:
+                return defects, _encode_cv2_to_data_url(cropped_card)
         return defects
     except Exception as e:
         print(f"[CV Service] Error inference local YOLO defect model: {e}")
-        return []
+        return ([], None) if return_warped else []
 
 
 def detect_defects_in_memory(clean_base64_data: str) -> List[Dict[str, Any]]:
@@ -369,21 +377,26 @@ def detect_card_defects_dual_side(
     front_bgr: Optional[np.ndarray],
     back_bgr: Optional[np.ndarray] = None,
     front_b64: Optional[str] = None,
-    back_b64: Optional[str] = None
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """
-    Mendeteksi cacat fisik pada kedua sisi kartu (Tampak Depan & Tampak Belakang).
-    Memprioritaskan local YOLOv8 model, lalu fallback ke Roboflow jika model lokal tidak aktif.
-    """
+    back_b64: Optional[str] = None,
+    return_warped: bool = False
+):
     front_defects = []
     back_defects = []
+    front_warped = None
+    back_warped = None
 
     model = get_defect_model()
     if model is not None:
         if front_bgr is not None:
-            front_defects = detect_defects_from_image(front_bgr)
+            if return_warped:
+                front_defects, front_warped = detect_defects_from_image(front_bgr, return_warped=True)
+            else:
+                front_defects = detect_defects_from_image(front_bgr)
         if back_bgr is not None:
-            back_defects = detect_defects_from_image(back_bgr)
+            if return_warped:
+                back_defects, back_warped = detect_defects_from_image(back_bgr, return_warped=True)
+            else:
+                back_defects = detect_defects_from_image(back_bgr)
     else:
         # Fallback Roboflow Cloud
         if front_b64:
@@ -391,6 +404,8 @@ def detect_card_defects_dual_side(
         if back_b64:
             back_defects = detect_defects_in_memory(back_b64)
 
+    if return_warped:
+        return front_defects, back_defects, front_warped, back_warped
     return front_defects, back_defects
 
 
@@ -622,11 +637,12 @@ def run_analyze_flow(
         }
 
     # 2. Deteksi Cacat Fisik (Model 2 YOLOv8 Lokal atau Roboflow pada depan & belakang)
-    front_defects, back_defects = detect_card_defects_dual_side(
+    front_defects, back_defects, front_warped, back_warped = detect_card_defects_dual_side(
         front_bgr=img_bgr,
         back_bgr=back_bgr,
         front_b64=clean_b64,
-        back_b64=back_b64
+        back_b64=back_b64,
+        return_warped=True
     )
     defects = front_defects + back_defects
 
@@ -649,6 +665,8 @@ def run_analyze_flow(
 
     valuation["condition_report"]["front_defects"] = front_defects
     valuation["condition_report"]["back_defects"] = back_defects
+    valuation["condition_report"]["front_warped_image"] = front_warped
+    valuation["condition_report"]["back_warped_image"] = back_warped
 
     candidates = build_candidates_list(ai_result.get("candidates", []))
 
