@@ -43,6 +43,7 @@ venv.bak/
 backend/models/*.pt
 backend/models/**/*.index
 backend/wheels/
+Ultralytics/
 
 # ============================================
 # Heavy Datasets & Compressed Archives
