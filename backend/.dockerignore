@@ -1,5 +1,5 @@
 # Berkas & Direktori yang Dikecualikan dari Build Image Docker
-__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -9,18 +9,34 @@ env/
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Dataset mentah & asset gambar berukuran gigabyte (tidak diperlukan di runtime API)
+# Kredensial & environment lokal (DILARANG masuk ke image)
+.env
+.env.*
+!.env.example
+
+# Dataset mentah, JSON besar & asset gambar yang tidak diperlukan di runtime API
 dataset/raw_images/
 dataset/compressed_images/
+dataset/card-condition-dataset/
+dataset/val_samples/
+dataset/broken_links_report.csv
+dataset/card_condition_dataset.yaml
+dataset/pokemon_cards_dataset.json
+dataset/pokemon_cards_dataset_cleaned.json
+dataset/pokemon_cards_dataset.csv
+models/legacy_mobilenet/
 wheels/
 scratch/
 notebooks/
+benchmark_realtime_results.json
 
-# File debug & arsip sementara
+# File debug, dokumentasi build Docker & arsip sementara
 *.zip
 *.tar.gz
 debug_*.jpg
 debug_*.png
+Dockerfile
+.dockerignore
 
 # Git & Editor
 .git/

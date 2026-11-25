@@ -275,6 +275,9 @@ pokemon-card-value-analytic-tool/
 │   └── .env                              # Konfigurasi API Keys & CAMERA_SOURCE
 │
 ├── frontend/                             # Single Page Application (React 19 + Vite)
+│   ├── Dockerfile                        # Multi-stage build (Node 22 Alpine -> Nginx Alpine)
+│   ├── nginx.conf                        # Konfigurasi Nginx & fallback routing SPA
+│   ├── .dockerignore                     # Pengecualian node_modules, dist & .env lokal
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── UploadPage.jsx            # Pemindai Langsung (Live HUD, Camera Selector, Guide-Box Crop) & Upload Inspeksi Foto Statis
@@ -299,7 +302,7 @@ pokemon-card-value-analytic-tool/
 │   ├── dataset_summary_and_metrics.md    # Statistik & Metrik Dataset Master
 │   ├── supabase_database_dictionary.md   # Dokumentasi Database Supabase
 │   └── schema.sql                        # Script DDL Relasional Database
-├── docker-compose.yml                    # Orkestrasi container backend & volume mounting
+├── docker-compose.yml                    # Orkestrasi multi-service backend (8000) & frontend (5173)
 ├── vercel.json                           # Konfigurasi deployment frontend Vercel (SPA rewrite)
 └── README.md                             # Dokumentasi Utama Proyek
 ```
@@ -368,20 +371,31 @@ python -m uvicorn app.main:app --reload --port 8000
 
 ---
 
-### 3.1 Menjalankan Backend Menggunakan Docker & Docker Compose
+### 3.1 Menjalankan Full-Stack Menggunakan Docker & Docker Compose
 
-Jika Anda ingin menjalankan backend pada server Linux, VPS, atau container terisolasi tanpa konfigurasi manual Python dan CUDA:
+Anda dapat menjalankan seluruh layanan (**Backend FastAPI + 3 Model AI** pada port `8000` dan **Frontend React Nginx** pada port `5173`) sekaligus dalam satu perintah tanpa konfigurasi manual Python, Node.js, maupun CUDA:
+
 ```powershell
-# Jalankan container backend di latar belakang:
+# Opsi A: Tarik image siap pakai dari Docker Hub lalu jalankan:
+docker compose pull
+docker compose up -d
+
+# Opsi B: Bangun ulang image secara lokal dari source lalu jalankan:
 docker compose up -d --build
 
-# Periksa status kontainer dan log runtime:
+# Periksa status kesehatan kedua kontainer dan log runtime:
+docker compose ps
 docker compose logs -f
 curl http://localhost:8000/health
 
-# Menghentikan kontainer:
+# Menghentikan seluruh kontainer:
 docker compose down
 ```
+
+* Image Docker Hub:
+  * Backend (`bejochan/regokemon-backend:latest`, port `8000`): `https://hub.docker.com/r/bejochan/regokemon-backend`
+  * Frontend (`bejochan/regokemon-frontend:latest`, port `5173`): `https://hub.docker.com/r/bejochan/regokemon-frontend`
+* Akses web portal lokal di `http://localhost:5173` dan dokumentasi API di `http://localhost:8000/docs`.
 
 ---
 

@@ -1,7 +1,6 @@
-version: '3.8'
-
 services:
   backend:
+    image: bejochan/regokemon-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -14,15 +13,32 @@ services:
       - HF_HUB_OFFLINE=1
       - TRANSFORMERS_OFFLINE=1
       - RATE_LIMIT_AI_PER_MINUTE=60
-      - ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000
-    volumes:
-      # Mount folder model untuk kemudahan update bobot tanpa build ulang container
-      - ./backend/models:/app/models:ro
-      - ./backend/dataset:/app/dataset:ro
+      - ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
+
+  frontend:
+    image: bejochan/regokemon-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://127.0.0.1:8000
+    container_name: regokemon-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
