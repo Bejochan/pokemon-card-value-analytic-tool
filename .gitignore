@@ -51,6 +51,8 @@ Ultralytics/
 pokemon-cards/
 backend/dataset/*.zip
 backend/dataset/card-condition-dataset/
+backend/dataset/card-condition-dataset-v5/
+backend/dataset/eda_v5_outputs
 backend/dataset/pokemon-cards-dataset/
 backend/dataset/raw_images/
 backend/dataset/compressed_images/
