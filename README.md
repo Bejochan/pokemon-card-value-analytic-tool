@@ -298,6 +298,7 @@ pokemon-card-value-analytic-tool/
 │   ├── yolo_model_architecture_and_rationale.md    # Arsitektur & Analisis Model 2 (YOLO26s 800px Condition Grader)
 │   ├── chronos_model_architecture_and_rationale.md # Arsitektur & Analisis Model 3 (Amazon Chronos-Bolt Mini)
 │   ├── api_specification.md              # Spesifikasi 14 REST API Endpoints & Kontrak Data
+│   ├── docker_architecture_and_deployment.md # Arsitektur Container Multi-Service, Offline Cache & Panduan Docker Hub
 │   ├── dataset_dictionary.md             # Kamus Data 22 Variabel CSV
 │   ├── dataset_summary_and_metrics.md    # Statistik & Metrik Dataset Master
 │   ├── supabase_database_dictionary.md   # Dokumentasi Database Supabase
@@ -396,6 +397,7 @@ docker compose down
   * Backend (`bejochan/regokemon-backend:latest`, port `8000`): `https://hub.docker.com/r/bejochan/regokemon-backend`
   * Frontend (`bejochan/regokemon-frontend:latest`, port `5173`): `https://hub.docker.com/r/bejochan/regokemon-frontend`
 * Akses web portal lokal di `http://localhost:5173` dan dokumentasi API di `http://localhost:8000/docs`.
+* Panduan teknis lengkap containerization, optimasi *offline cache* model AI, keamanan `.dockerignore`, serta skenario menjalankan sistem dijelaskan pada [docs/docker_architecture_and_deployment.md](docs/docker_architecture_and_deployment.md).
 
 ---
 
