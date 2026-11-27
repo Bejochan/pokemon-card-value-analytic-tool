@@ -8,7 +8,9 @@ from tqdm import tqdm
 
 # 1. Menentukan path direktori secara dinamis berdasarkan lokasi file script ini
 current_dir = os.path.dirname(os.path.abspath(__file__))
-csv_path = os.path.join(current_dir, "dataset", "pokemon_cards_dataset.csv")
+cleaned_csv_path = os.path.join(current_dir, "dataset", "pokemon_cards_dataset_cleaned.csv")
+raw_csv_path = os.path.join(current_dir, "dataset", "pokemon_cards_dataset.csv")
+csv_path = cleaned_csv_path if os.path.exists(cleaned_csv_path) else raw_csv_path
 
 # Folder penyimpanan target (sejajar dengan card-condition-dataset)
 output_dir = os.path.join(current_dir, "dataset", "raw_images")

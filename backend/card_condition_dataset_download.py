@@ -17,7 +17,7 @@ print("Menghubungkan ke Roboflow Cloud via REST API...")
 # 2. Format URL endpoint resmi Roboflow
 workspace = "group-6-major-project"
 project_name = "card-grader"
-version = 4
+version = 5
 format_type = "yolov8"
 
 export_url = f"https://api.roboflow.com/{workspace}/{project_name}/{version}/{format_type}?api_key={API_KEY}"
