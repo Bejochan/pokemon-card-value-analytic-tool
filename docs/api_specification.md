@@ -41,7 +41,7 @@ REST API Regokemon dirancang menggunakan framework **FastAPI** dengan arsitektur
 
 ### Base URL
 * **Lingkungan Pengembangan Lokal:** `http://127.0.0.1:8000`
-* **Frontend Client Config:** [`frontend/src/config/api.js`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/frontend/src/config/api.js) membaca variabel lingkungan `VITE_API_BASE_URL`.
+* **Frontend Client Config:** [`frontend/src/config/api.js`](../frontend/src/config/api.js) membaca variabel lingkungan `VITE_API_BASE_URL`.
 
 ### Kebijakan Keamanan (Security Hardening)
 1. **CORS Whitelist Terbatas:**
@@ -383,9 +383,9 @@ Endpoint peramalan harga probabilistik 7 hari ke depan menggunakan Amazon Chrono
   "status": "success",
   "message": "Peramalan harga 7 hari berhasil diproses.",
   "card_id": "sv4-241",
-  "card_name": "Roaring Moon ex",
-  "current_price_usd": 85.00,
-  "current_price_idr": 1402500,
+  "card_name": "Rika",
+  "current_price_usd": 2.81,
+  "current_price_idr": 46365,
   "forecast": [
     {
       "day": 1,
@@ -510,7 +510,7 @@ Mengambil informasi status kurs live USD ke IDR yang aktif digunakan dalam perhi
 
 ## 🧱 5. Skema Objek Data Bersama (Shared Schemas)
 
-Berikut definisi tipe Pydantic utama di [`backend/app/schemas.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/app/schemas.py):
+Berikut definisi tipe Pydantic utama di [`backend/app/schemas.py`](../backend/app/schemas.py):
 
 * **`PricingDetails`:**
   * `base_price_usd` *(float)*: Harga pasar acuan awal kartu dalam kondisi mulus.

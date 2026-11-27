@@ -67,12 +67,21 @@ erDiagram
         TEXT card_id PK_FK "Relasi ke cards(card_id) ON DELETE CASCADE"
         DATE recorded_date PK "Tanggal pencatatan kalender harian"
         NUMERIC tcg_normal_market "Harga pasar reguler pada tanggal tersebut"
+        NUMERIC tcg_normal_low "Harga low varian reguler pada tanggal tersebut"
+        NUMERIC tcg_normal_mid "Harga mid varian reguler pada tanggal tersebut"
+        NUMERIC tcg_normal_high "Harga high varian reguler pada tanggal tersebut"
         NUMERIC tcg_holo_market "Harga pasar holofoil pada tanggal tersebut"
+        NUMERIC tcg_holo_low "Harga low varian holofoil pada tanggal tersebut"
+        NUMERIC tcg_holo_mid "Harga mid varian holofoil pada tanggal tersebut"
+        NUMERIC tcg_holo_high "Harga high varian holofoil pada tanggal tersebut"
+        NUMERIC tcg_reverse_market "Harga pasar reverse holo pada tanggal tersebut"
         NUMERIC cardmarket_trend "Tren Cardmarket pada tanggal tersebut"
+        NUMERIC cardmarket_avg_sell "Rata-rata harga jual Cardmarket pada tanggal tersebut"
+        NUMERIC cardmarket_low "Harga terendah Cardmarket pada tanggal tersebut"
         NUMERIC cardmarket_avg1 "Rata-rata harga 1 hari pada tanggal tersebut"
         NUMERIC cardmarket_avg7 "Rata-rata harga 7 hari pada tanggal tersebut"
         NUMERIC cardmarket_avg30 "Rata-rata harga 30 hari pada tanggal tersebut"
-        NUMERIC effective_market_price "Harga acuan efektif pada tanggal tersebut"
+        NUMERIC effective_market_price "Snapshot harga acuan efektif pada tanggal tersebut"
         TIMESTAMPTZ created_at "Waktu pencatatan"
     }
 ```
@@ -148,8 +157,17 @@ Menyimpan snapshot historis harga harian per tanggal kalender untuk keperluan pe
 | `card_id` | `TEXT` | `PK, FK` | `'sv8pt5-77'` | Mengacu ke `cards.card_id`. Bagian dari Composite Primary Key. |
 | `recorded_date` | `DATE` | `PK` | `'2026-09-22'` | Tanggal pencatatan harga harian. Mengizinkan 1 rekaman per kartu per hari. |
 | `tcg_normal_market` | `NUMERIC(10,2)` | `NULLABLE` | `1.25` | Snapshot harga pasar varian reguler pada tanggal tersebut. |
+| `tcg_normal_low` | `NUMERIC(10,2)` | `NULLABLE` | `0.50` | Snapshot harga penawaran terendah varian reguler (USD). |
+| `tcg_normal_mid` | `NUMERIC(10,2)` | `NULLABLE` | `1.40` | Snapshot median penawaran varian reguler (USD). |
+| `tcg_normal_high` | `NUMERIC(10,2)` | `NULLABLE` | `5.00` | Snapshot harga penawaran tertinggi varian reguler (USD). |
 | `tcg_holo_market` | `NUMERIC(10,2)` | `NULLABLE` | `18.50` | Snapshot harga pasar varian holofoil pada tanggal tersebut. |
+| `tcg_holo_low` | `NUMERIC(10,2)` | `NULLABLE` | `12.00` | Snapshot harga penawaran terendah varian holofoil (USD). |
+| `tcg_holo_mid` | `NUMERIC(10,2)` | `NULLABLE` | `19.00` | Snapshot median penawaran varian holofoil (USD). |
+| `tcg_holo_high` | `NUMERIC(10,2)` | `NULLABLE` | `45.00` | Snapshot harga penawaran tertinggi varian holofoil (USD). |
+| `tcg_reverse_market` | `NUMERIC(10,2)` | `NULLABLE` | `2.10` | Snapshot harga pasar varian Reverse Holo (USD). |
 | `cardmarket_trend` | `NUMERIC(10,2)` | `NULLABLE` | `14.20` | Snapshot tren harga Cardmarket pada tanggal tersebut. |
+| `cardmarket_avg_sell` | `NUMERIC(10,2)` | `NULLABLE` | `13.85` | Snapshot rata-rata penjualan Cardmarket pada tanggal tersebut. |
+| `cardmarket_low` | `NUMERIC(10,2)` | `NULLABLE` | `8.00` | Snapshot harga terendah Cardmarket pada tanggal tersebut. |
 | `cardmarket_avg1` | `NUMERIC(10,2)` | `NULLABLE` | `14.50` | Rata-rata harga 1 hari pada tanggal pencatatan. |
 | `cardmarket_avg7` | `NUMERIC(10,2)` | `NULLABLE` | `14.10` | Rata-rata harga 7 hari pada tanggal pencatatan. |
 | `cardmarket_avg30` | `NUMERIC(10,2)` | `NULLABLE` | `13.90` | Rata-rata harga 30 hari pada tanggal pencatatan. |
@@ -205,7 +223,7 @@ CREATE INDEX IF NOT EXISTS idx_price_history_date ON public.card_price_history(r
  └────────────────────────────────────────────────────────────────────────┘
                                                               │
                                                               ▼
- [ Model 2: YOLOv8 Grader ] ──(F_condition: 0.85)──► [ Analytics Valuation ]
+ [ Model 2: YOLO26s Grader ] ──(F_condition: 0.90)──► [ Analytics Valuation ]
                                                               │
                                                               ▼
                                                [ Rekomendasi BUY / HOLD / SELL ]
@@ -213,7 +231,7 @@ CREATE INDEX IF NOT EXISTS idx_price_history_date ON public.card_price_history(r
 
 1. **Inferensi Model 1 (CLIP):** Mengembalikan `card_id` kartu dengan skor kemiripan visual tertinggi.
 2. **Pencarian Cepat Supabase:** Backend FastAPI menarik data `effective_market_price` ($P_{base}$), `release_year`, dan `rarity` dari tabel `card_prices`, serta deret waktu historis dari `card_price_history`.
-3. **Pemeriksaan Cacat Fisik Model 2 (YOLOv8):** Menilai cacat fisik (Scratched, Bent, Edge Wear) untuk mengoreksi nilai wajar kondisi aktual ($P_{final}$).
+3. **Pemeriksaan Cacat Fisik Model 2 (YOLO26s):** Menilai cacat fisik (*Scratch*, *Corner Wear*, *Edge Wear*, *Card*) secara proporsional untuk mengoreksi nilai wajar kondisi aktual ($P_{final}$).
 4. **Peramalan & Sinyal Model 3 (Amazon Chronos-Bolt):** Memproyeksikan pita kuantil dinamis 7 hari (P10, P50, P90) dan menghasilkan sinyal preskriptif BUY/HOLD/SELL berdasarkan posisi harga terhadap lorong valuasi.
 
 ---

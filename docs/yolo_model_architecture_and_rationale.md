@@ -46,7 +46,7 @@ TANTANGAN OPTIK                    SOLUSI TEKNIS REGOKEMON
 2. Sudut Palsu di Meja Putih    ──► Rounded Masking (Radius 3.2 mm Pokémon)
 3. Pantulan Latar Terang        ──► Veiling Glare Normalization di Ruang LAB
 4. Citra Kamera HP Agak Blur    ──► Kondisional Unsharp Masking (Laplacian < 70)
-5. Cacat Menumpuk di Sudut      ──► Two-Tier NMS (IoU Kelas 0.4 & Lintas-Kelas 0.75)
+5. Cacat Menumpuk di Sudut      ──► Two-Tier NMS (IoU Kelas 0.4 & Lintas-Kelas 0.90)
 6. Cacat di Belakang Kartu      ──► Dual-Side Inspection (Depan + Belakang)
 ```
 
@@ -125,7 +125,7 @@ $$\text{Sharpness} = \text{Var}(\nabla^2 I_{gray})$$
 Deteksi cacat fisik sering menghasilkan kotak deteksi bertumpuk karena fitur keausan tepi dan sudut saling bersinggungan. REGOKEMON menerapkan deduplikasi bertingkat:
 
 1. **Tier 1 (Per-Class NMS):** Menghapus *bounding box* redundan pada kelas yang sama dengan ambang batas $\text{IoU} > 0.40$.
-2. **Tier 2 (Cross-Class NMS Deduplication):** Menyaring kotak deteksi antar-kelas yang menempati lokasi fisik yang hampir identik dengan ambang batas $\text{IoU} > 0.75$. Kotak dengan skor keyakinan (*confidence*) tertinggi dipertahankan.
+2. **Tier 2 (Cross-Class NMS Deduplication):** Menyaring kotak deteksi antar-kelas yang menempati lokasi fisik yang hampir identik dengan ambang batas $\text{IoU} > 0.90$. Kotak dengan skor keyakinan (*confidence*) tertinggi dipertahankan.
 3. **Border Ratio Filtering:** Cacat bertipe *Edge Wear* dan *Corner Wear* diverifikasi koordinat pusatnya. Jika berada di area tengah kartu ($> 25\%$ dari tepi terluar), deteksi dibuang karena secara fisik tidak mungkin terjadi keausan tepi di bagian tengah kartu.
 
 ---
@@ -151,18 +151,20 @@ Kondisi fisik kartu Pokémon tidak dapat dinilai secara akurat hanya dari tampak
 
 ## 💰 7. Formula Depresiasi Nilai Wajar (F_condition)
 
-Cacat fisik yang terdeteksi dikonversikan menjadi pengali depresiasi nilai pasar wajar ($F_{condition}$) di dalam [`backend/app/analytics_engine.py`](../backend/app/analytics_engine.py):
+Cacat fisik yang terdeteksi dikonversikan menjadi pengali depresiasi nilai pasar wajar ($F_{condition}$) secara proporsional di dalam fungsi `calculate_condition_factor` pada [`backend/app/analytics_engine.py`](../backend/app/analytics_engine.py):
 
-| Kategori Kondisi | Kriteria Cacat Terdeteksi | Nilai $F_{condition}$ | Potongan Harga | Klasifikasi Pasar Kolektor |
-| :--- | :--- | :---: | :---: | :--- |
-| **Near Mint / Mint** | Tanpa cacat fisik (0 defect) | **1.00** | 0% | Kartu mulus sempurna seperti baru keluar dari booster pack. |
-| **Lightly Played (LP)** | Terdeteksi goresan permukaan (*Scratch*) | **0.85** | 15% | Goresan halus pada permukaan foil tanpa kerusakan struktur. |
-| **Moderately Played (MP)** | Terdeteksi keausan tepi (*Edge*) atau sudut (*Corner*) | **0.80** | 20% | Kikisan putih pada tepi kartu akibat pemakaian bermain. |
-| **Heavily Played (HP)** | Terdeteksi kartu tertekuk / lekukan (*Crease / Bent*) | **0.65** | 35% | Struktur kartu mengalami lipatan atau lekukan fisik. |
-| **Damaged** | Akumulasi cacat berat ganda di kedua sisi | **0.40** (Batas Bawah) | Hingga 60% | Kerusakan parah menyeluruh pada permukaan dan sudut. |
+| Jenis Cacat / Kategori Kondisi | Aturan Pengali / Penalti | Batas Maksimum Penalti per Jenis |
+| :--- | :--- | :---: |
+| **Tanpa Cacat (`Near Mint / Mint`)** | `F_condition = 1.00` (diskon 0%) | 0% |
+| **`Scratch` (Goresan Permukaan)** | Diskon **5%** per titik deteksi | **20%** |
+| **`Corner Wear` (Keausan Sudut)** | Diskon **6%** per sudut aus | **24%** |
+| **`Edge Wear` (Kikisan Tepi)** | Diskon **8%** per sisi aus | **25%** |
+| **`Bent / Crease` (Lipatan / Tekukan)** | Diskon struktural **25%** per titik | **40%** |
+| **Akumulasi Total (`Damaged` floor)** | Total diskon dibatasi maksimal 60% (`F_condition >= 0.40`) | **60%** |
 
-### Formula Multiplikatif:
-$$F_{condition} = \max\left(0.40,\ \text{round}\left(1.00 \times \prod \text{Penalty}_{i},\ 2\right)\right)$$
+### Formula Proporsional & Klasifikasi Tier:
+$$F_{condition} = \max\left(0.40,\ \text{round}\left(1.00 - \min\left(0.60,\ \sum \text{Penalty}_{jenis}\right),\ 2\right)\right)$$
+* Klasifikasi tingkat kondisi: *Near Mint / Mint* ($\ge 0.95$), *Lightly Played (LP)* ($\ge 0.80$), *Moderately Played (MP)* ($\ge 0.65$), *Heavily Played (HP)* ($\ge 0.50$), dan *Damaged* ($< 0.50$).
 * Diskon pasar terhitung: $\text{Discount}\% = (1.0 - F_{condition}) \times 100\%$
 * Skor Kondisi Fisik (*Condition Score*): $\text{Score}\% = F_{condition} \times 100\%$
 
@@ -170,17 +172,16 @@ $$F_{condition} = \max\left(0.40,\ \text{round}\left(1.00 \times \prod \text{Pen
 
 ## 📊 8. Tabel Komparasi Benchmark Model
 
-Berikut perbandingan performa pengujian empiris berbagai iterasi model deteksi cacat fisik:
+Berikut perbandingan performa pengujian empiris pada *test split* 71 citra (443 objek cacat):
 
-| Metrik Evaluasi | Model V3 (YOLO11s 640px) | Model V5 (YOLO11s 800px) | **Model V6: YOLO26s 800px (Regokemon)** |
+| Metrik Evaluasi | Model V3 (YOLOv8s-P2 640px) | Model V5 (YOLO11s 800px) | **Model V6.1: YOLO26s 800px (Regokemon)** |
 | :--- | :---: | :---: | :---: |
 | **mAP50 Keseluruhan** | 0.4095 (40.95%) | 0.4048 (40.48%) | **0.4277 (42.77%)** |
 | **mAP50: Corner Wear** | 0.5830 | 0.5690 | **0.6020** |
 | **mAP50: Card Contour** | 0.9950 | 0.9950 | **0.9950** |
 | **mAP50: Edge Wear** | 0.0810 | 0.0850 | **0.0870** |
-| **Waktu Inferensi (GPU)** | ~12 ms | ~15 ms | **~15 ms** |
-| **Waktu Inferensi (CPU)** | ~70 ms | ~110 ms | **~115 ms** |
-| **Ukuran Bobot Model** | ~18 MB | ~18 MB | **~18 MB** |
+| **Waktu Uji per Citra (Tesla T4)** | ~20.6 ms (inferensi 10.2 ms) | ~24.4 ms (inferensi 11.8 ms) | **~25.4 ms (inferensi 14.0 ms)** |
+| **Ukuran Bobot Model** | ~18 MB | ~16.8 MB | **~19.4 MB** |
 | **Ketahanan Sudut Meja Putih** | Rendah (Banyak False Corner) | Sedang | **Tinggi (Terintegrasi Rounded Mask)** |
 
 ---
@@ -195,7 +196,7 @@ Berikut perbandingan performa pengujian empiris berbagai iterasi model deteksi c
 
 ### Q2: *"Bagaimana sistem menjaga kestabilan memori saat memproses gambar resolusi tinggi?"*
 > **Penjelasan Teknis:**  
-> Sistem menerapkan pembatasan resolusi adaptif `resize_image_if_oversized` dengan batas dimensi maksimum 1280 px di sisi server, serta kompresi awal di browser via HTML5 Canvas (JPEG kualitas 0.88). Hal ini memangkas ukuran payload hingga 97% sebelum gambar dikirim ke backend. Selain itu, seluruh proses warping dan masking dieksekusi di memori RAM tanpa penulisan file temporer ke disk, mencegah *disk thrashing* dan fragmentasi memori.
+> Sistem menerapkan pembatasan resolusi adaptif `resize_image_if_oversized` dengan batas dimensi maksimum `2048 px` di sisi server, serta kompresi awal di browser via HTML5 Canvas (`2048 px`, JPEG kualitas `0.94` pada unggah foto statis dan `448 x 625 px`, JPEG kualitas `0.85` pada *live scanner*). Seluruh proses *warping* dan *masking* dieksekusi di memori RAM tanpa penulisan file temporer ke disk, mencegah *disk thrashing* dan fragmentasi memori.
 
 ---
 

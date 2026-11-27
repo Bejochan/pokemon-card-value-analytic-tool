@@ -171,13 +171,13 @@ P_actual > P90_1d (Harga melambung melampaui batas optimis) ──►  SELL (Ove
 Banyak aplikasi AI memajang angka keyakinan statis (misal *hardcoded* 95% atau 98%) yang menyesatkan pengguna. REGOKEMON menerapkan **kalkulasi keyakinan dinamis matematis murni** berdasarkan dispersi (lebar pita) kuantil:
 
 ```
-Rasio Dispersi (Spread Ratio) = (P90_1d - P10_1d) / P50_1d
-AI Confidence (%) = clamp(100 - (Spread Ratio * 60), min=20.0, max=98.0)
+Rasio Dispersi (Spread Ratio) = (P90_1d - P10_1d) / max(P50_1d, 0.01)
+AI Confidence (%) = clamp(100.0 - (Spread Ratio * 25.0), min=55.0, max=98.5)
 ```
 
 * **Interpretasi Matematis:**  
-  * Jika pita kuantil sempit (misal P10 = $98, P50 = $100, P90 = $102 → Spread = 4%), volatilitas rendah → **AI Confidence sangat tinggi (~95.6%)**.
-  * Jika pita kuantil melebar akibat pergerakan harga yang liar dan tidak menentu (misal P10 = $60, P90 = $140 → Spread = 80%), ketidakpastian tinggi → **AI Confidence turun otomatis (~52.0%)**.
+  * Jika pita kuantil sempit (misal P10 = $98, P50 = $100, P90 = $102 -> Spread = 4%), volatilitas rendah -> **AI Confidence mencapai batas atas `98.5%`**.
+  * Jika pita kuantil melebar akibat pergerakan harga yang fluktuatif (misal P10 = $60, P50 = $100, P90 = $140 -> Spread = 80%), ketidakpastian tinggi -> **AI Confidence turun otomatis ke `80.0%`**.
   * Angka keyakinan 100% mencerminkan kondisi riil pasar deret waktu tanpa rekayasa data.
 
 ---
