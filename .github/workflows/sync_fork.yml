@@ -13,6 +13,7 @@ permissions:
 jobs:
   sync-fork:
     name: Sync main branch with upstream Bejochan
+    if: github.repository != 'Bejochan/pokemon-card-value-analytic-tool'
     runs-on: ubuntu-latest
 
     steps:
