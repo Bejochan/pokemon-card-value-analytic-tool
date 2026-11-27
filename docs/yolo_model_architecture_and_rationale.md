@@ -46,7 +46,7 @@ TANTANGAN OPTIK                    SOLUSI TEKNIS REGOKEMON
 2. Sudut Palsu di Meja Putih    ──► Rounded Masking (Radius 3.2 mm Pokémon)
 3. Pantulan Latar Terang        ──► Veiling Glare Normalization di Ruang LAB
 4. Citra Kamera HP Agak Blur    ──► Kondisional Unsharp Masking (Laplacian < 70)
-5. Cacat Menumpuk di Sudut      ──► Two-Tier NMS (IoU Kelas 0.4 & Lintas-Kelas 0.75)
+5. Cacat Menumpuk di Sudut      ──► Two-Tier NMS (IoU Kelas 0.4 & Lintas-Kelas 0.90)
 6. Cacat di Belakang Kartu      ──► Dual-Side Inspection (Depan + Belakang)
 ```
 
@@ -100,10 +100,10 @@ Untuk menjamin akurasi tanpa membebani disk I/O, seluruh operasi pra-pemrosesan 
 3. Koordinat 4 sudut kartu diurutkan secara deterministik (*top-left, top-right, bottom-right, bottom-left*) melalui fungsi `_order_points`.
 4. Dilakukan transformasi perspektif (*perspective warp*) ke ukuran standar kartu 600×837 piksel (rasio 63:88) ditambah **margin luar 120 piksel** dengan warna `(20, 20, 22)`. Margin ini krusial agar model dapat melihat kontras tepi luar kartu secara utuh.
 
-### B. Rounded-Card Silhouette Masking (Radius 3.2 mm)
-Jika foto diambil di atas latar putih, sistem menerapkan mask siluet khusus berbentuk persegi panjang dengan sudut membulat:
+### B. Rounded-Card Silhouette Masking (Radius 3.2 mm, `shrink=-6`)
+Jika foto diambil di atas latar putih, sistem menerapkan mask siluet khusus berbentuk persegi panjang dengan sudut membulat serta kelonggaran `shrink=-6` agar tepi luar kartu tetap terinspeksi:
 $$\text{Radius Lengkung} = \text{round}\left(w_{card} \times \frac{3.2\text{ mm}}{63.0\text{ mm}}\right) \approx 30.5\text{ piksel}$$
-Mask ini memotong bersih area luar kartu, melenyapkan 100% segitiga latar belakang putih pada sudut kartu sehingga menghilangkan *false positive* pada kelas *Corner Wear*.
+Mask ini memotong bersih area luar kartu, melenyapkan segitiga latar belakang putih pada sudut kartu sehingga menghilangkan *false positive* pada kelas *Corner Wear* tanpa memangkas aus tepi.
 
 ### C. Veiling Glare Normalization
 Pada latar terang, nilai intensitas kanal L (*Lightness*) dianalisis menggunakan persentil:
@@ -125,7 +125,7 @@ $$\text{Sharpness} = \text{Var}(\nabla^2 I_{gray})$$
 Deteksi cacat fisik sering menghasilkan kotak deteksi bertumpuk karena fitur keausan tepi dan sudut saling bersinggungan. REGOKEMON menerapkan deduplikasi bertingkat:
 
 1. **Tier 1 (Per-Class NMS):** Menghapus *bounding box* redundan pada kelas yang sama dengan ambang batas $\text{IoU} > 0.40$.
-2. **Tier 2 (Cross-Class NMS Deduplication):** Menyaring kotak deteksi antar-kelas yang menempati lokasi fisik yang hampir identik dengan ambang batas $\text{IoU} > 0.75$. Kotak dengan skor keyakinan (*confidence*) tertinggi dipertahankan.
+2. **Tier 2 (Cross-Class NMS Deduplication):** Menyaring kotak deteksi antar-kelas yang menempati lokasi fisik yang hampir identik dengan ambang batas $\text{IoU} > 0.90$. Kotak dengan skor keyakinan (*confidence*) tertinggi dipertahankan.
 3. **Border Ratio Filtering:** Cacat bertipe *Edge Wear* dan *Corner Wear* diverifikasi koordinat pusatnya. Jika berada di area tengah kartu ($> 25\%$ dari tepi terluar), deteksi dibuang karena secara fisik tidak mungkin terjadi keausan tepi di bagian tengah kartu.
 
 ---
@@ -142,8 +142,9 @@ Kondisi fisik kartu Pokémon tidak dapat dinilai secara akurat hanya dari tampak
 
 * Sistem menerima payload dua sisi melalui endpoint `POST /analyze` atau `POST /cards/{card_id}/condition`.
 * Seluruh cacat depan dan belakang diagregasikan ke dalam objek `ConditionReport`:
-  - `front_defects`: Rincian cacat tampak depan beserta koordinat kotak.
-  - `back_defects`: Rincian cacat tampak belakang.
+  - `front_defects`: Rincian cacat tampak depan beserta koordinat kotak (`x_pct`, `y_pct`, `width_pct`, `height_pct`).
+  - `back_defects`: Rincian cacat tampak belakang beserta koordinat kotak.
+  - `front_warped_image` & `back_warped_image`: Citra hasil *perspective alignment* (Data URL Base64) agar overlay *bounding box* di frontend sejajar presisi dengan koordinat inferensi model.
   - `defect_count`: Jumlah total cacat terverifikasi.
   - `has_defects`: Status boolean deteksi.
 
@@ -151,19 +152,26 @@ Kondisi fisik kartu Pokémon tidak dapat dinilai secara akurat hanya dari tampak
 
 ## 💰 7. Formula Depresiasi Nilai Wajar (F_condition)
 
-Cacat fisik yang terdeteksi dikonversikan menjadi pengali depresiasi nilai pasar wajar ($F_{condition}$) di dalam [`backend/app/analytics_engine.py`](../backend/app/analytics_engine.py):
+Cacat fisik yang terdeteksi dikonversikan menjadi pengali depresiasi nilai pasar wajar proporsional ($F_{condition}$) di dalam [`backend/app/analytics_engine.py`](../backend/app/analytics_engine.py):
 
-| Kategori Kondisi | Kriteria Cacat Terdeteksi | Nilai $F_{condition}$ | Potongan Harga | Klasifikasi Pasar Kolektor |
-| :--- | :--- | :---: | :---: | :--- |
-| **Near Mint / Mint** | Tanpa cacat fisik (0 defect) | **1.00** | 0% | Kartu mulus sempurna seperti baru keluar dari booster pack. |
-| **Lightly Played (LP)** | Terdeteksi goresan permukaan (*Scratch*) | **0.85** | 15% | Goresan halus pada permukaan foil tanpa kerusakan struktur. |
-| **Moderately Played (MP)** | Terdeteksi keausan tepi (*Edge*) atau sudut (*Corner*) | **0.80** | 20% | Kikisan putih pada tepi kartu akibat pemakaian bermain. |
-| **Heavily Played (HP)** | Terdeteksi kartu tertekuk / lekukan (*Crease / Bent*) | **0.65** | 35% | Struktur kartu mengalami lipatan atau lekukan fisik. |
-| **Damaged** | Akumulasi cacat berat ganda di kedua sisi | **0.40** (Batas Bawah) | Hingga 60% | Kerusakan parah menyeluruh pada permukaan dan sudut. |
+| Jenis Cacat Fisik | Potongan per Titik | Batas Maksimal Penalti | Keterangan Penilaian |
+| :--- | :---: | :---: | :--- |
+| **Tanpa Cacat (`Clean`)** | **0%** | 0% | Multiplier **1.00** (*Near Mint / Mint*) |
+| **Scratch** | **5%** | 20% | Goresan permukaan foil |
+| **Corner Wear** | **6%** | 24% | Kikisan putih pada sudut kartu |
+| **Edge Wear** | **8%** | 25% | Aus gesekan pada tepi kartu |
+| **Bent / Crease** | **25%** | 40% | Kerusakan struktur lipatan / tekukan berat |
 
-### Formula Multiplikatif:
-$$F_{condition} = \max\left(0.40,\ \text{round}\left(1.00 \times \prod \text{Penalty}_{i},\ 2\right)\right)$$
-* Diskon pasar terhitung: $\text{Discount}\% = (1.0 - F_{condition}) \times 100\%$
+### Formula Akumulasi & Klasifikasi Tier:
+$$\text{Total Discount} = \min\left(0.60,\ \text{Penalti}_{crease} + \text{Penalti}_{edge} + \text{Penalti}_{corner} + \text{Penalti}_{scratch} + \text{Penalti}_{other}\right)$$
+$$F_{condition} = \text{round}\left(\max(0.40,\ 1.00 - \text{Total Discount}),\ 2\right)$$
+* **Tier Kondisi Otomatis:**
+  * $F_{condition} \ge 0.95$: **Near Mint / Mint**
+  * $F_{condition} \ge 0.80$: **Lightly Played (LP)**
+  * $F_{condition} \ge 0.65$: **Moderately Played (MP)**
+  * $F_{condition} \ge 0.50$: **Heavily Played (HP)**
+  * $F_{condition} < 0.50$: **Damaged** *(floor multiplier 0.40, diskon maks. 60%)*
+* Diskon pasar terhitung: $\text{Discount}\% = \text{round}((1.0 - F_{condition}) \times 100,\ 2)\%$
 * Skor Kondisi Fisik (*Condition Score*): $\text{Score}\% = F_{condition} \times 100\%$
 
 ---
@@ -195,11 +203,11 @@ Berikut perbandingan performa pengujian empiris berbagai iterasi model deteksi c
 
 ### Q2: *"Bagaimana sistem menjaga kestabilan memori saat memproses gambar resolusi tinggi?"*
 > **Penjelasan Teknis:**  
-> Sistem menerapkan pembatasan resolusi adaptif `resize_image_if_oversized` dengan batas dimensi maksimum 1280 px di sisi server, serta kompresi awal di browser via HTML5 Canvas (JPEG kualitas 0.88). Hal ini memangkas ukuran payload hingga 97% sebelum gambar dikirim ke backend. Selain itu, seluruh proses warping dan masking dieksekusi di memori RAM tanpa penulisan file temporer ke disk, mencegah *disk thrashing* dan fragmentasi memori.
+> Sistem menerapkan pembatasan resolusi adaptif `resize_image_if_oversized` dengan batas dimensi maksimum **2048 px** di sisi server, serta kompresi awal di browser via HTML5 Canvas (resolusi maks. **2048 px**, JPEG kualitas **0.94** untuk upload foto inspeksi). Kompromi resolusi ini menjaga detail goresan dan aus tepi mikro tetap tajam saat didownscale oleh YOLO 800 px sekaligus menekan payload jauh di bawah foto mentah 10–15 MB. Selain itu, seluruh proses warping dan masking dieksekusi di memori RAM tanpa penulisan file temporer ke disk, mencegah *disk thrashing* dan fragmentasi memori.
 
 ---
 
-### Q3: *"Bagaimana mekanisme fallback jika bobot model lokal tidak ditemukan?"*
+### Q3: *"Bagaimana mekanisme fallback jika bobot model lokal tidak ditemukan atau CUDA bermasalah?"*
 > **Penjelasan Teknis:**  
-> Modul `backend/models/card_condition.py` mengimplementasikan fungsi `resolve_defect_model_path`. Jika file bobot Model V6 tidak ditemukan di disk, sistem secara otomatis mencoba memuat Model V5. Jika kedua bobot lokal tidak tersedia, sistem beralih secara transparan ke *Roboflow Cloud Inference API* jika variabel `ROBOFLOW_API_KEY` terkonfigurasi di `.env`, atau melewati penilaian cacat tanpa menyebabkan server berhenti beroperasi (*graceful degradation*).
+> Modul `backend/models/card_condition.py` mengimplementasikan fungsi `resolve_defect_model_path`. Jika file bobot Model V6 tidak ditemukan di disk, sistem secara otomatis mencoba memuat Model V5. Jika kedua bobot lokal tidak tersedia, sistem beralih ke *Roboflow Cloud Inference API* apabila variabel `ROBOFLOW_API_KEY` terkonfigurasi di `.env`, atau melewati penilaian cacat tanpa menyebabkan server berhenti beroperasi (*graceful degradation*). Selain itu, saat inferensi lokal di GPU gagal karena `torchvision::nms` belum dikompilasi untuk backend CUDA di perangkat target, `cv_service.py` dan `card_condition.py` otomatis melakukan *fallback* ke `device="cpu"`.
 

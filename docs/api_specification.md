@@ -7,7 +7,7 @@
 > **Versi API:** `3.1.0`  
 > **Dokumentasi Interaktif:** `/docs` (Swagger UI) & `/redoc` (ReDoc)  
 > **Kebijakan CORS:** Whitelist asal terpercaya (`http://localhost:5173`, `http://localhost:3000`, `http://localhost:8000`), regex subdomain Vercel (`https://*.vercel.app`), dan konfigurasi variabel lingkungan `ALLOWED_ORIGINS`.  
-> **Proteksi Keamanan:** Batas ukuran payload maksimum 15 MB (File & Base64) serta in-memory sliding window rate limiting (60 req/menit per IP) untuk seluruh endpoint komputasi AI.  
+> **Proteksi Keamanan:** Batas ukuran payload maksimum 15 MB (File & Base64) serta *in-memory sliding window rate limiting* terpisah: **300 req/menit** untuk endpoint scanner kamera ringan (`/identify`, `/upload/identify`) dan **60 req/menit** untuk endpoint AI berat (`/analyze`, `/forecast`, `/condition`).  
 
 ---
 
@@ -41,23 +41,24 @@ REST API Regokemon dirancang menggunakan framework **FastAPI** dengan arsitektur
 
 ### Base URL
 * **Lingkungan Pengembangan Lokal:** `http://127.0.0.1:8000`
-* **Frontend Client Config:** [`frontend/src/config/api.js`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/frontend/src/config/api.js) membaca variabel lingkungan `VITE_API_BASE_URL`.
+* **Frontend Client Config:** [`frontend/src/config/api.js`](../frontend/src/config/api.js) membaca variabel lingkungan `VITE_API_BASE_URL`.
 
 ### Kebijakan Keamanan (Security Hardening)
 1. **CORS Whitelist Terbatas:**
    * Menolak wildcard tidak aman `*` saat menggunakan credentials.
-   * Default origins: `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:3000`, `http://localhost:8000`.
+   * Default origins: `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:3000`, `http://127.0.0.1:3000`, `http://localhost:8000`, `http://127.0.0.1:8000`.
    * Mendukung regex subdomain Vercel: `^https:\/\/.*\.vercel\.app$`.
    * Mendukung domain kustom melalui variabel lingkungan `ALLOWED_ORIGINS` (dipisahkan tanda koma).
 2. **Pembatasan Ukuran Unggahan (Payload Size Limit):**
    * Berkas multipart maksimum: **15 MB** (`MAX_FILE_SIZE_BYTES = 15.728.640 bytes`).
    * String Base64 maksimum: **22 MB karakter** (~15 MB data biner citra).
    * Pelanggaran ukuran menghasilkan respons **HTTP 413 Payload Too Large**.
-3. **Rate Limiting (Sliding Window):**
-   * Endpoint inferensi AI berat diproteksi secara in-memory: default **60 request per menit per alamat IP client** (dapat diatur via `RATE_LIMIT_AI_PER_MINUTE`).
+3. **Rate Limiting Terpisah (Sliding Window):**
+   * **Jalur Scanner Kamera Ringan (`identify`):** `/identify` dan `/upload/identify` (CLIP ViT-B/32 sub-milidetik) dilindungi dengan kuota default **300 request per menit per IP** (`RATE_LIMIT_IDENTIFY_PER_MINUTE`) agar *realtime streaming* kamera tidak terputus HTTP 429.
+   * **Jalur AI Berat (`heavy`):** `/analyze`, `/upload/analyze`, `/cards/{card_id}/forecast`, `/cards/{card_id}/condition`, dan `/upload/cards/{card_id}/condition` dilindungi dengan kuota default **60 request per menit per IP** (`RATE_LIMIT_AI_PER_MINUTE`).
    * Pelanggaran laju menghasilkan **HTTP 429 Too Many Requests** disertai header standar `Retry-After: <detik>`.
 4. **Offline Resilience (Ketahanan Offline):**
-   * Seluruh endpoint katalog (`/cards`, `/sets`, `/cards/{id}/history`, `/dashboard`) otomatis fallback ke data master lokal (`backend/dataset/pokemon_cards_dataset_cleaned.csv`) jika koneksi ke Supabase terputus.
+   * Seluruh endpoint katalog (`/cards`, `/sets`, `/cards/{id}/history`, `/dashboard`) otomatis fallback ke data master lokal (`backend/dataset/pokemon_cards_dataset_cleaned.csv`) melalui `offline_service.py` jika koneksi ke Supabase terputus.
 
 ---
 
@@ -67,17 +68,17 @@ REST API Regokemon dirancang menggunakan framework **FastAPI** dengan arsitektur
 | :---: | :---: | :--- | :--- | :---: | :---: |
 | 1 | `GET` | `/` | Informasi status layanan, versi API, dan daftar endpoint | Tidak Ada | Bebas |
 | 2 | `GET` | `/health` | Healthcheck kesiapan engine AI, database, dan kurs | Tidak Ada | Bebas |
-| 3 | `POST` | `/identify` | Identifikasi cepat Model 1 On-Cam (Live Camera HUD) | JSON (Base64) | 15 MB / Rate Limit |
-| 4 | `POST` | `/upload/identify` | Identifikasi cepat Model 1 On-Cam versi berkas multipart | Multipart Form | 15 MB / Rate Limit |
-| 5 | `POST` | `/analyze` | Analisis komprehensif dua sisi (Model 1 + Model 2 YOLO) | JSON (Base64) | 15 MB / Rate Limit |
-| 6 | `POST` | `/upload/analyze` | Analisis komprehensif dua sisi versi berkas multipart | Multipart Form | 15 MB / Rate Limit |
+| 3 | `POST` | `/identify` | Identifikasi cepat Model 1 On-Cam (Live Camera HUD) | JSON (Base64) | 15 MB / 300 req/menit |
+| 4 | `POST` | `/upload/identify` | Identifikasi cepat Model 1 On-Cam versi berkas multipart | Multipart Form | 15 MB / 300 req/menit |
+| 5 | `POST` | `/analyze` | Analisis komprehensif dua sisi (Model 1 + Model 2 YOLO) | JSON (Base64) | 15 MB / 60 req/menit |
+| 6 | `POST` | `/upload/analyze` | Analisis komprehensif dua sisi versi berkas multipart | Multipart Form | 15 MB / 60 req/menit |
 | 7 | `GET` | `/cards` | Eksplorasi katalog kartu (search, filter, pagination, sorting) | Query Params | Offline CSV Fallback |
 | 8 | `GET` | `/sets` | Daftar seluruh ekspansi set rilis kartu Pokémon (172 set) | Query Params | Offline CSV Fallback |
 | 9 | `GET` | `/cards/{card_id}/history` | Riwayat transaksi harga harian untuk visualisasi grafik | Path Param | Offline CSV Fallback |
-| 10 | `GET` | `/cards/{card_id}/forecast` | Peramalan harga 7 hari Amazon Chronos-Bolt (P10, P50, P90) | Path Param | Rate Limit |
-| 11 | `POST` | `/cards/{card_id}/condition` | Penilaian cacat fisik kartu standalone via Base64 | JSON (Base64) | 15 MB / Rate Limit |
-| 12 | `POST` | `/upload/cards/{card_id}/condition` | Penilaian cacat fisik kartu standalone via Multipart | Multipart Form | 15 MB / Rate Limit |
-| 13 | `GET` | `/dashboard` | Agregasi data trending, total kartu (20.617), dan total set (172) | Tidak Ada | Offline CSV Fallback |
+| 10 | `GET` | `/cards/{card_id}/forecast` | Peramalan harga 7 hari Amazon Chronos-Bolt (P10, P50, P90) | Path Param | 60 req/menit |
+| 11 | `POST` | `/cards/{card_id}/condition` | Penilaian cacat fisik kartu standalone via Base64 | JSON (Base64) | 15 MB / 60 req/menit |
+| 12 | `POST` | `/upload/cards/{card_id}/condition` | Penilaian cacat fisik kartu standalone via Multipart | Multipart Form | 15 MB / 60 req/menit |
+| 13 | `GET` | `/dashboard` | Agregasi dashboard pasar, leaderboard, rarity, era index, & likuiditas | Tidak Ada | Offline CSV Fallback |
 | 14 | `GET` | `/currency` | Informasi status kurs live USD ke IDR dari cache RAM | Tidak Ada | Bebas |
 
 ---
@@ -200,22 +201,17 @@ Endpoint pemindaian kamera langsung (On-Cam). Menerima Base64 citra kartu, menja
 }
 ```
 
-* **Response (200 OK - Kasus Ambigu / Confidence Gating < 60.0%):**
-Jika skor keyakinan kartu di bawah ambang batas toleransi 60%, API mengembalikan status `"ambiguous"` agar frontend dapat menginstruksikan pengguna untuk menyesuaikan posisi/pencahayaan:
+* **Response (200 OK - Kasus Ambigu / Confidence Gating < 45.0%):**
+Jika skor keyakinan kartu di bawah ambang batas toleransi 45% (setelah *Conditional Lazy Orientation Fallback* diuji pada skor < 48%), API mengembalikan status `"ambiguous"` agar frontend dapat menginstruksikan pengguna untuk menyesuaikan posisi/pencahayaan:
 ```json
 {
   "status": "ambiguous",
-  "message": "Kartu tidak dapat diidentifikasi secara meyakinkan (Keyakinan: 54.2% < 60.0%). Silakan dekatkan kartu atau perjelas pencahayaan.",
-  "confidence_percentage": 54.2,
-  "confidence_label": "Ambiguous / Retake Needed",
-  "candidates": [
-    {
-      "rank": 1,
-      "card_id": "sv8-116",
-      "name": "Koraidon",
-      "confidence_percentage": 54.2
-    }
-  ]
+  "message": "Kartu belum teridentifikasi jelas. Posisikan kartu tegak lurus di tengah kotak panduan.",
+  "card_id": null,
+  "name": null,
+  "confidence_percentage": 38.5,
+  "confidence_label": "Rendah",
+  "execution_time_ms": 124.2
 }
 ```
 
@@ -253,18 +249,42 @@ Mengembalikan seluruh atribut `IdentifyResponse` ditambah objek kondisi fisik da
       {
         "label": "Scratch",
         "confidence": 0.72,
-        "bbox": { "x": 300.0, "y": 420.0, "width": 85.0, "height": 12.0 }
+        "bbox": {
+          "x": 300.0,
+          "y": 420.0,
+          "width": 85.0,
+          "height": 12.0,
+          "x_pct": 35.71,
+          "y_pct": 39.0,
+          "width_pct": 10.12,
+          "height_pct": 1.11,
+          "img_width": 840,
+          "img_height": 1077
+        }
       }
     ],
     "back_defects": [
       {
         "label": "Corner Wear",
         "confidence": 0.64,
-        "bbox": { "x": 580.0, "y": 35.0, "width": 24.0, "height": 20.0 }
+        "bbox": {
+          "x": 580.0,
+          "y": 145.0,
+          "width": 24.0,
+          "height": 20.0,
+          "x_pct": 69.05,
+          "y_pct": 13.46,
+          "width_pct": 2.86,
+          "height_pct": 1.86,
+          "img_width": 840,
+          "img_height": 1077
+        }
       }
     ],
     "defects": [],
-    "evaluation_status": "evaluated"
+    "evaluation_status": "evaluated",
+    "front_warped_image": "data:image/jpeg;base64,/9j/4AAQSkZJRg...",
+    "back_warped_image": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
   },
   "market_analytics": {
     "predicted_fair_value_usd": 15.72,
@@ -411,9 +431,16 @@ Endpoint peramalan harga probabilistik 7 hari ke depan menggunakan Amazon Chrono
   "signal_reason": "Harga saat ini ($85.00) berada di bawah median wajar H+7 ($91.50) dengan tren akumulasi positif.",
   "mispricing_gap_pct": -7.1,
   "ai_confidence_pct": 91.4,
+  "quantile_ribbon": {
+    "future_dates": ["2026-11-16", "...", "2026-11-22"],
+    "p10": [82.50, "...", 84.00],
+    "p50": [86.20, "...", 91.50],
+    "p90": [90.10, "...", 99.20]
+  },
   "currency_rate": 16500.0
 }
 ```
+*(Catatan: `ai_confidence_pct` bernilai `null` apabila inferensi menggunakan fallback regresi tabular saat riwayat deret waktu < 5 hari).*
 
 ---
 
@@ -470,7 +497,7 @@ Versi Multipart Form-Data untuk evaluasi kondisi fisik standalone.
 ### F. Layanan Dashboard & Valuta Asing
 
 #### 13. `GET /dashboard`
-Mengambil data kartu trending dan total agregasi statistik katalog untuk widget dashboard pasar.
+Mengambil data kartu trending (Top Weekly Price Gainers) beserta agregasi analitika statistik katalog secara penuh untuk seluruh widget pada halaman Dashboard.
 * **Response (200 OK):**
 ```json
 {
@@ -480,8 +507,10 @@ Mengambil data kartu trending dan total agregasi statistik katalog untuk widget 
       "card_id": "base1-4",
       "name": "Charizard",
       "rarity": "Rare Holo",
-      "holo": "Normal Print",
+      "holo": "Holo Print",
       "price": "$ 285.50",
+      "gain_pct": "+14.2%",
+      "gain_numeric": 14.2,
       "image": "https://images.pokemontcg.io/base1/4_hires.png",
       "setIcon": "/base1-logo.png",
       "flagIcon": "US"
@@ -489,6 +518,27 @@ Mengambil data kartu trending dan total agregasi statistik katalog untuk widget 
   ],
   "total_cards": 20617,
   "total_sets": 172,
+  "liquidity": {
+    "active_cards": 19686,
+    "total_cards": 20617,
+    "liquidity_pct": 95.5,
+    "status": "HIGH LIQUIDITY"
+  },
+  "character_leaderboard": [
+    { "rank": 1, "pokemon": "Rayquaza", "medianUsd": 14.5, "medianIdr": "Rp 239.250", "sampleCount": 82, "tag": "Grail Tier" }
+  ],
+  "rarity_production": [
+    { "name": "Common", "percent": 31.2, "count": "6.432 kartu", "color": "#4b5e94" }
+  ],
+  "chase_packs": [
+    { "set_id": "sv3pt5", "title": "Pokemon 151", "theme": "tm-yellow", "layout": "tm-grid-2x2", "cards": [] }
+  ],
+  "era_trend_index": [
+    { "year": "2026", "vintage": 51.9, "midEra": 32.74, "modern": 10.29 }
+  ],
+  "feature_impact": [
+    { "feature": "Rarity Tier", "impact": 48.3, "label": "0.483 (Utama)" }
+  ],
   "is_offline_fallback": false
 }
 ```
@@ -510,7 +560,7 @@ Mengambil informasi status kurs live USD ke IDR yang aktif digunakan dalam perhi
 
 ## 🧱 5. Skema Objek Data Bersama (Shared Schemas)
 
-Berikut definisi tipe Pydantic utama di [`backend/app/schemas.py`](file:///d:/Career/Semester%205/Project%20Analitika%20Data/Proyek%20Pokemon/backend/app/schemas.py):
+Berikut definisi tipe Pydantic utama di [`backend/app/schemas.py`](../backend/app/schemas.py):
 
 * **`PricingDetails`:**
   * `base_price_usd` *(float)*: Harga pasar acuan awal kartu dalam kondisi mulus.
@@ -524,7 +574,14 @@ Berikut definisi tipe Pydantic utama di [`backend/app/schemas.py`](file:///d:/Ca
 * **`DefectItem`:**
   * `label` *(str)*: Jenis cacat fisik (`Card`, `Corner Wear`, `Edge Wear`, `Scratch`).
   * `confidence` *(float)*: Skor keyakinan model YOLO (0.0 s/d 1.0).
-  * `bbox` *(dict)*: Koordinat spasial `{ "x", "y", "width", "height" }`.
+  * `bbox` *(dict)*: Koordinat spasial & persentase relatif citra warped `{ "x", "y", "width", "height", "x_pct", "y_pct", "width_pct", "height_pct", "img_width", "img_height" }`.
+
+* **`ConditionReport`:**
+  * `condition_tier` *(str)*: Kategori kondisi fisik (`Near Mint / Mint`, `Lightly Played (LP)`, `Moderately Played (MP)`, `Heavily Played (HP)`, `Damaged`).
+  * `has_defects` *(bool)* & `defect_count` *(int)*.
+  * `front_defects` / `back_defects` / `defects` *(List[DefectItem])*.
+  * `evaluation_status` *(str)*: `evaluated`, `bypassed_oncam`, atau `error`.
+  * `front_warped_image` / `back_warped_image` *(str, opsional)*: Data URL Base64 citra hasil *perspective alignment* untuk rendering overlay *bounding box* yang akurat di frontend.
 
 ---
 
@@ -536,5 +593,5 @@ API mengimplementasikan kode status HTTP standar:
 * **`404 Not Found`:** `card_id` atau data kartu tidak ditemukan di database dan fallback master.
 * **`413 Payload Too Large`:** Ukuran berkas unggahan atau string Base64 melebihi batas maksimum 15 MB.
 * **`422 Unprocessable Entity`:** Struktur payload JSON tidak memenuhi spesifikasi skema Pydantic.
-* **`429 Too Many Requests`:** Melebihi kuota pemanggilan (rate limit) inferensi AI (maksimum 60 req/menit per IP). Disertai header `Retry-After`.
+* **`429 Too Many Requests`:** Melebihi kuota pemanggilan (*rate limit*) inferensi AI (maksimum **300 req/menit** untuk `/identify` & `/upload/identify`; **60 req/menit** untuk endpoint AI berat per IP). Disertai header `Retry-After`.
 * **`500 Internal Server Error`:** Terjadi kegagalan internal pada server backend atau pemrosesan model AI.

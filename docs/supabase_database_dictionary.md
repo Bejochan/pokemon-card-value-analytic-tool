@@ -205,15 +205,15 @@ CREATE INDEX IF NOT EXISTS idx_price_history_date ON public.card_price_history(r
  └────────────────────────────────────────────────────────────────────────┘
                                                               │
                                                               ▼
- [ Model 2: YOLOv8 Grader ] ──(F_condition: 0.85)──► [ Analytics Valuation ]
+ [ Model 2: YOLO26s Grader ] ──(F_condition: 0.95)──► [ Analytics Valuation ]
                                                               │
                                                               ▼
                                                [ Rekomendasi BUY / HOLD / SELL ]
 ```
 
 1. **Inferensi Model 1 (CLIP):** Mengembalikan `card_id` kartu dengan skor kemiripan visual tertinggi.
-2. **Pencarian Cepat Supabase:** Backend FastAPI menarik data `effective_market_price` ($P_{base}$), `release_year`, dan `rarity` dari tabel `card_prices`, serta deret waktu historis dari `card_price_history`.
-3. **Pemeriksaan Cacat Fisik Model 2 (YOLOv8):** Menilai cacat fisik (Scratched, Bent, Edge Wear) untuk mengoreksi nilai wajar kondisi aktual ($P_{final}$).
+2. **Pencarian Cepat Supabase:** Backend FastAPI menarik data `effective_market_price` ($P_{base}$), `release_year`, dan `rarity` dari tabel `card_prices`, serta deret waktu historis dari `card_price_history`. (Jika Supabase tidak terjangkau, modul `offline_service.py` otomatis membaca data master lokal CSV).
+3. **Pemeriksaan Cacat Fisik Model 2 (YOLO26s 800px):** Menilai cacat fisik (Scratch, Corner Wear, Edge Wear) pada tampak depan dan belakang untuk mengoreksi nilai wajar kondisi aktual ($P_{final}$).
 4. **Peramalan & Sinyal Model 3 (Amazon Chronos-Bolt):** Memproyeksikan pita kuantil dinamis 7 hari (P10, P50, P90) dan menghasilkan sinyal preskriptif BUY/HOLD/SELL berdasarkan posisi harga terhadap lorong valuasi.
 
 ---

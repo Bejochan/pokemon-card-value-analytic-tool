@@ -71,8 +71,8 @@ Berdasarkan hasil Data Quality Audit pada 20.617 kartu:
 1. **Model 1: Card Identifier (CLIP ViT-B-32 + FAISS Vector Search):**
    - Menghubungkan hasil pencarian visual FAISS (berdasarkan `compressed_images/*.jpg`) kembali ke `card_id` pada database/CSV ini untuk menarik seluruh informasi metadata kartu.
    - Dokumentasi: [`docs/clip_model_architecture_and_rationale.md`](clip_model_architecture_and_rationale.md).
-2. **Model 2: Condition Grader (YOLOv8):**
-   - Menghasilkan pengali kondisi fisik (F_condition) yang memotong nilai dari P_base di database.
+2. **Model 2: Condition Grader (YOLO26s 800px):**
+   - Menghasilkan pengali kondisi fisik (F_condition) yang memotong nilai dari P_base di database menggunakan aturan diskon proporsional per titik cacat.
 3. **Model 3: Time-Series Forecaster (Amazon Chronos-Bolt Mini):**
    - Mengambil deret waktu harga historis dari tabel `card_price_history`, melakukan standardisasi kalender harian (forward-fill), dan menghasilkan proyeksi probabilistik 7 hari ke depan (pita kuantil P10, P50, P90) serta sinyal preskriptif BUY/HOLD/SELL.
    - Dokumentasi: [`docs/chronos_model_architecture_and_rationale.md`](chronos_model_architecture_and_rationale.md).
