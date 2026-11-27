@@ -33,10 +33,10 @@ Sistem ini memecahkan empat tantangan utama ekosistem kartu koleksi (TCG):
 
 | No | Nama Mahasiswa | NRP | Akun GitHub | Peran Utama dalam Proyek |
 | :---: | :--- | :---: | :---: | :--- |
-| 1 | **Adnan Oktar** | `3324600039` | `Bejochan` | Arsitektur Backend FastAPI, Model 1 (`CLIP + FAISS + ORB`), Docker & CI/CD |
-| 2 | **Tegar Maulana Kusuma** | `3324600053` | `tegarkusuma12` | Model 2 (`YOLO26s` Condition Grader), EDA Dataset Roboflow v5, Halaman Marketplace |
-| 3 | **Udi Adhahaska Arta Ananta** | `3324600052` | `Kyouji Prinz` | Analitika Dashboard 6 Modul, Offline CSV Fallback Service, Kurs Live & UI Scanner |
-| 4 | **Faruq Iqbal Suhail** | `3324600049` | `GumdropAngel` | Desain Antarmuka Frontend (Modal Detail Catalog, Marketplace, Tata Letak Visual) |
+| 1 | **Adnan Oktar** | `3324600039` | `Bejochan` | Pipeline Dataset & Supabase, FastAPI/Security, Model 1 (CLIP+FAISS+ORB) & Chronos, HoloCard3D, serta Docker & CI/CD |
+| 2 | **Tegar Maulana Kusuma** | `3324600053` | `tegarkusuma12` | Model 2 (YOLO26s & Preprocessing), Notebook Forecasting & Valuasi, Agregasi Backend Dashboard, serta Fitur Marketplace |
+| 3 | **Udi Adhahaska Arta Ananta** | `3324600052` | `Kyouji Prinz` | UI ScannerDashboard, Dashboard 6 Modul & Catalog, Offline CSV Fallback, Kurs Live USD-IDR, Vercel SPA, & EDA Harga |
+| 4 | **Faruq Iqbal Suhail** | `3324600049` | `GumdropAngel` | Inisiasi Fondasi UI React, Layout Grafik Dashboard & Catalog, Modal Detail Kartu, serta Halaman Marketplace Awal |
 
 ---
 
@@ -178,6 +178,8 @@ P_final = P_base * M_variant * F_condition
 | **Waktu Respons End-to-End `POST /identify`** | **300,8 ms (GPU) / 469,1 ms (Docker CPU)** | Pengujian 3x pasca-warmup pada Intel Core i7-12650H + RTX 2050 |
 | **Waktu Respons End-to-End `POST /analyze`** | **~1,37 s (GPU) / ~1,52 s (Docker CPU)** | Identifikasi + deteksi cacat 2 sisi + valuasi (`1,08 s` mode fallback CSV Docker) |
 | **Waktu Respons `GET /cards/.../forecast`** | **658,2 ms (GPU) / 237,6 ms (Docker)** | Termasuk kueri riwayat; `11 ms` pada mode fallback lokal DevTools |
+| **Inferensi Komponen Standalone Model 1** | **~18 ms (GPU) / ~83 ms (CPU)** | Stream `card_identifier_realtime.py` (30+ FPS *Async Worker*) + FAISS `< 1 ms` |
+| **Inferensi Komponen Model 3 (Chronos-Bolt)** | **~25-35 ms (GPU) / ~180 ms (CPU)** | Proyeksi multi-kuantil 7 hari (`P10`, `P50`, `P90`) per kartu |
 | **Ukuran Payload & Dimensi Vektor** | **2048 px Upload / 448x625 Live \| 512-D FAISS** | `IndexFlatIP` untuk 20.617 kartu (~40,3 MB di disk) |
 | **Cakupan Dataset Katalog & Sinkronisasi** | **20.617 Kartu / 172 Set** | `19.686` kartu (`95,48%`) harga aktif; cron harian GitHub Actions |
 
@@ -189,9 +191,11 @@ P_final = P_base * M_variant * F_condition
 | :--- | :---: | :--- |
 | **Katalog Kartu Bersih** | **20.617 baris** | Tersedia lokal di `backend/dataset/pokemon_cards_dataset_cleaned.csv` |
 | **Ekspansi Rilis (`sets`)** | **172 Set** | *Base Set* (1999) hingga ekspansi terbaru |
+| **Gambar Terkompresi** | **20.617 JPG** | Resolusi `640x640` Lanczos (`backend/dataset/compressed_images/`) |
 | **Dataset Deteksi Cacat** | **1.495 citra bersih (11.358 bbox)** | Roboflow `card-grader` v5 (`1.302 train`, `122 valid`, `71 test`) |
 | **Tabel Relasional PostgreSQL** | **4 Tabel** | `sets`, `cards`, `card_prices`, `card_price_history` ([`docs/schema.sql`](docs/schema.sql)) |
 | **Cakupan Harga Efektif** | **95,48% (19.686 kartu)** | Sinkronisasi harian otomatis melalui `.github/workflows/daily_price_cron.yml` |
+| **Median Harga Pasar** | **$0,96 (~Rp14.880)** | 50% kartu berada pada <= $1 USD (*Right-Skewed*, mean $22,56) |
 
 > **Dokumentasi Teknis Lengkap:**
 > * [`docs/clip_model_architecture_and_rationale.md`](docs/clip_model_architecture_and_rationale.md) : Arsitektur & rasional Model 1 (`CLIP ViT-B/32 + FAISS + ORB`)
@@ -328,12 +332,17 @@ Cara tercepat menjalankan seluruh layanan (**Backend FastAPI + 3 Model AI + Fron
 git clone https://github.com/Bejochan/pokemon-card-value-analytic-tool.git
 cd pokemon-card-value-analytic-tool
 
-# 2. Tarik image siap pakai dari Docker Hub lalu jalankan container
+# 2. Opsi A: Tarik image siap pakai dari Docker Hub lalu jalankan container
 docker compose pull
 docker compose up -d
 
-# 3. Pantau kesiapan healthcheck (tunggu hingga regokemon-backend berstatus healthy)
+# Opsi B: Bangun ulang image secara lokal dari source (membutuhkan bobot di backend/models/)
+# docker compose up -d --build
+
+# 3. Pantau kesiapan healthcheck, log runtime, dan uji endpoint health
 docker compose ps
+docker compose logs -f
+curl http://localhost:8000/health
 ```
 
 Akses aplikasi setelah container sehat:
@@ -420,13 +429,13 @@ Buka browser pada **`http://localhost:5173`** (Swagger UI backend tersedia di `h
 * **DASHBOARD (`#dashboard`):** Analitika pasar dinamis dari `GET /dashboard` (top weekly gainers, likuiditas pasar, distribusi kelangkaan, *chase packs*, *era value index*, dan leaderboard).
 * **MARKETPLACE (`#marketplace`):** Simulasi jual-beli koleksi terkalibrasi nilai pasar wajar.
 
-#### 5. Menjalankan Skrip Demo Desktop & Pengujian
+#### 5. Menjalankan Skrip Demo Desktop, Utilitas, & Pengujian
 * **Live Scanner HUD (Kamera Webcam / DroidCam):**
-  Atur `CAMERA_SOURCE=0` (webcam) atau URL DroidCam pada `backend/.env`, lalu jalankan:
+  Atur `CAMERA_SOURCE=0` (webcam) atau `CAMERA_SOURCE=http://<IP_HP>:4747/video` (DroidCam) pada `backend/.env`, lalu jalankan:
   ```powershell
   python backend/models/card_identifier_realtime.py
   ```
-  Shortcut saat HUD berjalan: `[Spasi]` Freeze/Unfreeze, `[M]` Fullscreen, `[R]` Rotasi, `[F]` Autofokus, `[Q]` Keluar.
+  Shortcut saat HUD berjalan: `[Spasi]` Freeze/Unfreeze, `[M]` Fullscreen, `[R]` Rotasi (0°/90°/180°/270°), `[F]` Autofokus, `[Q]` Keluar.
 * **Pengujian Model 2 Condition Grader (CLI 2 Sisi):**
   ```powershell
   python backend/models/card_condition.py "path/ke/foto_depan.jpg" "path/ke/foto_belakang.jpg"
@@ -436,6 +445,11 @@ Buka browser pada **`http://localhost:5173`** (Swagger UI backend tersedia di `h
   python backend/test_security_hardening.py
   python backend/test_api_endpoints.py
   ```
+* **Skrip Utilitas Model & Sinkronisasi Harga:**
+  * Uji standalone Amazon Chronos-Bolt: `python backend/models/chronos_forecaster.py`
+  * Uji foto statis via GUI File Explorer / CLI: `python backend/models/card_identifier_manual.py`
+  * Bangun ulang indeks vektor FAISS: `python backend/models/build_card_index.py`
+  * Jalankan pelacak harga harian manual: `python backend/daily_price_tracker.py`
 
 ---
 
@@ -465,7 +479,7 @@ Buka browser pada **`http://localhost:5173`** (Swagger UI backend tersedia di `h
 * **Metadata Kartu & Harga Pasar:** [pokemontcg.io REST API](https://pokemontcg.io/)
 * **Vision Transformer Backbone (Model 1):** [OpenAI CLIP (OpenCLIP)](https://github.com/mlfoundations/open_clip)
 * **Dataset Cacat Fisik (Model 2):** [Roboflow Universe: Card Grader Dataset](https://universe.roboflow.com/group-6-major-project/card-grader/dataset/5) (`CC BY 4.0`)
-* **Dataset Referensi Tambahan (Model 2):** [GemSnipe Pokemon Centering Measurements](https://gemsnipe.com/)
+* **Dataset Referensi Tambahan (Model 2):** [GemSnipe Pokemon Centering Measurements](https://gemsnipe.com/) (Open-Source CC BY 4.0 via Contributor Issue #1)
 * **Time-Series Foundation Model (Model 3):** [Amazon Chronos-Bolt (AWS Research)](https://github.com/amazon-science/chronos-forecasting)
 * **Vector Retrieval Engine:** [Meta AI FAISS](https://github.com/facebookresearch/faiss)
 * **Cloud Database:** [Supabase PostgreSQL](https://supabase.com/)
