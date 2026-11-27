@@ -58,7 +58,9 @@ def test_rate_limiting():
     print(f"[*] Menguji Rate Limiter AI ({AI_RATE_LIMIT_PER_MINUTE} req/menit)...")
     hit_429 = False
     for i in range(AI_RATE_LIMIT_PER_MINUTE + 5):
-        res = client.get("/cards/base1-4/forecast")
+        # Pakai validasi ringan pada endpoint heavy agar uji rate limiter tidak memicu
+        # 60x kueri Supabase / inferensi Chronos yang berisiko melewati jendela 60 detik.
+        res = client.post("/cards/base1-4/condition", json={})
         if res.status_code == 429:
             hit_429 = True
             print(f"[PASS] Rate Limiter AI sukses memblokir spam pada request ke-{i+1}: 429 Too Many Requests!")

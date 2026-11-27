@@ -23,6 +23,7 @@ import torch
 
 _chronos_pipeline = None
 _chronos_lock = threading.Lock()
+_chronos_load_failed = False
 
 
 def get_chronos_pipeline():
@@ -31,10 +32,10 @@ def get_chronos_pipeline():
     Model hanya dimuat ke memori VRAM/RAM saat inferensi pertama kali dipanggil,
     sehingga waktu startup server FastAPI tetap instan (< 1 detik) dan aman dari race condition.
     """
-    global _chronos_pipeline
-    if _chronos_pipeline is None:
+    global _chronos_pipeline, _chronos_load_failed
+    if _chronos_pipeline is None and not _chronos_load_failed:
         with _chronos_lock:
-            if _chronos_pipeline is None:
+            if _chronos_pipeline is None and not _chronos_load_failed:
                 try:
                     print("[INFO] [Chronos Engine] Memuat bobot model Amazon Chronos-Bolt...")
                     from chronos import ChronosBoltPipeline  # type: ignore
@@ -46,6 +47,7 @@ def get_chronos_pipeline():
                     )
                     print(f"[OK] [Chronos Engine] Amazon Chronos-Bolt siap digunakan pada device: {device.upper()}!")
                 except Exception as e:
+                    _chronos_load_failed = True
                     print(f"[ERROR] [Chronos Engine] Gagal memuat Amazon Chronos-Bolt: {e}")
                     return None
     return _chronos_pipeline
