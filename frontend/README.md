@@ -8,20 +8,21 @@ Antarmuka web interaktif untuk sistem analitika dan valuasi kartu Pokémon berba
 
 Frontend Regokemon terdiri dari beberapa halaman dan komponen inti:
 
-1. **Catalog (`CatalogPage.jsx`)**
+1. **Catalog (`CatalogPage.jsx` & `HoloCard3D.jsx`)**
    * Penjelajahan 20.617 kartu Pokémon resmi.
    * Pencarian instan berdasarkan nama kartu, filter set (172 ekspansi), supertype (Pokémon, Trainer, Energy), dan tingkat kelangkaan (*rarity*).
-   * Modal pratinjau kartu 3D (`HoloCard3D.jsx`) untuk melihat detail atribut dan riwayat harga.
+   * Modal dual-card interaktif dengan **Kartu 3D Holografik** (`HoloCard3D.jsx`, *spring lerp*, putar 360°, *focus mode*, desain tampak belakang `63:88` kustom di `public/pokemon-card-back.png`), detail atribut, usia kartu dinamis, serta grafik riwayat dan proyeksi harga.
 
 2. **Live Scanner HUD & Upload (`UploadPage.jsx`)**
-   * **Mode Live Camera:** Pemindaian langsung via webcam atau kamera smartphone (DroidCam) dengan panduan rasio kartu 63:88, kompresi bingkai `448 x 625 px` (JPEG 0.85), sensor ketajaman fokus, ring buffer konsensus 3 frame, serta telemetri FPS dan latensi.
-   * **Mode Upload Foto:** Unggah foto dua sisi (tampak depan dan belakang) dengan kompresi otomatis HTML5 Canvas (maksimal `2048 px`, JPEG 0.94) untuk menjaga detail cacat mikro tanpa membebani payload HTTP sebelum dikirim ke backend.
+   * **Mode Live Camera:** Pemindaian langsung via webcam atau kamera smartphone (DroidCam) dengan crop rasio kartu `63:88` (`448 x 625 px`, JPEG `0.85`, interval polling `400 ms`, ambang kunci `>= 48%`, ring buffer konsensus 3 frame), indikator ketajaman sensor, serta telemetri FPS dan latensi.
+   * **Mode Upload Foto:** Unggah foto dua sisi (tampak depan dan belakang) dengan kompresi HTML5 Canvas **maksimal `2048 px` (JPEG `0.94`)** agar detail cacat fisik mikro tetap tajam sekaligus memangkas ukuran payload HTTP sebelum dikirim ke backend.
 
 3. **Dashboard Analitik & Hasil Pemindaian (`ScannerDashboard.jsx` & `DashboardPage.jsx`)**
-   * **Identifikasi Kartu:** Menampilkan kartu teridentifikasi hasil pencocokan Model 1 (CLIP ViT-B/32 + FAISS + ORB).
-   * **Inspeksi Kondisi Fisik:** Visualisasi cacat fisik (goresan permukaan, kikisan tepi dan sudut) hasil deteksi Model 2 (`YOLO26s` 800px) beserta persentase potongan harga.
-   * **Grafik Tren & Peramalan 7 Hari:** Kurva harga historis bersambung dengan proyeksi probabilistik Model 3 (Amazon Chronos-Bolt) yang dilengkapi pita kuantil P10, P50, dan P90.
+   * **Identifikasi Kartu:** Menampilkan kartu teridentifikasi hasil pencocokan Model 1 (`CLIP ViT-B/32 + FAISS + ORB`).
+   * **Inspeksi Kondisi Fisik:** Visualisasi *bounding box* cacat fisik (goresan permukaan, kikisan tepi dan sudut) hasil deteksi Model 2 (`YOLO26s 800px`) langsung di atas citra kartu hasil *perspective alignment* (`front_warped_image` / `back_warped_image`), lengkap dengan tab depan/belakang dan persentase potongan harga.
+   * **Grafik Tren & Peramalan 7 Hari:** Kurva harga historis bersambung dengan proyeksi probabilistik Model 3 (`Amazon Chronos-Bolt Mini`) yang dilengkapi pita kuantil `P10`, `P50`, dan `P90` serta rasio jarak visual seimbang.
    * **Sinyal Transaksi:** Rekomendasi preskriptif **BUY**, **HOLD**, atau **SELL** berdasarkan posisi harga listing terhadap lorong harga wajar.
+   * **Market Dashboard (`DashboardPage.jsx`):** Agregasi dinamis dari endpoint `GET /dashboard` (top weekly gainers, likuiditas pasar, distribusi kelangkaan, character leaderboard, chase packs, dan era release value index dengan tooltip interaktif).
 
 ---
 
@@ -66,27 +67,28 @@ Hasil kompilasi produksi akan tersimpan di direktori `frontend/dist/` dan siap d
 
 ```text
 frontend/
-├── public/                 # Aset statis (logo, ikon, gambar latar)
+├── public/                     # Aset statis (logo, ikon, pokemon-card-back.png, gambar latar)
 ├── src/
-│   ├── assets/             # Aset gambar komponen React
+│   ├── assets/                 # Aset gambar komponen React
 │   ├── components/
 │   │   ├── Navbar.jsx          # Navigasi utama aplikasi
 │   │   ├── HeroSection.jsx     # Banner beranda dan aksi mulai scan
-│   │   ├── CatalogPage.jsx     # Katalog interaktif 20.617 kartu
-│   │   ├── HoloCard3D.jsx      # Kartu interaktif 3D holografik pada modal detail
-│   │   ├── UploadPage.jsx      # Upload foto statis & Live Camera HUD
-│   │   ├── ScannerDashboard.jsx# Hasil identifikasi, cacat, & grafik Chronos
-│   │   ├── DashboardPage.jsx   # Agregasi analitika pasar & tren global
+│   │   ├── CatalogPage.jsx     # Katalog interaktif 20.617 kartu + modal analitik
+│   │   ├── HoloCard3D.jsx      # Kartu 3D holografik interaktif (spring lerp, flip 360°, focus mode)
+│   │   ├── UploadPage.jsx      # Upload foto statis (2048px) & Live Camera HUD (448 x 625 px)
+│   │   ├── ScannerDashboard.jsx# Hasil identifikasi, bbox warped image, & grafik Chronos
+│   │   ├── DashboardPage.jsx   # Agregasi analitika pasar & tren global dinamis
 │   │   └── Marketplace.jsx     # Simulasi jual beli kartu lokal
 │   ├── config/
 │   │   └── api.js              # Resolusi BASE_URL backend
-│   ├── App.jsx                 # Pengatur navigasi halaman
+│   ├── App.jsx                 # Pengatur navigasi halaman berbasis hash
 │   ├── main.jsx                # Entrypoint ReactDOM
 │   └── index.css               # Styling dasar global
-├── .env.example
-├── Dockerfile
-├── nginx.conf
+├── .env.example                # Template VITE_API_BASE_URL
+├── Dockerfile                  # Multi-stage build Node 22 Alpine -> Nginx Alpine
+├── nginx.conf                  # Konfigurasi Nginx gzip & SPA fallback
+├── .dockerignore               # Pengecualian node_modules & dist saat build container
 ├── package.json
-├── vercel.json
+├── vercel.json                 # Konfigurasi rewrite SPA Vercel
 └── vite.config.js
 ```

@@ -105,15 +105,12 @@ Salah satu tantangan terbesar data pasar kartu adalah **ketidakteraturan transak
 Model Transformer deret waktu mengasumsikan frekuensi pengambilan sampel yang konsisten. Oleh karena itu, modul [`backend/models/chronos_forecaster.py`](../backend/models/chronos_forecaster.py) menerapkan pipeline standarisasi kalender harian:
 
 ```python
-# 1. Parsing tanggal dan agregasi rata-rata harian jika ada transaksi ganda
-df = pd.DataFrame({"date": pd.to_datetime(dates), "price": prices})
-df = df.sort_values("date").drop_duplicates(subset=["date"], keep="last").set_index("date")
+# 1. Parsing tanggal, deduplikasi kronologis, dan resample kalender harian ('D')
+df = pd.DataFrame({"date": pd.to_datetime(history_dates), "price": history_prices})
+df = df.drop_duplicates(subset=["date"]).sort_values("date").set_index("date")
 
-# 2. Resample ke frekuensi kalender harian tetap ('D')
-df_daily = df.resample("D").mean()
-
-# 3. Forward-Fill (ffill): Membawa harga terakhir yang diketahui ke hari kosong
-df_daily["price"] = df_daily["price"].ffill().bfill()
+# 2. Resample ke frekuensi harian ('D') + Forward-Fill (ffill) tanpa interpolasi buatan
+df_resampled = df.resample("D").ffill().dropna()
 ```
 
 * **Mengapa Forward-Fill?**  
@@ -208,7 +205,7 @@ AI Confidence (%) = clamp(100.0 - (Spread Ratio * 25.0), min=55.0, max=98.5)
 ### Q2: *"Apakah Chronos-Bolt Mini tidak terlalu lambat saat dipanggil bersamaan dengan CLIP dan YOLO?"*
 > **Penjelasan Teknis:**  
 > Varian *Chronos-Bolt Mini* secara khusus dioptimasi untuk kecepatan inferensi sub-detik (hanya 9 juta parameter). Pada pengujian benchmark server lokal dengan akselerasi CUDA, kalkulasi peramalan 7 hari beserta pita kuantil P10-P50-P90 diselesaikan dalam waktu kurang dari **30 milidetik per kartu**.  
-> Selain itu, model dimuat menggunakan pola **Thread-Safe Lazy Singleton**: bobot hanya dimuat ke memori satu kali pada panggilan pertama, kemudian melayani seluruh request berikutnya secara instan dari memori RAM.
+> Selain itu, model dimuat menggunakan pola **Thread-Safe Lazy Singleton** dengan *guard flag* `_chronos_load_failed`: bobot hanya dimuat ke memori satu kali saat startup/panggilan pertama (dan mencegah pengulangan spam log jika bobot tidak tersedia secara offline), kemudian melayani seluruh request berikutnya secara instan dari memori RAM.
 
 ---
 

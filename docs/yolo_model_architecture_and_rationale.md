@@ -100,10 +100,10 @@ Untuk menjamin akurasi tanpa membebani disk I/O, seluruh operasi pra-pemrosesan 
 3. Koordinat 4 sudut kartu diurutkan secara deterministik (*top-left, top-right, bottom-right, bottom-left*) melalui fungsi `_order_points`.
 4. Dilakukan transformasi perspektif (*perspective warp*) ke ukuran standar kartu 600×837 piksel (rasio 63:88) ditambah **margin luar 120 piksel** dengan warna `(20, 20, 22)`. Margin ini krusial agar model dapat melihat kontras tepi luar kartu secara utuh.
 
-### B. Rounded-Card Silhouette Masking (Radius 3.2 mm)
-Jika foto diambil di atas latar putih, sistem menerapkan mask siluet khusus berbentuk persegi panjang dengan sudut membulat:
+### B. Rounded-Card Silhouette Masking (Radius 3.2 mm, `shrink=-6`)
+Jika foto diambil di atas latar putih, sistem menerapkan mask siluet khusus berbentuk persegi panjang dengan sudut membulat serta kelonggaran `shrink=-6` agar tepi luar kartu tetap terinspeksi:
 $$\text{Radius Lengkung} = \text{round}\left(w_{card} \times \frac{3.2\text{ mm}}{63.0\text{ mm}}\right) \approx 30.5\text{ piksel}$$
-Mask ini memotong bersih area luar kartu, melenyapkan 100% segitiga latar belakang putih pada sudut kartu sehingga menghilangkan *false positive* pada kelas *Corner Wear*.
+Mask ini memotong bersih area luar kartu, melenyapkan segitiga latar belakang putih pada sudut kartu sehingga menghilangkan *false positive* pada kelas *Corner Wear* tanpa memangkas aus tepi.
 
 ### C. Veiling Glare Normalization
 Pada latar terang, nilai intensitas kanal L (*Lightness*) dianalisis menggunakan persentil:
@@ -142,8 +142,9 @@ Kondisi fisik kartu Pokémon tidak dapat dinilai secara akurat hanya dari tampak
 
 * Sistem menerima payload dua sisi melalui endpoint `POST /analyze` atau `POST /cards/{card_id}/condition`.
 * Seluruh cacat depan dan belakang diagregasikan ke dalam objek `ConditionReport`:
-  - `front_defects`: Rincian cacat tampak depan beserta koordinat kotak.
-  - `back_defects`: Rincian cacat tampak belakang.
+  - `front_defects`: Rincian cacat tampak depan beserta koordinat kotak (`x_pct`, `y_pct`, `width_pct`, `height_pct`).
+  - `back_defects`: Rincian cacat tampak belakang beserta koordinat kotak.
+  - `front_warped_image` & `back_warped_image`: Citra hasil *perspective alignment* (Data URL Base64) agar overlay *bounding box* di frontend sejajar presisi dengan koordinat inferensi model.
   - `defect_count`: Jumlah total cacat terverifikasi.
   - `has_defects`: Status boolean deteksi.
 
@@ -151,21 +152,26 @@ Kondisi fisik kartu Pokémon tidak dapat dinilai secara akurat hanya dari tampak
 
 ## 💰 7. Formula Depresiasi Nilai Wajar (F_condition)
 
-Cacat fisik yang terdeteksi dikonversikan menjadi pengali depresiasi nilai pasar wajar ($F_{condition}$) secara proporsional di dalam fungsi `calculate_condition_factor` pada [`backend/app/analytics_engine.py`](../backend/app/analytics_engine.py):
+Cacat fisik yang terdeteksi dikonversikan menjadi pengali depresiasi nilai pasar wajar proporsional ($F_{condition}$) di dalam fungsi `calculate_condition_factor` pada [`backend/app/analytics_engine.py`](../backend/app/analytics_engine.py):
 
-| Jenis Cacat / Kategori Kondisi | Aturan Pengali / Penalti | Batas Maksimum Penalti per Jenis |
-| :--- | :--- | :---: |
-| **Tanpa Cacat (`Near Mint / Mint`)** | `F_condition = 1.00` (diskon 0%) | 0% |
-| **`Scratch` (Goresan Permukaan)** | Diskon **5%** per titik deteksi | **20%** |
-| **`Corner Wear` (Keausan Sudut)** | Diskon **6%** per sudut aus | **24%** |
-| **`Edge Wear` (Kikisan Tepi)** | Diskon **8%** per sisi aus | **25%** |
-| **`Bent / Crease` (Lipatan / Tekukan)** | Diskon struktural **25%** per titik | **40%** |
-| **Akumulasi Total (`Damaged` floor)** | Total diskon dibatasi maksimal 60% (`F_condition >= 0.40`) | **60%** |
+| Jenis Cacat Fisik | Potongan per Titik | Batas Maksimal Penalti | Keterangan Penilaian |
+| :--- | :---: | :---: | :--- |
+| **Tanpa Cacat (`Near Mint / Mint`)** | **0%** | 0% | Multiplier **1.00** (*Near Mint / Mint*) |
+| **`Scratch`** | **5%** | 20% | Goresan permukaan foil |
+| **`Corner Wear`** | **6%** | 24% | Kikisan putih pada sudut kartu |
+| **`Edge Wear`** | **8%** | 25% | Aus gesekan pada tepi kartu |
+| **`Bent / Crease`** | **25%** | 40% | Kerusakan struktur lipatan / tekukan berat |
 
-### Formula Proporsional & Klasifikasi Tier:
-$$F_{condition} = \max\left(0.40,\ \text{round}\left(1.00 - \min\left(0.60,\ \sum \text{Penalty}_{jenis}\right),\ 2\right)\right)$$
-* Klasifikasi tingkat kondisi: *Near Mint / Mint* ($\ge 0.95$), *Lightly Played (LP)* ($\ge 0.80$), *Moderately Played (MP)* ($\ge 0.65$), *Heavily Played (HP)* ($\ge 0.50$), dan *Damaged* ($< 0.50$).
-* Diskon pasar terhitung: $\text{Discount}\% = (1.0 - F_{condition}) \times 100\%$
+### Formula Akumulasi & Klasifikasi Tier:
+$$\text{Total Discount} = \min\left(0.60,\ \text{Penalti}_{crease} + \text{Penalti}_{edge} + \text{Penalti}_{corner} + \text{Penalti}_{scratch} + \text{Penalti}_{other}\right)$$
+$$F_{condition} = \text{round}\left(\max(0.40,\ 1.00 - \text{Total Discount}),\ 2\right)$$
+* **Tier Kondisi Otomatis:**
+  * $F_{condition} \ge 0.95$: **Near Mint / Mint**
+  * $F_{condition} \ge 0.80$: **Lightly Played (LP)**
+  * $F_{condition} \ge 0.65$: **Moderately Played (MP)**
+  * $F_{condition} \ge 0.50$: **Heavily Played (HP)**
+  * $F_{condition} < 0.50$: **Damaged** *(floor multiplier 0.40, diskon maks. 60%)*
+* Diskon pasar terhitung: $\text{Discount}\% = \text{round}((1.0 - F_{condition}) \times 100,\ 2)\%$
 * Skor Kondisi Fisik (*Condition Score*): $\text{Score}\% = F_{condition} \times 100\%$
 
 ---
@@ -196,11 +202,11 @@ Berikut perbandingan performa pengujian empiris pada *test split* 71 citra (443 
 
 ### Q2: *"Bagaimana sistem menjaga kestabilan memori saat memproses gambar resolusi tinggi?"*
 > **Penjelasan Teknis:**  
-> Sistem menerapkan pembatasan resolusi adaptif `resize_image_if_oversized` dengan batas dimensi maksimum `2048 px` di sisi server, serta kompresi awal di browser via HTML5 Canvas (`2048 px`, JPEG kualitas `0.94` pada unggah foto statis dan `448 x 625 px`, JPEG kualitas `0.85` pada *live scanner*). Seluruh proses *warping* dan *masking* dieksekusi di memori RAM tanpa penulisan file temporer ke disk, mencegah *disk thrashing* dan fragmentasi memori.
+> Sistem menerapkan pembatasan resolusi adaptif `resize_image_if_oversized` dengan batas dimensi maksimum `2048 px` di sisi server, serta kompresi awal di browser via HTML5 Canvas (`2048 px`, JPEG kualitas `0.94` pada unggah foto inspeksi dan `448 x 625 px`, JPEG kualitas `0.85` pada *live scanner*). Kompromi resolusi ini menjaga detail goresan dan aus tepi mikro tetap tajam saat di-downscale oleh YOLO `800 px` sekaligus menekan ukuran payload dibanding foto mentah `10-15 MB`. Seluruh proses *warping* dan *masking* dieksekusi di memori RAM tanpa penulisan file temporer ke disk, mencegah *disk thrashing* dan fragmentasi memori.
 
 ---
 
-### Q3: *"Bagaimana mekanisme fallback jika bobot model lokal tidak ditemukan?"*
+### Q3: *"Bagaimana mekanisme fallback jika bobot model lokal tidak ditemukan atau CUDA bermasalah?"*
 > **Penjelasan Teknis:**  
-> Modul `backend/models/card_condition.py` mengimplementasikan fungsi `resolve_defect_model_path`. Jika file bobot Model V6 tidak ditemukan di disk, sistem secara otomatis mencoba memuat Model V5. Jika kedua bobot lokal tidak tersedia, sistem beralih secara transparan ke *Roboflow Cloud Inference API* jika variabel `ROBOFLOW_API_KEY` terkonfigurasi di `.env`, atau melewati penilaian cacat tanpa menyebabkan server berhenti beroperasi (*graceful degradation*).
+> Modul `backend/models/card_condition.py` mengimplementasikan fungsi `resolve_defect_model_path`. Jika file bobot Model V6 tidak ditemukan di disk, sistem secara otomatis mencoba memuat Model V5. Jika kedua bobot lokal tidak tersedia, sistem beralih ke *Roboflow Cloud Inference API* apabila variabel `ROBOFLOW_API_KEY` terkonfigurasi di `.env`, atau melewati penilaian cacat tanpa menyebabkan server berhenti beroperasi (*graceful degradation*). Selain itu, saat inferensi lokal di GPU gagal karena `torchvision::nms` belum dikompilasi untuk backend CUDA di perangkat target, `cv_service.py` dan `card_condition.py` otomatis melakukan *fallback* ke `device="cpu"`.
 
