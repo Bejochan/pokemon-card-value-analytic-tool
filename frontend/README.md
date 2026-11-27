@@ -11,15 +11,15 @@ Frontend Regokemon terdiri dari beberapa halaman dan komponen inti:
 1. **Catalog (`CatalogPage.jsx`)**
    * Penjelajahan 20.617 kartu Pokémon resmi.
    * Pencarian instan berdasarkan nama kartu, filter set (172 ekspansi), supertype (Pokémon, Trainer, Energy), dan tingkat kelangkaan (*rarity*).
-   * Modal pratinjau kartu untuk melihat detail atribut dan riwayat harga.
+   * Modal pratinjau kartu 3D (`HoloCard3D.jsx`) untuk melihat detail atribut dan riwayat harga.
 
 2. **Live Scanner HUD & Upload (`UploadPage.jsx`)**
-   * **Mode Live Camera:** Pemindaian langsung via webcam atau kamera smartphone (DroidCam) dengan panduan rasio kartu 63:88, indikator ketajaman sensor, serta telemetri FPS dan latensi.
-   * **Mode Upload Foto:** Unggah foto dua sisi (tampak depan dan belakang) dengan kompresi otomatis HTML5 Canvas (maksimal 1280px) untuk memangkas ukuran payload HTTP sebelum dikirim ke backend.
+   * **Mode Live Camera:** Pemindaian langsung via webcam atau kamera smartphone (DroidCam) dengan panduan rasio kartu 63:88, kompresi bingkai `448 x 625 px` (JPEG 0.85), sensor ketajaman fokus, ring buffer konsensus 3 frame, serta telemetri FPS dan latensi.
+   * **Mode Upload Foto:** Unggah foto dua sisi (tampak depan dan belakang) dengan kompresi otomatis HTML5 Canvas (maksimal `2048 px`, JPEG 0.94) untuk menjaga detail cacat mikro tanpa membebani payload HTTP sebelum dikirim ke backend.
 
 3. **Dashboard Analitik & Hasil Pemindaian (`ScannerDashboard.jsx` & `DashboardPage.jsx`)**
    * **Identifikasi Kartu:** Menampilkan kartu teridentifikasi hasil pencocokan Model 1 (CLIP ViT-B/32 + FAISS + ORB).
-   * **Inspeksi Kondisi Fisik:** Visualisasi cacat fisik (goresan permukaan, kikisan tepi dan sudut) hasil deteksi Model 2 (YOLOv8) beserta persentase potongan harga.
+   * **Inspeksi Kondisi Fisik:** Visualisasi cacat fisik (goresan permukaan, kikisan tepi dan sudut) hasil deteksi Model 2 (`YOLO26s` 800px) beserta persentase potongan harga.
    * **Grafik Tren & Peramalan 7 Hari:** Kurva harga historis bersambung dengan proyeksi probabilistik Model 3 (Amazon Chronos-Bolt) yang dilengkapi pita kuantil P10, P50, dan P90.
    * **Sinyal Transaksi:** Rekomendasi preskriptif **BUY**, **HOLD**, atau **SELL** berdasarkan posisi harga listing terhadap lorong harga wajar.
 
@@ -73,15 +73,20 @@ frontend/
 │   │   ├── Navbar.jsx          # Navigasi utama aplikasi
 │   │   ├── HeroSection.jsx     # Banner beranda dan aksi mulai scan
 │   │   ├── CatalogPage.jsx     # Katalog interaktif 20.617 kartu
+│   │   ├── HoloCard3D.jsx      # Kartu interaktif 3D holografik pada modal detail
 │   │   ├── UploadPage.jsx      # Upload foto statis & Live Camera HUD
 │   │   ├── ScannerDashboard.jsx# Hasil identifikasi, cacat, & grafik Chronos
 │   │   ├── DashboardPage.jsx   # Agregasi analitika pasar & tren global
 │   │   └── Marketplace.jsx     # Simulasi jual beli kartu lokal
 │   ├── config/
 │   │   └── api.js              # Resolusi BASE_URL backend
-│   ├── App.jsx             # Pengatur navigasi halaman
-│   ├── main.jsx            # Entrypoint ReactDOM
-│   └── index.css           # Styling dasar global
+│   ├── App.jsx                 # Pengatur navigasi halaman
+│   ├── main.jsx                # Entrypoint ReactDOM
+│   └── index.css               # Styling dasar global
+├── .env.example
+├── Dockerfile
+├── nginx.conf
 ├── package.json
+├── vercel.json
 └── vite.config.js
 ```
